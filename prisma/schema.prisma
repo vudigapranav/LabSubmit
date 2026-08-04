@@ -1,0 +1,191 @@
+// Postgres, not SQLite: the app now runs on two hosts (Vercel serves the UI and API
+// routes, Railway runs the execution engine) and both need to reach the same database
+// over the network. A SQLite file lives on one machine's disk and cannot be shared.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String          @id @default(uuid())
+  email        String?         @unique
+  rollNumber   String?         @unique
+  password     String
+  name         String
+  role         String          // ADMIN, LECTURER, STUDENT
+  theme        String          @default("light") // light, dark
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  // Profile relations
+  lecturerProfile LecturerProfile?
+  studentProfile  StudentProfile?
+
+  // Lecturer relations
+  createdLabs          Lab[]             @relation("LecturerLabs")
+  assignedSubjects     Subject[]         @relation("LecturerSubjects")
+  evaluatedSubmissions Submission[]      @relation("EvaluatedSubmissions")
+
+  // Student relations
+  workspaces   LabWorkspace[] @relation("StudentWorkspaces")
+  submissions  Submission[]   @relation("StudentSubmissions")
+  violations   ExamViolation[]
+}
+
+model LecturerProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  maxStudents Int      @default(60)
+  department  String   @default("Computer Science & Engineering")
+  phone       String   @default("")
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Branch {
+  id          String   @id @default(uuid())
+  name        String   // e.g. CSE-1, CSE-2, CSE-3, IT-1, IT-2, ECE-A, ECE-B
+  year        Int      // 1, 2, 3, 4
+  rollStart   String?  // e.g. 160125733001
+  rollEnd     String?  // e.g. 160125733060
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  students    StudentProfile[]
+  subjects    Subject[]
+  labs        Lab[]
+}
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String   // e.g. Java Programming Lab, Operating Systems Lab, DBMS Lab
+  code        String   // e.g. CS201L
+  semester    Int?     // e.g. 3, 4
+  year        Int      // 1, 2, 3, 4
+  branchId    String
+  lecturerId  String?  // Assigned Lecturer
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  lecturer    User?    @relation("LecturerSubjects", fields: [lecturerId], references: [id], onDelete: SetNull)
+  labs        Lab[]
+}
+
+model StudentProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  rollNumber  String   @unique // 1601XXXXXXXX
+  year        Int      // 1, 2, 3, 4
+  branchId    String?
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch      Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+}
+
+model Lab {
+  id               String        @id @default(uuid())
+  title            String
+  description      String
+  problemStatement String
+  year             Int           // 1, 2, 3, 4
+  branchId         String?
+  subjectId        String?
+  lecturerId       String
+  dueDate          DateTime?
+  allowCopy        Boolean       @default(false)
+  allowPaste       Boolean       @default(false)
+  allowCut         Boolean       @default(false)
+  allowRightClick  Boolean       @default(false)
+  allowDragDrop    Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+
+  // Exam scheduling
+  examDate                DateTime?
+  startTime               DateTime?
+  endTime                 DateTime?
+  durationMinutes         Int?
+  allowedLanguages        String    @default("c,cpp,java,python") // CSV: c, cpp, java, python
+  examModeEnabled         Boolean   @default(true)
+  isPublished              Boolean   @default(false)
+  fullscreenExitThreshold Int       @default(3)
+
+  lecturer         User          @relation("LecturerLabs", fields: [lecturerId], references: [id], onDelete: Cascade)
+  branch           Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  subject          Subject?      @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  workspaces       LabWorkspace[]
+  submissions      Submission[]
+  violations       ExamViolation[]
+}
+
+model LabWorkspace {
+  id          String    @id @default(uuid())
+  labId       String
+  studentId   String
+  isSubmitted Boolean   @default(false)
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Exam mode tracking
+  startedAt           DateTime? // set when the student clicks "Start Exam" — begins their personal countdown
+  fullscreenExitCount Int       @default(0)
+  autoSubmitted       Boolean   @default(false)
+
+  lab         Lab       @relation(fields: [labId], references: [id], onDelete: Cascade)
+  student     User      @relation("StudentWorkspaces", fields: [studentId], references: [id], onDelete: Cascade)
+  files       LabFile[]
+  submissions Submission[]
+}
+
+model LabFile {
+  id          String       @id @default(uuid())
+  workspaceId String
+  filename    String       // e.g. main.c, solution.cpp, App.java, script.js
+  content     String
+  language    String       // c, cpp, java, javascript
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  workspace   LabWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Submission {
+  id          String    @id @default(uuid())
+  labId       String
+  studentId   String
+  workspaceId String
+  status      String    @default("PENDING") // PENDING, APPROVED, REJECTED, NEEDS_CORRECTION
+  marks       Float?
+  maxMarks    Float     @default(100.0)
+  remarks     String?
+  isPublished Boolean   @default(false)
+  submittedAt DateTime  @default(now())
+  evaluatedAt DateTime?
+  evaluatorId String?
+
+  lab         Lab          @relation(fields: [labId], references: [id], onDelete: Cascade)
+  student     User         @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)
+  workspace   LabWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  evaluator   User?        @relation("EvaluatedSubmissions", fields: [evaluatorId], references: [id], onDelete: SetNull)
+}
+
+model ExamViolation {
+  id        String   @id @default(uuid())
+  labId     String
+  studentId String
+  type      String   // FULLSCREEN_EXIT, TAB_SWITCH, WINDOW_BLUR, VISIBILITY_HIDDEN, DEVTOOLS_ATTEMPT, CLIPBOARD_BLOCKED
+  details   String?
+  createdAt DateTime @default(now())
+
+  lab     Lab  @relation(fields: [labId], references: [id], onDelete: Cascade)
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([labId, studentId])
+  @@index([labId])
+}

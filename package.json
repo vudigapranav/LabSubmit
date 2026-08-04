@@ -1,0 +1,46 @@
+{
+  "name": "labsubmit",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node server.js",
+    "build": "prisma generate && next build",
+    "start": "NODE_ENV=production node server.js",
+    "lint": "next lint",
+    "db:push": "prisma db push",
+    "db:seed": "npx tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.6.0",
+    "@prisma/client": "^5.19.1",
+    "@types/ws": "^8.18.1",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.439.0",
+    "next": "14.2.10",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.5.2",
+    "ws": "^8.21.1",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0"
+  },
+  "//optionalDependencies": "node-pty compiles a native addon and only runs on the Railway execution host. Marking it optional means the Vercel build (which serves only the UI and API routes) does not fail if the addon cannot be compiled there. `npm ci` still installs it inside the Dockerfile.",
+  "optionalDependencies": {
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.16.5",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.45",
+    "prisma": "^5.19.1",
+    "tailwindcss": "^3.4.10",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
+  }
+}

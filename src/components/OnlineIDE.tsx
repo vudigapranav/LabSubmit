@@ -54,7 +54,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   allowRightClick = false,
   allowDragDrop = false,
 }) => {
-  const { theme } = useApp();
+  const { token, theme } = useApp();
   const [files, setFiles] = useState<LabFile[]>(initialFiles);
   const [activeFileId, setActiveFileId] = useState<string>('');
   
@@ -84,7 +84,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   const fetchWorkspace = async () => {
     try {
       const res = await fetch(`/api/student/workspace?labId=${labId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('cbit_token')}` },
+        headers: { Authorization: `Bearer ${token || localStorage.getItem('cbit_token')}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -116,7 +116,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('cbit_token')}`,
+          Authorization: `Bearer ${token || localStorage.getItem('cbit_token')}`,
         },
         body: JSON.stringify({
           action: 'save_file',
@@ -138,7 +138,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('cbit_token')}`,
+          Authorization: `Bearer ${token || localStorage.getItem('cbit_token')}`,
         },
         body: JSON.stringify({
           action: 'create_file',
@@ -168,7 +168,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('cbit_token')}`,
+          Authorization: `Bearer ${token || localStorage.getItem('cbit_token')}`,
         },
         body: JSON.stringify({
           action: 'rename_file',
@@ -202,7 +202,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('cbit_token')}`,
+          Authorization: `Bearer ${token || localStorage.getItem('cbit_token')}`,
         },
         body: JSON.stringify({
           action: 'delete_file',
@@ -236,7 +236,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         code: activeFile.content,
         files: files.map((f) => ({ filename: f.filename, content: f.content })),
         labId,
-        token: localStorage.getItem('cbit_token') || '',
+        token: token || localStorage.getItem('cbit_token') || '',
       });
     }
   };

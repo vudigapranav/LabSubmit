@@ -203,7 +203,26 @@ export class ExecutionController {
     }
 
     const payload = verifyToken(token);
-    if (!payload || payload.role !== 'STUDENT') {
+    if (!payload) {
+      return { code: 'UNAUTHORIZED', message: 'Invalid or expired session. Please log in again.' };
+    }
+
+    const lab = await prisma.lab.findUnique({ where: { id: labId } });
+    if (!lab) {
+      return { code: 'NOT_FOUND', message: 'Exam not found.' };
+    }
+
+    // Faculty (LECTURER/ADMIN) run code to review/test a student's submission via the
+    // Submission Inspector — a pre-existing UI path, not tied to any student's own exam
+    // attempt. No workspace/exam-window/deadline applies; only lab ownership matters.
+    if (payload.role === 'LECTURER' || payload.role === 'ADMIN') {
+      if (payload.role === 'LECTURER' && lab.lecturerId !== payload.userId) {
+        return { code: 'FORBIDDEN', message: 'You do not have access to this exam.' };
+      }
+      return null;
+    }
+
+    if (payload.role !== 'STUDENT') {
       return { code: 'UNAUTHORIZED', message: 'Invalid or expired session. Please log in again.' };
     }
 
@@ -212,11 +231,6 @@ export class ExecutionController {
     });
     if (!workspace) {
       return { code: 'NOT_FOUND', message: 'Exam workspace not found.' };
-    }
-
-    const lab = await prisma.lab.findUnique({ where: { id: labId } });
-    if (!lab) {
-      return { code: 'NOT_FOUND', message: 'Exam not found.' };
     }
 
     if (workspace.isSubmitted) {

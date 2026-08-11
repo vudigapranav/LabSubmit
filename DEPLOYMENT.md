@@ -9,9 +9,9 @@ Railway runs behind it and is never typed into a browser by a student or lecture
 
 LabSubmit is one Next.js codebase, but it does two very different jobs, and only one of them can run on Vercel.
 
-| Job | Needs | Runs on |
-|---|---|---|
-| UI + REST API routes (login, labs, submissions, grading, admin) | Database access only | **Vercel** |
+| Job                                                                         | Needs                                                                                  | Runs on     |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------- |
+| UI + REST API routes (login, labs, submissions, grading, admin)             | Database access only                                                                   | **Vercel**  |
 | Execution engine (compile & run student C/C++/Java code in a live terminal) | Persistent WebSocket, `node-pty` native addon, `gcc`/`g++`/`javac`, writable temp disk | **Railway** |
 
 Vercel runs Next.js as short-lived serverless functions. They cannot hold a WebSocket open, cannot load `node-pty`, and have no compilers installed. That is not a config problem — it is what serverless is. So the execution engine keeps living in the Docker container it already has, and Railway hosts it.
@@ -80,7 +80,7 @@ Check `git status` before committing — `.env` and `prisma/dev.db` must **not**
 1. Go to **railway.app** → sign in with GitHub → **New Project**.
 2. **+ New** → **Database** → **Add PostgreSQL**. Wait for it to provision.
 3. Click the Postgres service → **Variables** tab → find **`DATABASE_URL`**. It looks like `postgresql://postgres:xxxx@xxxx.railway.internal:5432/railway`.
-4. You also need the *public* form of that URL for Vercel, because Vercel is outside Railway's private network. In the same Variables tab find **`DATABASE_PUBLIC_URL`** (its host ends in `.proxy.rlwy.net`). Copy that separately.
+4. You also need the _public_ form of that URL for Vercel, because Vercel is outside Railway's private network. In the same Variables tab find **`DATABASE_PUBLIC_URL`** (its host ends in `.proxy.rlwy.net`). Copy that separately.
 
 > Two URLs, two consumers: Railway's own service uses the internal `DATABASE_URL`; Vercel uses `DATABASE_PUBLIC_URL`. Mixing them up is the most common failure here — Vercel cannot resolve `.railway.internal` hostnames.
 
@@ -91,12 +91,12 @@ Check `git status` before committing — `.env` and `prisma/dev.db` must **not**
 1. In the same project: **+ New** → **GitHub Repo** → select `vudigapranav/LabSubmit`. Railway detects the `Dockerfile` automatically.
 2. Open the new service → **Variables** → add:
 
-   | Variable | Value |
-   |---|---|
+   | Variable       | Value                                                                            |
+   | -------------- | -------------------------------------------------------------------------------- |
    | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — type it exactly like that; Railway substitutes it |
-   | `JWT_SECRET` | the value from your local `.env` — **the same string you will put in Vercel** |
-   | `NODE_ENV` | `production` |
-   | `PORT` | `3000` |
+   | `JWT_SECRET`   | the value from your local `.env` — **the same string you will put in Vercel**    |
+   | `NODE_ENV`     | `production`                                                                     |
+   | `PORT`         | `3000`                                                                           |
 
 3. **Settings** → **Networking** → **Generate Domain**. You get something like `labsubmit-production.up.railway.app`. Copy it.
 4. Wait for the build to go green. The first build takes ~5 minutes — it compiles `node-pty` and installs JDK 17.
@@ -119,12 +119,12 @@ You do **not** need a Railway volume any more — Postgres holds all the data, a
 2. Framework preset: **Next.js**. Leave build and output settings at their defaults — `npm run build` already runs `prisma generate` first, which Vercel requires.
 3. Before clicking Deploy, expand **Environment Variables** and add all four:
 
-   | Variable | Value |
-   |---|---|
-   | `DATABASE_URL` | the **`DATABASE_PUBLIC_URL`** from step 4 (the `.proxy.rlwy.net` one) |
-   | `JWT_SECRET` | **byte-for-byte identical** to the Railway value |
+   | Variable             | Value                                                                                                                          |
+   | -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+   | `DATABASE_URL`       | the **`DATABASE_PUBLIC_URL`** from step 4 (the `.proxy.rlwy.net` one)                                                          |
+   | `JWT_SECRET`         | **byte-for-byte identical** to the Railway value                                                                               |
    | `NEXT_PUBLIC_WS_URL` | `wss://labsubmit-production.up.railway.app/api/ws` — your Railway domain, `wss://` not `https://`, and keep the `/api/ws` path |
-   | `NODE_ENV` | `production` |
+   | `NODE_ENV`           | `production`                                                                                                                   |
 
 4. **Deploy.** You get `https://labsubmit.vercel.app` (or `labsubmit-<hash>.vercel.app`).
 

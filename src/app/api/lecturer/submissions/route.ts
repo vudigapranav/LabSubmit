@@ -85,6 +85,9 @@ export async function GET(req: Request) {
       submittedAt: sub.submittedAt,
       evaluatedAt: sub.evaluatedAt,
       autoSubmitted: sub.workspace.autoSubmitted,
+      startedAt: sub.workspace.startedAt,
+      fullscreenExitCount: sub.workspace.fullscreenExitCount,
+      fullscreenExitThreshold: sub.lab.fullscreenExitThreshold,
       violationCount: violationCountMap.get(`${sub.labId}:${sub.studentId}`) || 0,
       files: sub.workspace.files.map((f: any) => ({
         id: f.id,

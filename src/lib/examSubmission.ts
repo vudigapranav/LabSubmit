@@ -1,4 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+import { severityForType } from './examIntegrity';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -8,12 +9,16 @@ type Db = PrismaClient | Prisma.TransactionClient;
  * (workspace route, ExecutionController), and the violation-threshold auto-submit
  * path — so they can never diverge (e.g. one path creating a duplicate Submission).
  * Idempotent: calling it on an already-submitted workspace is a safe no-op.
+ *
+ * `reason: 'TIMEOUT'` additionally logs an EXAM_TIMEOUT integrity event here (not at
+ * each call site) so every deadline-triggered auto-submit — regardless of which of the
+ * two lazy-check call sites caught it — reliably gets the same audit trail entry.
  */
 export async function finalizeSubmission(
   db: Db,
-  params: { workspaceId: string; labId: string; studentId: string; auto: boolean }
+  params: { workspaceId: string; labId: string; studentId: string; auto: boolean; reason?: 'TIMEOUT' | 'FULLSCREEN_THRESHOLD' }
 ) {
-  const { workspaceId, labId, studentId, auto } = params;
+  const { workspaceId, labId, studentId, auto, reason } = params;
 
   const workspace = await db.labWorkspace.findUnique({ where: { id: workspaceId } });
   if (!workspace) {
@@ -26,6 +31,12 @@ export async function finalizeSubmission(
   }
 
   const now = new Date();
+
+  if (auto && reason === 'TIMEOUT') {
+    await db.examViolation.create({
+      data: { labId, studentId, type: 'EXAM_TIMEOUT', severity: severityForType('EXAM_TIMEOUT'), details: 'Auto-submitted: exam deadline reached' },
+    });
+  }
 
   await db.labWorkspace.update({
     where: { id: workspaceId },

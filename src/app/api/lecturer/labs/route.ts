@@ -137,7 +137,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const { errorResponse } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -170,12 +170,17 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Exam ID is required' }, { status: 400 });
     }
 
+    const existing = await prisma.lab.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
+    }
+    if (session!.role === 'LECTURER' && existing.lecturerId !== session!.userId) {
+      return NextResponse.json({ error: 'You do not have access to this exam.' }, { status: 403 });
+    }
+
     const effectiveExamModeEnabled = examModeEnabled !== undefined ? Boolean(examModeEnabled) : undefined;
-    if (effectiveExamModeEnabled && endTime === undefined) {
-      const existing = await prisma.lab.findUnique({ where: { id } });
-      if (!existing?.endTime) {
-        return NextResponse.json({ error: 'An end time is required for exam-mode exams' }, { status: 400 });
-      }
+    if (effectiveExamModeEnabled && endTime === undefined && !existing.endTime) {
+      return NextResponse.json({ error: 'An end time is required for exam-mode exams' }, { status: 400 });
     }
 
     const lab = await prisma.lab.update({
@@ -214,7 +219,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const { errorResponse } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -223,6 +228,14 @@ export async function DELETE(req: Request) {
 
     if (!id) {
       return NextResponse.json({ error: 'Exam ID is required' }, { status: 400 });
+    }
+
+    const existing = await prisma.lab.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
+    }
+    if (session!.role === 'LECTURER' && existing.lecturerId !== session!.userId) {
+      return NextResponse.json({ error: 'You do not have access to this exam.' }, { status: 403 });
     }
 
     await prisma.lab.delete({

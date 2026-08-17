@@ -7,6 +7,8 @@ import { Navbar } from '@/components/Navbar';
 import { OnlineIDE } from '@/components/OnlineIDE';
 import { ExamGuard } from '@/components/ExamGuard';
 import { ProfileModal } from '@/components/ProfileModal';
+import { useViolationLogger } from '@/lib/useViolationLogger';
+import { getOrCreateExamSessionId } from '@/lib/examSession';
 import { ArrowLeft, BookOpen, AlertCircle, ShieldAlert, Maximize, Clock, CheckCircle2, Hourglass } from 'lucide-react';
 import Link from 'next/link';
 
@@ -23,6 +25,7 @@ export default function StudentLabWorkspacePage() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const logClipboardViolation = useViolationLogger(labId, token || '');
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'STUDENT')) {
@@ -72,7 +75,7 @@ export default function StudentLabWorkspacePage() {
       const res = await fetch('/api/student/workspace', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: 'start_exam', labId }),
+        body: JSON.stringify({ action: 'start_exam', labId, sessionId: getOrCreateExamSessionId(labId) }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -242,6 +245,7 @@ export default function StudentLabWorkspacePage() {
           <ExamGuard
             labId={labData.id}
             token={token || ''}
+            sessionId={getOrCreateExamSessionId(labData.id)}
             examModeEnabled={labData.examModeEnabled}
             fullscreenExitThreshold={labData.fullscreenExitThreshold}
             initialFullscreenExitCount={workspace.fullscreenExitCount || 0}
@@ -262,6 +266,7 @@ export default function StudentLabWorkspacePage() {
               allowCut={labData.allowCut}
               allowRightClick={labData.allowRightClick}
               allowDragDrop={labData.allowDragDrop}
+              onViolation={logClipboardViolation}
             />
           </ExamGuard>
         </div>

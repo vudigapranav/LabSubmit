@@ -136,6 +136,8 @@ model LabWorkspace {
   startedAt           DateTime? // set when the student clicks "Start Exam" — begins their personal countdown
   fullscreenExitCount Int       @default(0)
   autoSubmitted       Boolean   @default(false)
+  sessionId           String?   // active browser-session claim, for duplicate-session detection
+  lastActivityAt      DateTime? // updated by the heartbeat endpoint while the exam is open
 
   lab         Lab       @relation(fields: [labId], references: [id], onDelete: Cascade)
   student     User      @relation("StudentWorkspaces", fields: [studentId], references: [id], onDelete: Cascade)
@@ -179,7 +181,10 @@ model ExamViolation {
   id        String   @id @default(uuid())
   labId     String
   studentId String
-  type      String   // FULLSCREEN_EXIT, TAB_SWITCH, WINDOW_BLUR, VISIBILITY_HIDDEN, DEVTOOLS_ATTEMPT, CLIPBOARD_BLOCKED
+  type      String   // FULLSCREEN_EXIT, FULLSCREEN_ENTER, WINDOW_BLUR, VISIBILITY_HIDDEN, DEVTOOLS_ATTEMPT,
+                     // COPY_ATTEMPT, CUT_ATTEMPT, PASTE_ATTEMPT, CONTEXT_MENU_ATTEMPT, SELECT_ALL_ATTEMPT,
+                     // DUPLICATE_SESSION, EXAM_TIMEOUT — see src/lib/examIntegrity.ts for the severity mapping
+  severity  String   @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL — server-computed, never client-supplied
   details   String?
   createdAt DateTime @default(now())
 

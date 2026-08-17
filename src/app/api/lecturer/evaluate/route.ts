@@ -21,11 +21,14 @@ export async function POST(req: Request) {
 
     const submission = await prisma.submission.findUnique({
       where: { id: submissionId },
-      include: { workspace: true },
+      include: { workspace: true, lab: true },
     });
 
     if (!submission) {
       return NextResponse.json({ error: 'Submission not found' }, { status: 404 });
+    }
+    if (session!.role === 'LECTURER' && submission.lab.lecturerId !== session!.userId) {
+      return NextResponse.json({ error: 'You do not have access to this submission.' }, { status: 403 });
     }
 
     // Update submission evaluation

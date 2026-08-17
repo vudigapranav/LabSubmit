@@ -38,6 +38,7 @@ interface OnlineIDEProps {
   allowCut?: boolean;
   allowRightClick?: boolean;
   allowDragDrop?: boolean;
+  onViolation?: (type: string, details?: string) => void;
 }
 
 export const OnlineIDE: React.FC<OnlineIDEProps> = ({
@@ -53,6 +54,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   allowCut = false,
   allowRightClick = false,
   allowDragDrop = false,
+  onViolation,
 }) => {
   const { token, theme } = useApp();
   const [files, setFiles] = useState<LabFile[]>(initialFiles);
@@ -302,6 +304,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
       allowCut={allowCut}
       allowRightClick={allowRightClick}
       allowDragDrop={allowDragDrop}
+      onViolation={onViolation}
     >
       <div className="flex flex-col h-[calc(100vh-5rem)] w-full bg-slate-950 text-slate-100 rounded-2xl overflow-hidden shadow-md border border-slate-800">
         {notification && (

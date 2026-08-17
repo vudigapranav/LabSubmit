@@ -6,6 +6,7 @@ import { useApp } from '@/context/AppContext';
 import { Navbar } from '@/components/Navbar';
 import { ProfileModal } from '@/components/ProfileModal';
 import { OnlineIDE } from '@/components/OnlineIDE';
+import { deriveIntegrityStatus, type IntegrityStatus, type Severity } from '@/lib/examIntegrity';
 import {
   GraduationCap,
   Plus,
@@ -345,6 +346,47 @@ export default function LecturerDashboard() {
   const submissionViolations = selectedSubmission
     ? violations.filter((v) => v.labId === selectedSubmission.labId && v.studentId === selectedSubmission.studentId)
     : [];
+
+  const integrityStatus: IntegrityStatus | null = selectedSubmission
+    ? deriveIntegrityStatus(
+        submissionViolations,
+        selectedSubmission.fullscreenExitCount || 0,
+        selectedSubmission.fullscreenExitThreshold || 3
+      )
+    : null;
+
+  // Chronological timeline: real violation events plus synthetic (display-only, not
+  // persisted) "Exam Started"/"Exam Submitted" bookends from the workspace record.
+  const timelineEvents = selectedSubmission
+    ? [
+        ...(selectedSubmission.startedAt
+          ? [{ id: 'start', label: 'Exam Started', severity: 'INFO' as const, timestamp: selectedSubmission.startedAt }]
+          : []),
+        ...submissionViolations.map((v) => ({ id: v.id, label: v.type, severity: v.severity as Severity, timestamp: v.createdAt })),
+        ...(selectedSubmission.submittedAt
+          ? [{
+              id: 'submit',
+              label: selectedSubmission.autoSubmitted ? 'Exam Auto-Submitted' : 'Exam Submitted',
+              severity: 'INFO' as const,
+              timestamp: selectedSubmission.submittedAt,
+            }]
+          : []),
+      ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    : [];
+
+  const INTEGRITY_STATUS_STYLES: Record<IntegrityStatus, string> = {
+    NORMAL: 'bg-emerald-950/40 text-emerald-300 border-emerald-800/50',
+    WARNING: 'bg-amber-950/40 text-amber-300 border-amber-800/50',
+    FLAGGED: 'bg-rose-950/40 text-rose-300 border-rose-800/50',
+  };
+
+  const SEVERITY_DOT_STYLES: Record<string, string> = {
+    INFO: 'bg-slate-500',
+    LOW: 'bg-slate-400',
+    MEDIUM: 'bg-amber-400',
+    HIGH: 'bg-rose-500',
+    CRITICAL: 'bg-red-600',
+  };
 
   return (
     <div className="min-h-screen bg-surface-lightBg dark:bg-surface-darkBg flex flex-col transition-colors">
@@ -804,20 +846,30 @@ export default function LecturerDashboard() {
               </div>
 
               <div className="w-full md:w-80 flex flex-col space-y-4 overflow-y-auto">
-                {submissionViolations.length > 0 && (
-                  <div className="bg-rose-950/30 border border-rose-800/50 rounded-2xl p-4 space-y-2">
-                    <h4 className="font-bold text-xs text-rose-300 flex items-center space-x-1.5">
-                      <ShieldAlert className="w-3.5 h-3.5" />
-                      <span>{submissionViolations.length} Violation(s) Logged</span>
-                    </h4>
-                    <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {submissionViolations.map((v) => (
-                        <div key={v.id} className="text-[10px] text-rose-200/80 font-mono flex justify-between">
-                          <span>{v.type}</span>
-                          <span>{new Date(v.createdAt).toLocaleTimeString()}</span>
-                        </div>
-                      ))}
+                {integrityStatus && (
+                  <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-xs text-white flex items-center space-x-1.5">
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        <span>Integrity Timeline</span>
+                      </h4>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${INTEGRITY_STATUS_STYLES[integrityStatus]}`}>
+                        {integrityStatus}
+                      </span>
                     </div>
+                    {timelineEvents.length === 0 ? (
+                      <p className="text-[11px] text-slate-500">No events recorded.</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                        {timelineEvents.map((ev) => (
+                          <div key={ev.id} className="flex items-center space-x-2 text-[10px] font-mono">
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${SEVERITY_DOT_STYLES[ev.severity] || SEVERITY_DOT_STYLES.LOW}`} />
+                            <span className="text-slate-300 flex-1">{ev.label}</span>
+                            <span className="text-slate-500">{new Date(ev.timestamp).toLocaleTimeString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 

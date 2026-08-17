@@ -49,6 +49,7 @@ export async function GET(req: Request) {
       studentName: v.student.name,
       rollNumber: v.student.rollNumber || v.student.studentProfile?.rollNumber || 'N/A',
       type: v.type,
+      severity: v.severity,
       details: v.details,
       createdAt: v.createdAt,
       violationCount: totalCounts.get(`${v.labId}:${v.studentId}`) || 1,

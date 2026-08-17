@@ -2,18 +2,21 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ShieldAlert, Maximize, Clock, AlertTriangle } from 'lucide-react';
+import { useViolationLogger } from '@/lib/useViolationLogger';
 
 type ViolationType =
   | 'FULLSCREEN_EXIT'
-  | 'TAB_SWITCH'
+  | 'FULLSCREEN_ENTER'
   | 'WINDOW_BLUR'
   | 'VISIBILITY_HIDDEN'
-  | 'DEVTOOLS_ATTEMPT'
-  | 'CLIPBOARD_BLOCKED';
+  | 'DEVTOOLS_ATTEMPT';
+
+const HEARTBEAT_INTERVAL_MS = 45_000;
 
 interface ExamGuardProps {
   labId: string;
   token: string;
+  sessionId: string;
   examModeEnabled: boolean;
   fullscreenExitThreshold: number;
   initialFullscreenExitCount: number;
@@ -22,8 +25,6 @@ interface ExamGuardProps {
   onAutoSubmit: () => void; // parent performs the actual submit_lab call + UI lock
   children: React.ReactNode;
 }
-
-const DEBOUNCE_MS = 500;
 
 function formatRemaining(ms: number): string {
   if (ms <= 0) return '00:00:00';
@@ -37,6 +38,7 @@ function formatRemaining(ms: number): string {
 export const ExamGuard: React.FC<ExamGuardProps> = ({
   labId,
   token,
+  sessionId,
   examModeEnabled,
   fullscreenExitThreshold,
   initialFullscreenExitCount,
@@ -53,7 +55,7 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
   const [toast, setToast] = useState<string | null>(null);
 
   const autoSubmitFiredRef = useRef(false);
-  const lastEventRef = useRef<Record<string, number>>({});
+  const postViolation = useViolationLogger(labId, token);
 
   const triggerAutoSubmit = useCallback(() => {
     if (autoSubmitFiredRef.current) return;
@@ -63,32 +65,17 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
 
   const logViolation = useCallback(
     async (type: ViolationType, details?: string) => {
-      const now = Date.now();
-      const last = lastEventRef.current[type] || 0;
-      if (now - last < DEBOUNCE_MS) return null;
-      lastEventRef.current[type] = now;
-
-      try {
-        const res = await fetch('/api/student/violations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ labId, type, details }),
-        });
-        if (!res.ok) return null;
-        const data = await res.json();
-        if (typeof data.fullscreenExitCount === 'number') {
-          setExitCount(data.fullscreenExitCount);
-        }
-        if (data.autoSubmit) {
-          triggerAutoSubmit();
-        }
-        return data;
-      } catch (e) {
-        console.error('Failed to log violation:', e);
-        return null;
+      const data = await postViolation(type, details);
+      if (!data) return null;
+      if (typeof data.fullscreenExitCount === 'number') {
+        setExitCount(data.fullscreenExitCount);
       }
+      if (data.autoSubmit) {
+        triggerAutoSubmit();
+      }
+      return data;
     },
-    [labId, token, triggerAutoSubmit]
+    [postViolation, triggerAutoSubmit]
   );
 
   // Fullscreen enforcement
@@ -111,6 +98,8 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
         } else {
           setToast('You exited fullscreen.');
         }
+      } else {
+        logViolation('FULLSCREEN_ENTER', 'Student (re-)entered fullscreen');
       }
     };
 
@@ -194,6 +183,34 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
     const t = setTimeout(() => setToast(null), 5000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // Session-health heartbeat — updates lastActivityAt and surfaces a second concurrent
+  // session (same attempt opened in another tab/browser) without evicting either one.
+  useEffect(() => {
+    if (isSubmitted || !sessionId) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        const res = await fetch('/api/student/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ labId, sessionId }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.duplicateSession) {
+          setToast('This exam is open in another tab or browser. This has been recorded.');
+        }
+      } catch (e) {
+        // Heartbeat failures are non-fatal — the server-authoritative deadline check on
+        // every real action remains the actual enforcement, this is just a health signal.
+      }
+    };
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [labId, token, sessionId, isSubmitted]);
 
   const handleReenterFullscreen = () => {
     document.documentElement.requestFullscreen?.().catch(() => {

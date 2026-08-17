@@ -244,7 +244,7 @@ export class ExecutionController {
 
     const deadline = getEffectiveDeadline(lab, workspace);
     if (deadline && new Date() > deadline) {
-      await finalizeSubmission(prisma, { workspaceId: workspace.id, labId, studentId: payload.userId, auto: true });
+      await finalizeSubmission(prisma, { workspaceId: workspace.id, labId, studentId: payload.userId, auto: true, reason: 'TIMEOUT' });
       return { code: 'TIME_EXPIRED', message: 'Exam time has expired. Your work has been auto-submitted.' };
     }
 

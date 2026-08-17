@@ -11,6 +11,10 @@ interface AntiCheatWrapperProps {
   allowCut?: boolean;
   allowRightClick?: boolean;
   allowDragDrop?: boolean;
+  // Reports a blocked action as an integrity event (e.g. to ExamGuard's violation logger).
+  // Optional — the faculty read-only Submission Inspector uses this wrapper too and has
+  // no reason to log a lecturer's own clipboard use against a student.
+  onViolation?: (type: string, details?: string) => void;
 }
 
 export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
@@ -21,6 +25,7 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
   allowCut = false,
   allowRightClick = false,
   allowDragDrop = false,
+  onViolation,
 }) => {
   const [warningMsg, setWarningMsg] = useState<string | null>(null);
 
@@ -42,6 +47,7 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
       if (!allowRightClick) {
         e.preventDefault();
         showWarning('Right Click Context Menu');
+        onViolation?.('CONTEXT_MENU_ATTEMPT');
       }
     };
 
@@ -53,6 +59,7 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
       if (!allowCopy) {
         e.preventDefault();
         showWarning('Copying Text');
+        onViolation?.('COPY_ATTEMPT');
       }
     };
 
@@ -64,6 +71,7 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
       if (!allowCut) {
         e.preventDefault();
         showWarning('Cutting Text');
+        onViolation?.('CUT_ATTEMPT');
       }
     };
 
@@ -75,6 +83,7 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
       if (!allowPaste) {
         e.preventDefault();
         showWarning('Pasting Code');
+        onViolation?.('PASTE_ATTEMPT');
       }
     };
 
@@ -112,18 +121,21 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
           e.preventDefault();
           e.stopPropagation();
           showWarning('Shortcut Ctrl+C');
+          onViolation?.('COPY_ATTEMPT', 'Ctrl/Cmd+C');
           return false;
         }
         if (key === 'v' && !allowPaste) {
           e.preventDefault();
           e.stopPropagation();
           showWarning('Shortcut Ctrl+V');
+          onViolation?.('PASTE_ATTEMPT', 'Ctrl/Cmd+V');
           return false;
         }
         if (key === 'x' && !allowCut) {
           e.preventDefault();
           e.stopPropagation();
           showWarning('Shortcut Ctrl+X');
+          onViolation?.('CUT_ATTEMPT', 'Ctrl/Cmd+X');
           return false;
         }
         if (key === 'a' && !allowCopy) {
@@ -134,6 +146,7 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
             e.preventDefault();
             e.stopPropagation();
             showWarning('Shortcut Ctrl+A (Select All)');
+            onViolation?.('SELECT_ALL_ATTEMPT', 'Ctrl/Cmd+A');
             return false;
           }
         }
@@ -143,6 +156,7 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
         e.preventDefault();
         e.stopPropagation();
         showWarning('Shortcut Shift+Insert');
+        onViolation?.('PASTE_ATTEMPT', 'Shift+Insert');
         return false;
       }
     };
@@ -155,6 +169,7 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
       if (e.button === 1 && !allowPaste) {
         e.preventDefault();
         showWarning('Middle Mouse Paste');
+        onViolation?.('PASTE_ATTEMPT', 'Middle mouse button');
       }
     };
 
@@ -191,7 +206,7 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
       window.removeEventListener('auxclick', handleAuxClick);
       window.removeEventListener('selectstart', handleSelectStart);
     };
-  }, [active, allowCopy, allowPaste, allowCut, allowRightClick, allowDragDrop]);
+  }, [active, allowCopy, allowPaste, allowCut, allowRightClick, allowDragDrop, onViolation]);
 
   return (
     <div className="relative w-full h-full select-none">

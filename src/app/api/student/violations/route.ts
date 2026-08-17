@@ -2,14 +2,22 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { finalizeSubmission } from '@/lib/examSubmission';
+import { severityForType } from '@/lib/examIntegrity';
 
+// Client-triggered types posted through this route. EXAM_TIMEOUT and DUPLICATE_SESSION are
+// inserted directly by the workspace route's lazy deadline check and the heartbeat route
+// respectively — never posted here, so they can't be spoofed by a client claiming a timeout.
 const VALID_TYPES = [
   'FULLSCREEN_EXIT',
-  'TAB_SWITCH',
+  'FULLSCREEN_ENTER',
   'WINDOW_BLUR',
   'VISIBILITY_HIDDEN',
   'DEVTOOLS_ATTEMPT',
-  'CLIPBOARD_BLOCKED',
+  'COPY_ATTEMPT',
+  'CUT_ATTEMPT',
+  'PASTE_ATTEMPT',
+  'CONTEXT_MENU_ATTEMPT',
+  'SELECT_ALL_ATTEMPT',
 ];
 
 const DEDUPE_WINDOW_MS = 2000;
@@ -65,7 +73,7 @@ export async function POST(req: Request) {
       }
 
       await tx.examViolation.create({
-        data: { labId, studentId: session!.userId, type, details: details || null },
+        data: { labId, studentId: session!.userId, type, severity: severityForType(type), details: details || null },
       });
 
       let fullscreenExitCount = workspace.fullscreenExitCount;
@@ -84,6 +92,7 @@ export async function POST(req: Request) {
           labId,
           studentId: session!.userId,
           auto: true,
+          reason: 'FULLSCREEN_THRESHOLD',
         });
         autoSubmit = true;
       }

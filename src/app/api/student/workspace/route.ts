@@ -102,7 +102,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, labId, fileId, filename, content, newFilename } = body;
+    const { action, labId, fileId, filename, content, newFilename, sessionId } = body;
 
     if (!labId || !action) {
       return NextResponse.json({ error: 'Exam ID and action are required' }, { status: 400 });
@@ -135,7 +135,14 @@ export async function POST(req: Request) {
       }
       const updated = await prisma.labWorkspace.update({
         where: { id: workspace.id },
-        data: { startedAt: workspace.startedAt ?? new Date() },
+        data: {
+          startedAt: workspace.startedAt ?? new Date(),
+          // Claim the session slot on first start; a resumed session (workspace.sessionId
+          // already set) keeps whichever session claimed it first — heartbeat detects any
+          // second concurrent session from there rather than this action silently stealing it.
+          ...(workspace.sessionId || !sessionId ? {} : { sessionId }),
+          lastActivityAt: new Date(),
+        },
         include: { files: { orderBy: { createdAt: 'asc' } } },
       });
       return NextResponse.json({
@@ -162,6 +169,7 @@ export async function POST(req: Request) {
         labId,
         studentId: session!.userId,
         auto: true,
+        reason: 'TIMEOUT',
       });
       return NextResponse.json({ error: 'Exam time has expired. Your work has been auto-submitted.' }, { status: 403 });
     }

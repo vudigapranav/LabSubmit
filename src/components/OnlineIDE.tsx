@@ -25,6 +25,17 @@ interface LabFile {
   language: string;
 }
 
+// Extension is always derived from an explicit language choice in the New Source File
+// modal — never free-typed — so a file's extension can never disagree with its language
+// (which was the cause of a real bug: a student typed "main.cpp" by habit but wrote Java
+// code in it, and the compiler correctly-but-confusingly compiled it as C++).
+const NEW_FILE_LANGUAGE_OPTIONS: { value: string; label: string; ext: string; defaultBaseName: string }[] = [
+  { value: 'c', label: 'C', ext: 'c', defaultBaseName: 'main' },
+  { value: 'cpp', label: 'C++', ext: 'cpp', defaultBaseName: 'main' },
+  { value: 'java', label: 'Java', ext: 'java', defaultBaseName: 'Main' },
+  { value: 'python', label: 'Python', ext: 'py', defaultBaseName: 'main' },
+];
+
 interface OnlineIDEProps {
   labId: string;
   labTitle: string;
@@ -39,6 +50,7 @@ interface OnlineIDEProps {
   allowRightClick?: boolean;
   allowDragDrop?: boolean;
   onViolation?: (type: string, details?: string) => void;
+  allowedLanguages?: string[];
 }
 
 export const OnlineIDE: React.FC<OnlineIDEProps> = ({
@@ -55,8 +67,12 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   allowRightClick = false,
   allowDragDrop = false,
   onViolation,
+  allowedLanguages,
 }) => {
   const { token, theme } = useApp();
+  const newFileLanguageOptions = allowedLanguages && allowedLanguages.length > 0
+    ? NEW_FILE_LANGUAGE_OPTIONS.filter((o) => allowedLanguages.includes(o.value))
+    : NEW_FILE_LANGUAGE_OPTIONS;
   const [files, setFiles] = useState<LabFile[]>(initialFiles);
   const [activeFileId, setActiveFileId] = useState<string>('');
   
@@ -68,7 +84,8 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   const [showProblemModal, setShowProblemModal] = useState<boolean>(false);
 
   // File management modal inputs
-  const [newFilenameInput, setNewFilenameInput] = useState<string>('');
+  const [newFileLanguage, setNewFileLanguage] = useState<string>('');
+  const [newFileBaseName, setNewFileBaseName] = useState<string>('');
   const [showAddFileModal, setShowAddFileModal] = useState<boolean>(false);
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [renameInput, setRenameInput] = useState<string>('');
@@ -133,8 +150,14 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   };
 
   const handleCreateFile = async () => {
-    if (!newFilenameInput.trim()) return;
-    const filename = newFilenameInput.trim();
+    const baseName = newFileBaseName.trim();
+    if (!baseName) return;
+    if (baseName.includes('.') || baseName.includes('/') || baseName.includes('\\')) {
+      showToast('error', 'File name should not include a dot or path separator — just the name, e.g. "Main" or "input".');
+      return;
+    }
+    const langOption = newFileLanguageOptions.find((o) => o.value === newFileLanguage) || newFileLanguageOptions[0];
+    const filename = `${baseName}.${langOption.ext}`;
     try {
       const res = await fetch('/api/student/workspace', {
         method: 'POST',
@@ -153,7 +176,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         setFiles((prev) => [...prev, data.file]);
         setActiveFileId(data.file.id);
         setShowAddFileModal(false);
-        setNewFilenameInput('');
+        setNewFileBaseName('');
         showToast('success', `File "${filename}" created.`);
       } else {
         showToast('error', data.error || 'Failed to create file');
@@ -384,7 +407,12 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
               <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Files</span>
               {!readOnly && !workspaceSubmitted && (
                 <button
-                  onClick={() => setShowAddFileModal(true)}
+                  onClick={() => {
+                    const first = newFileLanguageOptions[0];
+                    setNewFileLanguage(first?.value || 'c');
+                    setNewFileBaseName('');
+                    setShowAddFileModal(true);
+                  }}
                   className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800"
                   title="New Source File"
                 >
@@ -550,17 +578,41 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
                 </button>
               </div>
 
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">
-                  Filename (.c, .cpp, .java, .js)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. main.c, App.java"
-                  value={newFilenameInput}
-                  onChange={(e) => setNewFilenameInput(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-white focus:outline-none"
-                />
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Language</label>
+                  <select
+                    value={newFileLanguage}
+                    onChange={(e) => setNewFileLanguage(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm text-white focus:outline-none"
+                  >
+                    {newFileLanguageOptions.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                    {newFileLanguageOptions.length === 0 && <option value="c">C</option>}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">
+                    Name{' '}
+                    {newFileLanguage === 'java' && (
+                      <span className="text-amber-400">— must match the public class name exactly</span>
+                    )}
+                  </label>
+                  <div className="flex items-center">
+                    <input
+                      type="text"
+                      placeholder={newFileLanguageOptions.find((o) => o.value === newFileLanguage)?.defaultBaseName || 'main'}
+                      value={newFileBaseName}
+                      onChange={(e) => setNewFileBaseName(e.target.value)}
+                      className="flex-1 bg-slate-950 border border-slate-800 rounded-l px-3 py-2 text-sm text-white focus:outline-none"
+                    />
+                    <span className="bg-slate-800 border border-l-0 border-slate-800 rounded-r px-3 py-2 text-sm text-slate-400 font-mono">
+                      .{newFileLanguageOptions.find((o) => o.value === newFileLanguage)?.ext || 'c'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 pt-2">

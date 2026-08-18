@@ -267,6 +267,7 @@ export default function StudentLabWorkspacePage() {
               allowRightClick={labData.allowRightClick}
               allowDragDrop={labData.allowDragDrop}
               onViolation={logClipboardViolation}
+              allowedLanguages={labData.allowedLanguages}
             />
           </ExamGuard>
         </div>

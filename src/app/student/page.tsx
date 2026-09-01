@@ -4,8 +4,24 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
-import { Navbar } from '@/components/Navbar';
 import { ProfileModal } from '@/components/ProfileModal';
+import { AppShell, STUDENT_NAV } from '@/components/AppShell';
+import {
+  Button,
+  Card,
+  EmptyState,
+  EXAM_STATUS_TONE,
+  LoadingState,
+  PageHeader,
+  StatCard,
+  StatusBadge,
+  TableWrap,
+  TBody,
+  Td,
+  Th,
+  THead,
+  Tr,
+} from '@/components/ui';
 import {
   GraduationCap,
   BookOpen,
@@ -25,12 +41,6 @@ const LANGUAGE_LABELS: Record<string, string> = {
   cpp: 'C++',
   java: 'Java',
   python: 'Python',
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  UPCOMING: 'bg-slate-800 text-slate-300 border border-slate-700',
-  RUNNING: 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/50',
-  COMPLETED: 'bg-slate-800 text-slate-400 border border-slate-700',
 };
 
 export default function StudentDashboard() {
@@ -108,248 +118,228 @@ export default function StudentDashboard() {
     activeTab === 'upcoming' ? upcomingExams : activeTab === 'running' ? runningExams : activeTab === 'completed' ? completedExams : [];
 
   if (loading || !user) {
-    return <div className="min-h-screen bg-surface-darkBg flex items-center justify-center text-white font-mono text-xs">Loading Student Portal...</div>;
+    return (
+      <div className="min-h-screen bg-surface-lightBg dark:bg-surface-darkBg flex items-center justify-center">
+        <LoadingState label="Loading your portal…" />
+      </div>
+    );
   }
+
+  const submittedCount = allExams.filter((e) => e.isSubmitted).length;
+  const publishedGrades = grades.filter((g) => g.marks !== null);
+  const averageScore =
+    publishedGrades.length > 0
+      ? Math.round(publishedGrades.reduce((sum, g) => sum + (g.marks / (g.maxMarks || 100)) * 100, 0) / publishedGrades.length)
+      : null;
 
   const renderExamCard = (lab: any) => {
     const languages = (lab.allowedLanguages || []).map((l: string) => LANGUAGE_LABELS[l] || l).join(', ');
-    const buttonLabel = lab.isSubmitted ? 'View Submission' : lab.hasStarted ? 'Resume Exam' : lab.status === 'RUNNING' ? 'Start Exam' : 'Locked';
+    const buttonLabel = lab.isSubmitted ? 'View submission' : lab.hasStarted ? 'Resume exam' : lab.status === 'RUNNING' ? 'Start exam' : 'Locked';
     const buttonDisabled = lab.status !== 'RUNNING' && !lab.isSubmitted;
 
     return (
-      <div
-        key={lab.id}
-        className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm flex flex-col justify-between space-y-3 transition-all hover:border-brand-olive-600/50 hover:shadow-md"
-      >
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-brand-blue-950/40 text-brand-blue-300 border border-brand-blue-800/50">
-              {lab.subjectCode}
-            </span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${STATUS_STYLES[lab.status] || STATUS_STYLES.UPCOMING}`}>
-              {lab.status}
-            </span>
+      <Card key={lab.id} interactive className="p-4 sm:p-5 flex flex-col justify-between gap-4">
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <StatusBadge tone="blue">{lab.subjectCode}</StatusBadge>
+            <StatusBadge tone={EXAM_STATUS_TONE[lab.status] || 'neutral'}>{lab.status}</StatusBadge>
           </div>
 
-          <h3 className="font-bold text-sm text-slate-900 dark:text-white">{lab.title}</h3>
+          <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-snug">{lab.title}</h3>
 
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono pt-1">
-            <div className="flex items-center space-x-1.5">
-              <UserIcon className="w-3 h-3 text-brand-blue-500 flex-shrink-0" />
-              <span className="truncate">{lab.facultyName}</span>
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <UserIcon className="w-3 h-3 text-brand-blue-500 flex-shrink-0" aria-hidden="true" />
+              <dt className="sr-only">Faculty</dt>
+              <dd className="truncate">{lab.facultyName}</dd>
             </div>
-            <div className="flex items-center space-x-1.5">
-              <Calendar className="w-3 h-3 text-brand-olive-500 flex-shrink-0" />
-              <span>{lab.examDate ? new Date(lab.examDate).toLocaleDateString() : lab.startTime ? new Date(lab.startTime).toLocaleDateString() : 'TBD'}</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Calendar className="w-3 h-3 text-brand-olive-600 flex-shrink-0" aria-hidden="true" />
+              <dt className="sr-only">Date</dt>
+              <dd className="truncate">
+                {lab.examDate ? new Date(lab.examDate).toLocaleDateString() : lab.startTime ? new Date(lab.startTime).toLocaleDateString() : 'To be announced'}
+              </dd>
             </div>
-            <div className="flex items-center space-x-1.5">
-              <Timer className="w-3 h-3 text-amber-500 flex-shrink-0" />
-              <span>{lab.durationMinutes ? `${lab.durationMinutes} min` : 'No limit'}</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Timer className="w-3 h-3 text-amber-500 flex-shrink-0" aria-hidden="true" />
+              <dt className="sr-only">Duration</dt>
+              <dd className="truncate">{lab.durationMinutes ? `${lab.durationMinutes} min` : 'No limit'}</dd>
             </div>
-            <div className="flex items-center space-x-1.5">
-              <Code2 className="w-3 h-3 text-purple-500 flex-shrink-0" />
-              <span className="truncate">{languages || 'Any'}</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Code2 className="w-3 h-3 text-brand-blue-500 flex-shrink-0" aria-hidden="true" />
+              <dt className="sr-only">Languages</dt>
+              <dd className="truncate">{languages || 'Any'}</dd>
             </div>
-          </div>
+          </dl>
         </div>
 
-        <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/40 flex items-center justify-between">
+        <div className="pt-3 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center justify-between gap-2">
           {lab.marks !== null ? (
-            <div className="text-xs font-mono font-bold text-emerald-400">
-              Grade: {lab.marks}/{lab.maxMarks}
-            </div>
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular">
+              {lab.marks}/{lab.maxMarks}
+            </span>
           ) : (
-            <div className="text-[11px] text-slate-400">
-              {lab.isSubmitted ? 'Submitted' : lab.hasStarted ? 'In Progress' : 'Not Started'}
-            </div>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              {lab.isSubmitted ? 'Submitted' : lab.hasStarted ? 'In progress' : 'Not started'}
+            </span>
           )}
 
           {buttonDisabled ? (
-            <span className="px-3.5 py-1.5 rounded-lg bg-slate-800 text-slate-500 text-xs font-semibold cursor-not-allowed">
+            <Button size="sm" variant="outline" disabled>
               {buttonLabel}
-            </span>
+            </Button>
           ) : (
             <Link
               href={`/student/lab/${lab.id}`}
-              className="px-3.5 py-1.5 rounded-lg bg-brand-olive-700 hover:bg-brand-olive-800 text-white text-xs font-semibold transition-all shadow-sm flex items-center space-x-1.5"
+              className="inline-flex items-center justify-center gap-1.5 font-semibold rounded-control transition-colors text-xs px-3 py-1.5 bg-brand-olive-700 hover:bg-brand-olive-600 text-white shadow-card"
             >
-              {lab.hasStarted && !lab.isSubmitted ? <PlayCircle className="w-3.5 h-3.5" /> : <Code2 className="w-3.5 h-3.5" />}
-              <span>{buttonLabel}</span>
+              {lab.hasStarted && !lab.isSubmitted ? <PlayCircle className="w-3.5 h-3.5" aria-hidden="true" /> : <Code2 className="w-3.5 h-3.5" aria-hidden="true" />}
+              {buttonLabel}
             </Link>
           )}
         </div>
-      </div>
+      </Card>
     );
   };
 
+  const TAB_COPY: Record<string, { title: string; description: string; emptyTitle: string; emptyBody: string }> = {
+    running: {
+      title: 'Active examinations',
+      description: 'Examinations open right now. Starting one begins your personal countdown.',
+      emptyTitle: 'No examinations are open',
+      emptyBody: 'When your faculty opens an examination it will appear here, ready to start.',
+    },
+    upcoming: {
+      title: 'Upcoming examinations',
+      description: 'Scheduled examinations that have not opened yet.',
+      emptyTitle: 'Nothing scheduled',
+      emptyBody: 'Upcoming examinations for your branch and year will be listed here.',
+    },
+    completed: {
+      title: 'Submissions',
+      description: 'Examinations whose window has closed, and the work you submitted.',
+      emptyTitle: 'No submissions yet',
+      emptyBody: 'Examinations you have completed will be collected here.',
+    },
+    results: {
+      title: 'Results',
+      description: 'Marks and remarks your faculty has published.',
+      emptyTitle: 'No published results yet',
+      emptyBody: 'Results appear once your faculty has evaluated and published them.',
+    },
+  };
+
+  const copy = TAB_COPY[activeTab];
+
   return (
-    <div className="min-h-screen bg-surface-lightBg dark:bg-surface-darkBg flex flex-col transition-colors">
-      <Navbar onOpenProfile={() => setProfileOpen(true)} />
+    <>
+      <AppShell
+        sections={STUDENT_NAV}
+        active={activeTab}
+        onNavigate={(id) => setActiveTab(id as typeof activeTab)}
+        onOpenProfile={() => setProfileOpen(true)}
+      >
+        <PageHeader
+          title={`Welcome, ${user.name.split(' ')[0]}`}
+          description="Your laboratory examinations, submissions and results."
+          meta={
+            <>
+              <span>Roll {user.rollNumber}</span>
+              <span>Year {studentInfo?.year || user.studentProfile?.year || 1}</span>
+              <span>{studentInfo?.branchName || 'Branch pending'}</span>
+            </>
+          }
+        />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-4 sm:space-y-6">
-        {/* Student Welcome Header */}
-        <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 sm:p-8 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="space-y-2 min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <GraduationCap className="w-5 h-5 text-slate-700 dark:text-slate-300 flex-shrink-0" />
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white truncate">Welcome, {user.name}</h1>
-            </div>
-            {/* Wrapping chips rather than one bullet-separated line, which broke mid-value
-                on a narrow screen. */}
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-              <span>Roll <span className="font-bold text-slate-900 dark:text-slate-100">{user.rollNumber}</span></span>
-              <span>Year <span className="font-bold text-slate-900 dark:text-slate-100">{studentInfo?.year || user.studentProfile?.year || 1}</span></span>
-              <span>Branch <span className="font-bold text-slate-900 dark:text-slate-100">{studentInfo?.branchName || 'Assigned Branch'}</span></span>
-            </div>
-          </div>
+        {/* Compact statistics: what a student most wants to know at a glance. */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <StatCard label="Active now" value={runningExams.length} tone={runningExams.length > 0 ? 'olive' : 'neutral'} icon={<PlayCircle className="w-4 h-4" />} hint={runningExams.length > 0 ? 'Open for you' : 'Nothing open'} />
+          <StatCard label="Upcoming" value={upcomingExams.length} icon={<Hourglass className="w-4 h-4" />} hint="Scheduled" />
+          <StatCard label="Submitted" value={submittedCount} tone="blue" icon={<CheckCircle className="w-4 h-4" />} hint="Across all subjects" />
+          <StatCard label="Average" value={averageScore !== null ? `${averageScore}%` : '—'} tone={averageScore !== null ? 'emerald' : 'neutral'} icon={<Award className="w-4 h-4" />} hint={publishedGrades.length > 0 ? `${publishedGrades.length} published` : 'Awaiting results'} />
         </div>
 
-        {/* Tab Selector */}
-        <div className="flex items-center space-x-2 border-b border-slate-200 dark:border-slate-800/80 pb-2 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('running')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 flex-shrink-0 ${
-              activeTab === 'running' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <PlayCircle className="w-3.5 h-3.5" />
-            <span><span className="sm:hidden">Running</span><span className="hidden sm:inline">Running Exams</span> ({runningExams.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('upcoming')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 flex-shrink-0 ${
-              activeTab === 'upcoming' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Hourglass className="w-3.5 h-3.5" />
-            <span><span className="sm:hidden">Upcoming</span><span className="hidden sm:inline">Upcoming Exams</span> ({upcomingExams.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('completed')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 flex-shrink-0 ${
-              activeTab === 'completed' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            <span><span className="sm:hidden">Completed</span><span className="hidden sm:inline">Completed Exams</span> ({completedExams.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('results')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 flex-shrink-0 ${
-              activeTab === 'results' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Award className="w-3.5 h-3.5" />
-            <span>Results</span>
-          </button>
-        </div>
-
-        {/* Tab Content: Exam lists */}
-        {activeTab !== 'results' && (
-          <div className="space-y-4">
-            {loadingData ? (
-              <div className="text-center py-12 text-slate-500 font-mono text-xs">Loading programming exams...</div>
-            ) : tabExams.length === 0 ? (
-              <div className="bg-white dark:bg-surface-darkCard p-8 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-2">
-                <BookOpen className="w-10 h-10 text-slate-400 mx-auto" />
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                  No {activeTab === 'running' ? 'Running' : activeTab === 'upcoming' ? 'Upcoming' : 'Completed'} Exams
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {activeTab === 'running'
-                    ? 'No programming exams are currently active for you.'
-                    : activeTab === 'upcoming'
-                    ? 'No exams are scheduled yet.'
-                    : 'No exams have concluded yet.'}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{tabExams.map(renderExamCard)}</div>
-            )}
+        {/* Section heading mirrors the sidebar selection, so the page always says where you are. */}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">{copy.title}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{copy.description}</p>
           </div>
-        )}
 
-        {/* Tab Content: Results */}
-        {activeTab === 'results' && (
-          <>
-          {/* Below md the results table becomes stacked cards. A five-column table on a
-              phone forces horizontal scrolling for the one screen students check most. */}
-          <div className="md:hidden space-y-3">
-            {grades.length === 0 ? (
-              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-8 text-center text-slate-400 text-xs shadow-sm">
-                No published results yet.
-              </div>
+          {loadingData ? (
+            <Card>
+              <LoadingState label="Loading your examinations…" />
+            </Card>
+          ) : activeTab === 'results' ? (
+            grades.length === 0 ? (
+              <Card>
+                <EmptyState icon={<Award className="w-5 h-5" />} title={copy.emptyTitle} description={copy.emptyBody} />
+              </Card>
             ) : (
-              grades.map((g) => (
-                <div key={g.id} className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-white min-w-0">{g.labTitle}</h3>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/40 text-emerald-300 border border-emerald-800/50 flex-shrink-0">
-                      {g.status}
-                    </span>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-lg font-bold text-emerald-500">
-                      {g.marks !== null ? `${g.marks}/${g.maxMarks}` : 'Ungraded'}
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-mono">
-                      {new Date(g.submittedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {g.remarks && (
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-2">
-                      {g.remarks}
-                    </p>
-                  )}
+              <>
+                {/* Cards below md, table above — a five-column table is unusable on a phone,
+                    and results are the screen students check most from one. */}
+                <div className="md:hidden space-y-3">
+                  {grades.map((g) => (
+                    <Card key={g.id} className="p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-bold text-sm text-slate-900 dark:text-white min-w-0">{g.labTitle}</h3>
+                        <StatusBadge tone={EXAM_STATUS_TONE[g.status] || 'neutral'}>{g.status}</StatusBadge>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular">
+                          {g.marks !== null ? `${g.marks}/${g.maxMarks}` : 'Ungraded'}
+                        </span>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">{new Date(g.submittedAt).toLocaleDateString()}</span>
+                      </div>
+                      {g.remarks && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-2">{g.remarks}</p>
+                      )}
+                    </Card>
+                  ))}
                 </div>
-              ))
-            )}
-          </div>
 
-          <div className="hidden md:block bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
-                  <tr>
-                    <th className="p-4">Programming Exam</th>
-                    <th className="p-4">Submitted At</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Score</th>
-                    <th className="p-4">Remarks</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {grades.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-400 font-sans">No published results yet.</td>
-                    </tr>
-                  ) : (
-                    grades.map((g) => (
-                      <tr key={g.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                        <td className="p-4 font-sans font-bold text-slate-900 dark:text-white">{g.labTitle}</td>
-                        <td className="p-4 text-slate-500">{new Date(g.submittedAt).toLocaleDateString()}</td>
-                        <td className="p-4">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/40 text-emerald-300 border border-emerald-800/50">
-                            {g.status}
-                          </span>
-                        </td>
-                        <td className="p-4 font-bold text-emerald-400">{g.marks !== null ? `${g.marks}/${g.maxMarks}` : 'Ungraded'}</td>
-                        <td className="p-4 font-sans text-slate-400">{g.remarks || 'No remarks'}</td>
+                <Card className="hidden md:block overflow-hidden">
+                  <TableWrap>
+                    <THead>
+                      <tr>
+                        <Th>Examination</Th>
+                        <Th>Submitted</Th>
+                        <Th>Status</Th>
+                        <Th className="text-right">Score</Th>
+                        <Th>Remarks</Th>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          </>
-        )}
-      </main>
+                    </THead>
+                    <TBody>
+                      {grades.map((g) => (
+                        <Tr key={g.id}>
+                          <Td className="font-semibold text-slate-900 dark:text-white">{g.labTitle}</Td>
+                          <Td className="text-slate-500 tabular">{new Date(g.submittedAt).toLocaleDateString()}</Td>
+                          <Td>
+                            <StatusBadge tone={EXAM_STATUS_TONE[g.status] || 'neutral'}>{g.status}</StatusBadge>
+                          </Td>
+                          <Td className="text-right font-bold text-emerald-600 dark:text-emerald-400 tabular">
+                            {g.marks !== null ? `${g.marks}/${g.maxMarks}` : '—'}
+                          </Td>
+                          <Td className="text-slate-500 max-w-xs truncate">{g.remarks || '—'}</Td>
+                        </Tr>
+                      ))}
+                    </TBody>
+                  </TableWrap>
+                </Card>
+              </>
+            )
+          ) : tabExams.length === 0 ? (
+            <Card>
+              <EmptyState icon={<BookOpen className="w-5 h-5" />} title={copy.emptyTitle} description={copy.emptyBody} />
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{tabExams.map(renderExamCard)}</div>
+          )}
+        </div>
+      </AppShell>
 
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
-    </div>
+    </>
   );
 }

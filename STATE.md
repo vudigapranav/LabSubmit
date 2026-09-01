@@ -3,9 +3,8 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after the responsive platform pass and hardening of the
-exam-device restriction (exam content now withheld from ineligible devices) on
-`claude/labsubmit-development-y605fv`.
+**Last updated:** 2026-09-01, after establishing the shared UI design system and
+application shell on `claude/labsubmit-development-y605fv`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
 exists in the repository. A database model with no code reading or writing it is *schema
@@ -285,6 +284,63 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
 | 7 | Digital record containing configurable sections | ✅ Complete |
 | 8 | Code execution with input/output capture | ⏳ Execution complete; capture wired into the answer sheet; server-side persistence outstanding |
 | 9 | Lecturer manual evaluation workflow | ⏳ Works at submission level; section-wise marking not started |
+
+---
+
+## 3b. UI/UX Refinement
+
+### Design-system status
+Established and in use. `src/components/ui/index.tsx` is the single source of visual truth;
+`tailwind.config.js` carries the tokens (`rounded-card`, `rounded-control`, `shadow-card`,
+`shadow-cardHover`, `shadow-overlay`, `w-sidebar`, animation keyframes) as an **extension**
+of the existing LabSubmit palette — olive and blue are unchanged, no new hues introduced.
+`globals.css` adds a global `:focus-visible` ring, a `prefers-reduced-motion` guard and a
+tabular-numerals helper.
+
+### Shared components created
+`Button` (5 variants × 3 sizes, loading state), `Card`, `SectionCard`, `PageHeader`,
+`StatCard`, `StatusBadge` (+ `EXAM_STATUS_TONE`, one canonical status→colour mapping),
+`Label`, `Input`, `Textarea`, `Select`, `Field`, `Tabs`, `TableWrap`/`THead`/`TBody`/`Tr`/
+`Th`/`Td`, `EmptyState`, `LoadingState`, `ErrorState`, `Alert`, `Modal`, `Toast`, plus the
+`cn` class helper. `AppShell` + role navigation (`STUDENT_NAV`, `LECTURER_NAV`, `ADMIN_NAV`)
+provides the persistent sidebar, mobile drawer and top bar.
+
+### Routes redesigned
+| Route | State |
+|---|---|
+| `/student` | **Fully redesigned** — shell, page header, four stat cards, exam cards rebuilt on the primitives, per-section copy, empty/loading states, results as cards below `md` |
+| `/lecturer` | **Shell applied** — sidebar navigation driving the existing tabs, `PageHeader`, shared `Toast`; inner tab panels still use their original markup |
+| `/admin` | **Shell applied** — sidebar navigation, `PageHeader` retaining its action buttons, shared `Toast`, shared `LoadingState`; inner tab panels still original |
+| `/login`, `/register` | Card surfaces moved onto the design tokens |
+| `/student/lab/[id]` | Deliberately **not** shell-wrapped — an active examination stays distraction-free. Gate and instructions polished in the previous change |
+
+### Remaining routes / work
+- `/lecturer` and `/admin` inner panels (tables, forms, modals) still use per-page markup
+  rather than the shared primitives. They are visually consistent enough to ship but are
+  the next candidates for conversion.
+- `QuestionSetManager`, `AnswerSheetConfigurator`, `AnswerSheet` and the Submission
+  Inspector predate the library and carry their own styling.
+- `/` (landing page) untouched by this pass.
+- Faculty tables are not yet converted to mobile card layouts (they scroll instead).
+
+### Responsive status
+Sidebar collapses to a drawer below `lg`; the drawer opens, traps a backdrop, closes on
+Escape and dismisses on selection. Verified at 1440px (student, lecturer, admin) and 390px
+(student): no horizontal page scroll, navigation reachable, sections render.
+
+### Known UI issues / limitations
+- Verified at two viewport widths, not a device matrix.
+- Two navigation surfaces coexist below `lg` on lecturer/admin: the drawer and the original
+  tab strip (the strip is now `lg:hidden`). Intentional for now, but slightly redundant.
+- The shell renders navigation from a static per-role list; it does not reflect permissions
+  beyond role.
+
+### Next UI/UX tasks
+1. Convert lecturer/admin inner panels to the shared primitives.
+2. Bring `QuestionSetManager`, `AnswerSheetConfigurator` and the Submission Inspector onto
+   the library.
+3. Faculty tables → responsive card lists on small screens.
+4. Redesign the landing page to match.
 
 ---
 

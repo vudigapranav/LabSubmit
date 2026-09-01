@@ -171,7 +171,79 @@ Supporting conventions:
 
 ---
 
-## 7. Architecture map
+## 7. UI/UX design system
+
+**Design philosophy.** LabSubmit should read as one calm, professional, structured product:
+clean surfaces, generous spacing, a clear hierarchy on every page, and restraint with
+colour. It is an examination platform for a college, not a consumer app — polish serves
+legibility and confidence, never decoration.
+
+**The reference image supplied during the redesign is inspiration, not a target to copy.**
+Take from it the *qualities* — spacing, hierarchy, card system, navigation structure,
+typography, polish. Never its branding, wording, icons, layouts or product features. The
+result must remain unmistakably LabSubmit.
+
+**Functionality outranks appearance.** No visual change may remove a feature, alter exam
+security or integrity behaviour, weaken the device restriction, expose question-set
+identity, or rewrite business logic to make a layout tidier. If a redesign appears to
+require a logic change, that is a signal to redesign differently.
+
+### Shared component strategy
+
+`src/components/ui/index.tsx` is the single source of visual truth. Pages compose from it:
+`Button`, `Card`, `SectionCard`, `PageHeader`, `StatCard`, `StatusBadge`, `Label`, `Input`,
+`Textarea`, `Select`, `Field`, `Tabs`, `TableWrap`/`Th`/`Td`/`THead`/`TBody`/`Tr`,
+`EmptyState`, `LoadingState`, `ErrorState`, `Alert`, `Modal`, `Toast`.
+
+Do not restyle a card, badge or button inside a page. If a primitive is missing, add it to
+the library so every page gains it at once.
+
+### Layout system
+
+`src/components/AppShell.tsx` provides the shell: a persistent sidebar on `lg` and above, a
+slide-over drawer below it, and a compact sticky top bar. Navigation is role-based
+(`STUDENT_NAV`, `LECTURER_NAV`, `ADMIN_NAV`).
+
+**Sidebar items must correspond to destinations that actually exist.** LabSubmit keeps each
+role's views as tabs within one route, so a sidebar item selects a section of the current
+page. Never add an item for a page the application does not serve.
+
+**The active examination does not use the shell.** An exam is deliberately
+distraction-free: no sidebar, no cross-navigation, nothing inviting a student away from a
+live attempt. It keeps the design tokens, not the chrome.
+
+Theme tokens live in `tailwind.config.js`: `rounded-card` / `rounded-control`,
+`shadow-card` / `shadow-cardHover` / `shadow-overlay`, and `w-sidebar`. Use them rather
+than ad-hoc values. Olive is the primary action colour (CBIT's identity); blue is
+secondary/informational; amber, rose and emerald carry warning, error and success. Do not
+introduce further hues.
+
+### Responsive principles
+
+Mobile, tablet, laptop and desktop must all work for non-exam use. Breakpoints follow
+Tailwind defaults; the shell switches at `lg`. Dense data tables may scroll horizontally
+inside `TableWrap`, which enforces a minimum width so columns are never crushed — but a
+table a student reads often (results) becomes stacked cards below `md` instead. Never let
+the page body itself scroll horizontally.
+
+### Answer-sheet UI principles
+
+The student sheet renders **whatever the lecturer configured** — enabled sections, in their
+order, under their headings, with their required flags. Never hardcode the section list or
+its order into a layout. Required state is shown by more than colour, and the Code section
+is bound to the workspace files rather than being a second editor.
+
+### Accessibility expectations
+
+Semantic HTML (`nav`, `header`, `main`, `table`, real `button`s); every input has a label;
+`aria-current` marks the active nav item and `aria-selected` the active tab; dialogs are
+`role="dialog"` with `aria-modal` and close on Escape; loading regions are `aria-live`;
+status is never conveyed by colour alone — always a label, often an icon; one consistent
+`:focus-visible` ring is defined globally; animation respects `prefers-reduced-motion`.
+
+---
+
+## 8. Architecture map
 
 Next.js 14 App Router + TypeScript, custom `server.js` (HTTP + WebSocket upgrade),
 Prisma + PostgreSQL, Tailwind, Monaco, xterm.
@@ -199,7 +271,7 @@ the WebSocket. A rule enforced in only one of these is not enforced.
 
 ---
 
-## 8. Commands
+## 9. Commands
 
 ```bash
 npm run dev        # node server.js — app + execution WebSocket

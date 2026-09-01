@@ -48,3 +48,37 @@ body {
   height: 100%;
   width: 100%;
 }
+
+/* ---------------------------------------------------------------------------
+   Design-system base layer.
+   Focus, motion and typography defaults that every component inherits, so
+   individual pages never have to restate them.
+   --------------------------------------------------------------------------- */
+
+/* A single visible focus treatment across the app. Keyboard users get an obvious
+   ring; pointer users are not distracted by one. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #4d7c0f;
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+.dark :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline-color: #84cc16;
+}
+
+/* Respect the OS "reduce motion" setting rather than animating regardless. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Numeric columns line up when figures share a width. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

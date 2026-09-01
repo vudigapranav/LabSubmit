@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
-import { Navbar } from '@/components/Navbar';
+import { AppShell, ADMIN_NAV } from '@/components/AppShell';
+import { LoadingState, PageHeader, Toast as UiToast } from '@/components/ui';
 import { ProfileModal } from '@/components/ProfileModal';
 import {
   Shield,
@@ -446,42 +447,26 @@ export default function AdminDashboard() {
   };
 
   if (loading || !user) {
-    return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-mono text-xs">Loading Admin Control Center...</div>;
+    return (
+      <div className="min-h-screen bg-surface-lightBg dark:bg-surface-darkBg flex items-center justify-center">
+        <LoadingState label="Loading the control centre…" />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-surface-lightBg dark:bg-surface-darkBg flex flex-col transition-colors">
-      <Navbar onOpenProfile={() => setProfileOpen(true)} />
-
-      {/* Toast Notification */}
-      {notification && (
-        <div
-          className={`fixed top-16 right-4 z-50 px-4 py-3 rounded-xl shadow-xl border text-xs font-semibold flex items-center space-x-2 animate-bounce ${
-            notification.type === 'success'
-              ? 'bg-emerald-900/90 border-emerald-700 text-emerald-100'
-              : 'bg-rose-900/90 border-rose-700 text-rose-100'
-          }`}
-        >
-          {notification.type === 'success' ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-rose-400" />}
-          <span>{notification.message}</span>
-        </div>
-      )}
-
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-4 sm:space-y-6">
-        {/* Header */}
-        <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 sm:p-8 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <Shield className="w-5 h-5 text-brand-blue-600 dark:text-brand-blue-400" />
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Admin Control Center</h1>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-              Academic Hierarchy & College System Governance
-            </p>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center space-x-2">
+    <>
+      <AppShell
+        sections={ADMIN_NAV}
+        active={activeTab}
+        onNavigate={(id) => setActiveTab(id as typeof activeTab)}
+        onOpenProfile={() => setProfileOpen(true)}
+      >
+        <PageHeader
+          title="Control centre"
+          description="Academic hierarchy and college system governance."
+          actions={
+            <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => {
                 setEditingBranchId(null);
@@ -520,11 +505,13 @@ export default function AdminDashboard() {
               <UserPlus className="w-3.5 h-3.5" />
               <span>Add Faculty</span>
             </button>
-          </div>
-        </div>
+            </div>
+          }
+        />
 
-        {/* Tab Navigation */}
-        <div className="flex items-center space-x-2 border-b border-slate-200 dark:border-slate-800/80 pb-3 overflow-x-auto">
+        {/* Tab Navigation — kept as a secondary control on small screens, where the
+            sidebar is a drawer rather than always visible. */}
+        <div className="lg:hidden flex items-center gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-3 overflow-x-auto">
           <button
             onClick={() => setActiveTab('branches')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 ${
@@ -947,7 +934,11 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-      </main>
+      </AppShell>
+
+      {notification && (
+        <UiToast tone={notification.type === 'success' ? 'success' : 'error'} message={notification.message} onDismiss={() => setNotification(null)} />
+      )}
 
       {/* Modal: View User Details */}
       {showViewUserModal && viewingUser && (
@@ -1166,6 +1157,6 @@ export default function AdminDashboard() {
       )}
 
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
-    </div>
+    </>
   );
 }

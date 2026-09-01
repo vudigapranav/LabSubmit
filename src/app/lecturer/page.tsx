@@ -434,9 +434,9 @@ export default function LecturerDashboard() {
         </div>
       )}
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 sm:p-8 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="space-y-1">
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Faculty Examination Workspace</h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -676,7 +676,7 @@ export default function LecturerDashboard() {
             {activeMainTab === 'students' && (
               <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full min-w-[640px] text-left text-xs">
                     <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                       <tr>
                         <th className="p-4">Roll Number</th>
@@ -704,7 +704,7 @@ export default function LecturerDashboard() {
             {activeMainTab === 'submissions' && (
               <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full min-w-[640px] text-left text-xs">
                     <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                       <tr>
                         <th className="p-4">Student Roll</th>
@@ -755,7 +755,7 @@ export default function LecturerDashboard() {
             {activeMainTab === 'violations' && (
               <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full min-w-[640px] text-left text-xs">
                     <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                       <tr>
                         <th className="p-4">Student</th>
@@ -798,8 +798,8 @@ export default function LecturerDashboard() {
 
       {/* Modal: Create/Edit Programming Exam */}
       {showLabModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl w-full p-4 sm:p-6 shadow-xl space-y-4 max-h-[92vh] overflow-y-auto">
             <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingLabId ? 'Edit Programming Exam' : 'Create Programming Exam'}</h3>
             <form className="space-y-3">
               <input type="text" placeholder="Exam Name" value={labTitle} onChange={(e) => setLabTitle(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
@@ -809,7 +809,7 @@ export default function LecturerDashboard() {
               {/* Scheduling */}
               <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
                 <label className="text-xs font-semibold text-slate-900 dark:text-white block">Exam Schedule</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
                     <label className="text-[10px] text-slate-500 block mb-0.5">Date</label>
                     <input type="date" value={examDateInput} onChange={(e) => setExamDateInput(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white" />
@@ -823,7 +823,7 @@ export default function LecturerDashboard() {
                     <input type="time" value={endTimeInput} onChange={(e) => setEndTimeInput(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="text-[10px] text-slate-500 block mb-0.5">Duration (minutes)</label>
                     <input type="number" min={1} placeholder="e.g. 90" value={durationMinutesInput} onChange={(e) => setDurationMinutesInput(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white" />
@@ -838,7 +838,7 @@ export default function LecturerDashboard() {
               {/* Allowed languages */}
               <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
                 <label className="text-xs font-semibold text-slate-900 dark:text-white block">Allowed Programming Languages</label>
-                <div className="grid grid-cols-4 gap-2 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   {LANGUAGE_OPTIONS.map((lang) => (
                     <label key={lang.value} className="flex items-center space-x-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5">
                       <input type="checkbox" checked={selectedLanguages.includes(lang.value)} onChange={() => toggleLanguage(lang.value)} />
@@ -899,7 +899,7 @@ export default function LecturerDashboard() {
 
       {/* Submission Inspector Modal */}
       {selectedSubmission && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex flex-col p-4 sm:p-6 overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex flex-col p-2 sm:p-6 overflow-hidden">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl">
             <div className="bg-slate-950 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
               <div>

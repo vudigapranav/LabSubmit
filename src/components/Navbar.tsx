@@ -16,38 +16,39 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenProfile }) => {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800/80 bg-white/95 dark:bg-surface-darkCard/95 backdrop-blur transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
         {/* Official CBIT Branding */}
-        <Link href="/" className="flex items-center space-x-3 group">
-          <div className="relative w-10 h-10 flex items-center justify-center overflow-hidden">
+        <Link href="/" className="flex items-center gap-2 sm:gap-3 group min-w-0">
+          <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center overflow-hidden flex-shrink-0">
             {!logoError ? (
               <Image
                 src="/cbit-logo.png"
                 alt="CBIT Logo"
                 width={40}
                 height={40}
-                className="object-contain w-auto h-10"
+                className="object-contain w-auto h-8 sm:h-10"
                 onError={() => setLogoError(true)}
                 priority
               />
             ) : (
-              <div className="w-10 h-10 rounded-lg bg-brand-olive-700 text-white flex items-center justify-center font-bold text-xs">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-brand-olive-700 text-white flex items-center justify-center font-bold text-[10px] sm:text-xs">
                 CBIT
               </div>
             )}
           </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-base tracking-tight text-slate-900 dark:text-slate-100 group-hover:text-brand-olive-700 dark:group-hover:text-brand-olive-500 transition-colors">
-              Chaitanya Bharathi Institute of Technology
+          <div className="flex flex-col min-w-0">
+            <span className="font-semibold text-sm sm:text-base tracking-tight text-slate-900 dark:text-slate-100 group-hover:text-brand-olive-700 dark:group-hover:text-brand-olive-500 transition-colors truncate">
+              <span className="sm:hidden">CBIT LabSubmit</span>
+              <span className="hidden sm:inline">Chaitanya Bharathi Institute of Technology</span>
             </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-normal">
+            <span className="hidden sm:block text-xs text-slate-500 dark:text-slate-400 font-normal">
               Programming Laboratory Platform
             </span>
           </div>
         </Link>
 
         {/* Right Controls */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
@@ -62,7 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenProfile }) => {
           </button>
 
           {user && (
-            <div className="flex items-center space-x-3 pl-3 border-l border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-1.5 sm:gap-3 sm:pl-3 sm:border-l border-slate-200 dark:border-slate-800">
               <div className="hidden sm:flex flex-col items-end">
                 <span className="text-xs font-semibold text-slate-900 dark:text-slate-200">
                   {user.name}

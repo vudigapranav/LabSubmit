@@ -253,7 +253,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
   const assignable = sets.filter((s) => s.isActive && s.questions.length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex flex-col p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex flex-col p-2 sm:p-6">
       <div className="relative bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl max-w-5xl w-full mx-auto">
         {/* Header */}
         <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between gap-3">
@@ -499,7 +499,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                 <p className="p-8 text-center text-slate-500 text-xs">No student has been assigned a set yet.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full min-w-[640px] text-left text-xs">
                     <thead className="bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-800">
                       <tr>
                         <th className="p-3">Roll Number</th>

@@ -88,8 +88,8 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-surface-lightBg dark:bg-surface-darkBg flex flex-col transition-colors">
       <Navbar />
 
-      <main className="flex-1 flex items-center justify-center p-4 py-16">
-        <div className="max-w-lg w-full bg-white dark:bg-surface-darkCard p-8 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm space-y-6">
+      <main className="flex-1 flex items-center justify-center px-3 py-8 sm:p-4 sm:py-16">
+        <div className="max-w-lg w-full bg-white dark:bg-surface-darkCard p-5 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm space-y-5 sm:space-y-6">
           {/* Header */}
           <div className="text-center space-y-3">
             <div className="flex justify-center">
@@ -219,7 +219,7 @@ export default function RegisterPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">
                       Create Password

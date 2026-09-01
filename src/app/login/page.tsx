@@ -65,8 +65,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-surface-lightBg dark:bg-surface-darkBg flex flex-col transition-colors">
       <Navbar />
 
-      <main className="flex-1 flex items-center justify-center p-4 py-16">
-        <div className="max-w-md w-full bg-white dark:bg-surface-darkCard p-8 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm space-y-6">
+      <main className="flex-1 flex items-center justify-center px-3 py-8 sm:p-4 sm:py-16">
+        <div className="max-w-md w-full bg-white dark:bg-surface-darkCard p-5 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm space-y-5 sm:space-y-6">
           {/* Official College Header & Logo */}
           <div className="text-center space-y-3">
             <div className="flex justify-center">

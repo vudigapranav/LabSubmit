@@ -25,6 +25,18 @@ export type DeviceClass = 'DESKTOP' | 'TABLET' | 'MOBILE' | 'UNKNOWN';
  */
 export type DeviceCheckPhase = 'START' | 'CONTINUE';
 
+/** The message a student sees on a phone or tablet. Single source of truth. */
+export const UNSUPPORTED_DEVICE_MESSAGE =
+  'LabSubmit examinations must be attempted on a laptop or desktop computer. Please switch to a supported device to continue.';
+
+/**
+ * Shown when the device cannot be classified at all. Kept distinct from the message above
+ * because the remedy differs: the student is not necessarily on a phone, their browser is
+ * withholding the information the check needs.
+ */
+export const UNIDENTIFIED_DEVICE_MESSAGE =
+  'LabSubmit could not identify this device, so the examination cannot be started here. Please use a standard desktop browser (Chrome, Edge, Firefox or Safari) without any user-agent modification.';
+
 export interface DeviceSignals {
   userAgent: string | null;
   /** Sec-CH-UA-Mobile: "?1" on mobile, "?0" otherwise. Chromium-family only. */
@@ -120,11 +132,10 @@ export function evaluateDeviceEligibility(
   }
 
   if (deviceClass === 'MOBILE' || deviceClass === 'TABLET') {
-    const label = deviceClass === 'MOBILE' ? 'phone' : 'tablet';
     return {
       deviceClass,
       eligible: false,
-      reason: `This examination cannot be taken on a ${label}. Please use a laptop or desktop computer. Your dashboard, notices and results remain available on this device.`,
+      reason: UNSUPPORTED_DEVICE_MESSAGE,
       userAgent: signals.userAgent,
     };
   }
@@ -133,8 +144,7 @@ export function evaluateDeviceEligibility(
     return {
       deviceClass,
       eligible: false,
-      reason:
-        'Your device could not be identified, so the examination cannot be started here. Please use a standard desktop browser (Chrome, Edge, Firefox or Safari) without any user-agent modification.',
+      reason: UNIDENTIFIED_DEVICE_MESSAGE,
       userAgent: signals.userAgent,
     };
   }

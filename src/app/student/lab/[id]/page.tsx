@@ -227,7 +227,7 @@ export default function StudentLabWorkspacePage() {
       {/* Gate: exam not started yet */}
       {!hasStarted && !isSubmitted && (
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-8 space-y-5 shadow-2xl text-center">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-8 space-y-4 sm:space-y-5 shadow-2xl text-center">
             <div className="w-14 h-14 rounded-2xl bg-brand-olive-950/60 border border-brand-olive-800/60 flex items-center justify-center mx-auto">
               <BookOpen className="w-7 h-7 text-brand-olive-400" />
             </div>
@@ -238,7 +238,7 @@ export default function StudentLabWorkspacePage() {
 
             {labData.status === 'RUNNING' ? (
               <>
-                {labData.examModeEnabled && (
+                {labData.examModeEnabled && (deviceEligibility?.eligible ?? true) && (
                   <div className="bg-amber-950/40 border border-amber-800/60 rounded-xl p-4 text-left space-y-2">
                     <div className="flex items-center space-x-2 text-amber-300 font-bold text-xs">
                       <ShieldAlert className="w-4 h-4" />
@@ -260,15 +260,17 @@ export default function StudentLabWorkspacePage() {
                 {/* Exam-device restriction. This card is the courtesy notice; the binding
                     refusal is made server-side on start_exam and on every action after it. */}
                 {deviceEligibility && !deviceEligibility.eligible ? (
-                  <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-4 space-y-2 text-left">
-                    <div className="flex items-center space-x-2 text-rose-300 font-bold text-xs">
-                      <Laptop className="w-4 h-4" />
-                      <span>A computer is required for this examination</span>
+                  <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-4 sm:p-5 space-y-3 text-center">
+                    <div className="w-11 h-11 rounded-2xl bg-rose-950/60 border border-rose-800/60 flex items-center justify-center mx-auto">
+                      <Laptop className="w-5 h-5 text-rose-300" />
                     </div>
-                    <p className="text-[11px] text-rose-200/90 leading-relaxed">{deviceEligibility.reason}</p>
+                    <h3 className="text-rose-200 font-bold text-sm">Unsupported device</h3>
+                    {/* Verbatim from the server — one message, defined once in
+                        deviceEligibility.ts, so the UI cannot drift from what the API says. */}
+                    <p className="text-xs text-rose-200/90 leading-relaxed">{deviceEligibility.reason}</p>
                     <Link
                       href="/student"
-                      className="inline-block text-[11px] font-semibold text-rose-200 underline underline-offset-2"
+                      className="block w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold transition-colors"
                     >
                       Return to your dashboard
                     </Link>

@@ -3,9 +3,9 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after completing the multi-set randomized examination system
-(authoring, per-set preview, explicit assignment generation, administrative reassignment and
-an audit trail) on `claude/labsubmit-development-y605fv`.
+**Last updated:** 2026-09-01, after the responsive platform pass and hardening of the
+exam-device restriction (exam content now withheld from ineligible devices) on
+`claude/labsubmit-development-y605fv`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
 exists in the repository. A database model with no code reading or writing it is *schema
@@ -167,6 +167,25 @@ only* and belongs under In Progress, not Completed.
   ignored (the server resolves the set from persisted state), and both faculty routes reject
   student tokens with 403.
 
+### Responsive platform — *completed this session*
+- Navigation: the full institution name is abbreviated below `sm` (it previously overflowed
+  a phone header), with a smaller logo and tightened spacing.
+- Student dashboard: wrapping metadata chips instead of one bullet-separated line, shortened
+  tab labels on narrow screens, and reduced page/card padding.
+- **Results render as stacked cards below `md`** rather than a five-column table — this is
+  the screen students check most often on a phone, and horizontal scrolling for it was the
+  clearest instance of merely shrinking the desktop UI.
+- Login and registration: mobile padding and spacing; the registration form's paired fields
+  stack below `sm`.
+- Lecturer and admin: page and header padding, and rigid modal grids (`grid-cols-3` date
+  fields, `grid-cols-4` language pickers, `grid-cols-2` pairs) now stack below `sm`.
+- Dialogs: reduced outer and inner padding on small screens, with the profile modal made
+  scrollable so it can never exceed the viewport.
+- Faculty data tables keep horizontal scrolling — appropriate for dense multi-column data —
+  but now carry a minimum width so columns are not crushed into illegibility while scrolled.
+- Verified at a 390×844 iPhone viewport: no horizontal page scroll on login, dashboard,
+  results or the exam gate.
+
 ### Device policy — *added this session*
 - Server-side device classification from request headers (`User-Agent`,
   `Sec-CH-UA-Mobile`, `Sec-CH-UA-Platform`) in `src/lib/deviceEligibility.ts`.
@@ -179,6 +198,14 @@ only* and belongs under In Progress, not Completed.
   student is locked out mid-paper by an odd header.
 - Per-exam `requireDesktopDevice` toggle; device class recorded on the attempt for audit.
 - Dashboards, results and non-exam pages remain reachable from any device.
+- **Exam content is withheld from an ineligible device, not merely hidden.** The workspace
+  response returns no questions, no problem statement, no answer-sheet sections and no
+  source files when the device may not sit the exam, and sets `examContentWithheld`. A phone
+  therefore cannot read the paper out of the API and work on it elsewhere. A *submitted*
+  attempt is exempt, because reviewing what you submitted is submission history, which the
+  platform keeps available on any device.
+- The student-facing wording is defined once, as `UNSUPPORTED_DEVICE_MESSAGE` in
+  `deviceEligibility.ts`, and rendered verbatim by the UI so the two cannot drift.
 
 ### Verification performed
 - `tsc --noEmit` clean; `next build` compiles successfully (35/35 pages).
@@ -243,15 +270,6 @@ usable end to end.
 - Per-section `maxMarks` is configurable and displayed, but evaluation still records a
   single flat total on `Submission`. No breakdown is captured.
 
-### Mobile compatibility of the general UI
-- Data tables are wrapped in horizontal-scroll containers, and dashboards carry some
-  responsive breakpoints (student 7, lecturer 14, admin 14 breakpoint utilities).
-- Login and registration pages use centred cards with **no** explicit breakpoints.
-- No page has been audited or tested at phone widths. Treat general mobile compatibility as
-  *plausible but unverified*, not delivered.
-
----
-
 ## 3. Newly planned (agreed requirements)
 
 Recorded so intent is not lost. Items marked ✅ are delivered; the rest are outstanding.
@@ -262,7 +280,7 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
 | 2 | Multiple randomized question sets | ✅ Complete — any number of sets, any number of questions each, preview, explicit generation |
 | 3 | Hidden student set identity | ✅ Complete (payload built from what a student may know; ids, labels and counts all absent) |
 | 4 | Lecturer-visible assignment mapping | ✅ Complete (student→set table plus per-set counts and the inspector badge) |
-| 5 | Mobile-compatible general application | ⏳ Partial, unaudited |
+| 5 | Mobile-compatible general application | ✅ Audited and fixed at phone width (exam page remains desktop-only by policy) |
 | 6 | Desktop/laptop-only active exams | ✅ Complete, enforced server-side at all entry points |
 | 7 | Digital record containing configurable sections | ✅ Complete |
 | 8 | Code execution with input/output capture | ⏳ Execution complete; capture wired into the answer sheet; server-side persistence outstanding |
@@ -297,12 +315,26 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
   reliable cross-browser API for this.
 - **Fullscreen cannot be forced.** The browser may refuse or a student may decline; the
   system detects and logs the exit rather than preventing it.
-- **Device classification is heuristic.** A determined student on a rooted device with a
-  spoofed User-Agent and a desktop-class browser could present as a desktop. The check
-  raises the cost of cheating substantially; it is not a hardware attestation.
-- **The exam workspace assumes a wide viewport.** The IDE has a fixed-width file sidebar;
-  the answer-sheet/code split assumes desktop. This is consistent with the desktop-only
-  exam policy but means the exam page itself is not responsive.
+- **Device classification is heuristic, and cannot be otherwise.** A browser cannot prove
+  what hardware it runs on. The check reads the `User-Agent` and the `Sec-CH-UA-*` client
+  hints, all of which the client ultimately controls. Specifically:
+  - A student who spoofs a desktop User-Agent (developer tools, a browser extension, a
+    custom build, or desktop-mode on a mobile browser) **will** be treated as eligible.
+  - iPadOS 13+ sends a desktop Safari User-Agent by design. It is caught only by a
+    client-side hint (touch points on a reported Mac), which a modified client can suppress.
+  - A browser that sends no User-Agent is refused at exam start but allowed to continue an
+    attempt already under way, deliberately, so an ambiguous signal cannot strand a student
+    mid-paper.
+  This raises the effort required to sit an exam on an unsupported device; it is **not**
+  attestation and must not be presented to faculty as one. It belongs alongside the
+  integrity log as a signal, not as a guarantee.
+- **The exam workspace assumes a wide viewport.** The IDE has a fixed-width file sidebar and
+  the answer-sheet/code split assumes desktop. This is deliberate and consistent with the
+  desktop-only exam policy — the exam page is the one screen that is not made responsive.
+- **The responsive pass was verified at one phone width (390px) and by reading layouts, not
+  across a device matrix.** Faculty data tables still scroll horizontally on a phone by
+  design; that is appropriate for dense multi-column data but is not the same as a
+  purpose-built mobile faculty view.
 - **Grading remains a single flat mark** despite per-section weighting being configurable.
 - **No notices module exists**, though notices are named in the product direction as
   mobile-accessible content.

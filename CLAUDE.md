@@ -118,6 +118,17 @@ When a section list grows, extend the catalogue — do not fork the model.
   iPadOS, deliberately misreport themselves as desktops), but must never be able to
   *widen* it. A client can volunteer that it is a tablet; it can never talk its way into
   being treated as a desktop.
+- **Exam content is withheld, not hidden.** An ineligible device must not receive the
+  questions, the problem statement or the workspace files in any API response. Hiding them
+  in the UI is not enough: the payload itself is the leak.
+
+**What device detection can and cannot do.** A browser cannot prove what hardware it is
+running on. Detection rests on the `User-Agent` string and the `Sec-CH-UA-*` client hints,
+both of which the client ultimately controls. A determined student with developer tools or
+a custom browser build can present a desktop User-Agent from a tablet and will be treated
+as eligible. This restriction raises the effort required to sit an exam on an unsupported
+device; it is not attestation, and it should not be described to faculty as one. Treat it
+as one signal alongside the integrity log, not as a guarantee.
 
 ---
 

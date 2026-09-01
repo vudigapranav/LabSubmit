@@ -186,17 +186,21 @@ export default function StudentDashboard() {
     <div className="min-h-screen bg-surface-lightBg dark:bg-surface-darkBg flex flex-col transition-colors">
       <Navbar onOpenProfile={() => setProfileOpen(true)} />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-4 sm:space-y-6">
         {/* Student Welcome Header */}
-        <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <GraduationCap className="w-5 h-5 text-slate-700 dark:text-slate-300" />
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Welcome, {user.name}</h1>
+        <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 sm:p-8 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="space-y-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <GraduationCap className="w-5 h-5 text-slate-700 dark:text-slate-300 flex-shrink-0" />
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white truncate">Welcome, {user.name}</h1>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-              Roll Number: <span className="font-bold text-slate-900 dark:text-slate-100">{user.rollNumber}</span> • Academic Year: <span className="font-bold text-slate-900 dark:text-slate-100">Year {studentInfo?.year || user.studentProfile?.year || 1}</span> • Branch: <span className="font-bold text-slate-900 dark:text-slate-100">{studentInfo?.branchName || 'Assigned Branch'}</span>
-            </p>
+            {/* Wrapping chips rather than one bullet-separated line, which broke mid-value
+                on a narrow screen. */}
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+              <span>Roll <span className="font-bold text-slate-900 dark:text-slate-100">{user.rollNumber}</span></span>
+              <span>Year <span className="font-bold text-slate-900 dark:text-slate-100">{studentInfo?.year || user.studentProfile?.year || 1}</span></span>
+              <span>Branch <span className="font-bold text-slate-900 dark:text-slate-100">{studentInfo?.branchName || 'Assigned Branch'}</span></span>
+            </div>
           </div>
         </div>
 
@@ -209,7 +213,7 @@ export default function StudentDashboard() {
             }`}
           >
             <PlayCircle className="w-3.5 h-3.5" />
-            <span>Running Exams ({runningExams.length})</span>
+            <span><span className="sm:hidden">Running</span><span className="hidden sm:inline">Running Exams</span> ({runningExams.length})</span>
           </button>
 
           <button
@@ -219,7 +223,7 @@ export default function StudentDashboard() {
             }`}
           >
             <Hourglass className="w-3.5 h-3.5" />
-            <span>Upcoming Exams ({upcomingExams.length})</span>
+            <span><span className="sm:hidden">Upcoming</span><span className="hidden sm:inline">Upcoming Exams</span> ({upcomingExams.length})</span>
           </button>
 
           <button
@@ -229,7 +233,7 @@ export default function StudentDashboard() {
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>Completed Exams ({completedExams.length})</span>
+            <span><span className="sm:hidden">Completed</span><span className="hidden sm:inline">Completed Exams</span> ({completedExams.length})</span>
           </button>
 
           <button
@@ -270,7 +274,42 @@ export default function StudentDashboard() {
 
         {/* Tab Content: Results */}
         {activeTab === 'results' && (
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
+          <>
+          {/* Below md the results table becomes stacked cards. A five-column table on a
+              phone forces horizontal scrolling for the one screen students check most. */}
+          <div className="md:hidden space-y-3">
+            {grades.length === 0 ? (
+              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-8 text-center text-slate-400 text-xs shadow-sm">
+                No published results yet.
+              </div>
+            ) : (
+              grades.map((g) => (
+                <div key={g.id} className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-sm space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white min-w-0">{g.labTitle}</h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/40 text-emerald-300 border border-emerald-800/50 flex-shrink-0">
+                      {g.status}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-lg font-bold text-emerald-500">
+                      {g.marks !== null ? `${g.marks}/${g.maxMarks}` : 'Ungraded'}
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      {new Date(g.submittedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  {g.remarks && (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-2">
+                      {g.remarks}
+                    </p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden md:block bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
@@ -306,6 +345,7 @@ export default function StudentDashboard() {
               </table>
             </div>
           </div>
+          </>
         )}
       </main>
 

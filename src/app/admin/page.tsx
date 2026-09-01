@@ -467,9 +467,9 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 sm:p-8 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <Shield className="w-5 h-5 text-brand-blue-600 dark:text-brand-blue-400" />
@@ -671,7 +671,7 @@ export default function AdminDashboard() {
         {activeTab === 'lecturers' && (
           <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full min-w-[640px] text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="p-4">Faculty Member</th>
@@ -827,7 +827,7 @@ export default function AdminDashboard() {
             ) : (
               <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full min-w-[640px] text-left text-xs">
                     <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                       <tr>
                         <th className="p-4">Roll Number</th>
@@ -951,7 +951,7 @@ export default function AdminDashboard() {
 
       {/* Modal: View User Details */}
       {showViewUserModal && viewingUser && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
               <Eye className="w-5 h-5 text-brand-blue-500" />
@@ -987,7 +987,7 @@ export default function AdminDashboard() {
 
       {/* Modal: Edit Student */}
       {showEditStudentModal && editingStudent && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white">Edit Student Details</h3>
             <form onSubmit={handleSaveEditStudent} className="space-y-3">
@@ -999,7 +999,7 @@ export default function AdminDashboard() {
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Email Address</label>
                 <input type="email" value={editStudentEmail} onChange={(e) => setEditStudentEmail(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Roll Number</label>
                   <input type="text" value={editStudentRoll} onChange={(e) => setEditStudentRoll(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono" />
@@ -1032,7 +1032,7 @@ export default function AdminDashboard() {
 
       {/* Modal: Reset Password (Student & Lecturer) */}
       {showResetPasswordModal && targetResetUser && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
               <Key className="w-5 h-5 text-amber-500" />
@@ -1055,7 +1055,7 @@ export default function AdminDashboard() {
 
       {/* Modal: Create/Edit Branch */}
       {showBranchModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingBranchId ? 'Edit Branch' : 'Create New Branch'}</h3>
             <form onSubmit={handleSaveBranch} className="space-y-3">
@@ -1072,7 +1072,7 @@ export default function AdminDashboard() {
                   <option value="4">4th Year</option>
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Roll Start</label>
                   <input type="text" placeholder="160125733001" value={rollStart} onChange={(e) => setRollStart(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono" />
@@ -1093,7 +1093,7 @@ export default function AdminDashboard() {
 
       {/* Modal: Create/Edit Subject */}
       {showSubjectModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingSubjectId ? 'Edit Subject' : 'Create New Subject'}</h3>
             <form onSubmit={handleSaveSubject} className="space-y-3">
@@ -1101,7 +1101,7 @@ export default function AdminDashboard() {
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Subject Name (e.g. Java Programming Lab)</label>
                 <input type="text" value={subName} onChange={(e) => setSubName(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Subject Code</label>
                   <input type="text" placeholder="CS202L" value={subCode} onChange={(e) => setSubCode(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono" />
@@ -1111,7 +1111,7 @@ export default function AdminDashboard() {
                   <input type="number" placeholder="4" value={subSemester} onChange={(e) => setSubSemester(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Academic Year</label>
                   <select value={subYear} onChange={(e) => setSubYear(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white">
@@ -1146,7 +1146,7 @@ export default function AdminDashboard() {
 
       {/* Modal: Add Lecturer */}
       {showAddLecturerModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingLecturerId ? 'Edit Faculty Lecturer' : 'Add Faculty Lecturer'}</h3>
             <form onSubmit={handleSaveLecturer} className="space-y-3">

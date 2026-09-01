@@ -125,21 +125,33 @@ export async function GET(req: Request) {
       questionSet: unknown;
     };
 
+    // Exam content is withheld from an ineligible device, not merely hidden by the UI.
+    // A phone must not be able to read the paper out of the API response and work on it
+    // elsewhere, so questions, the problem statement and the source files never leave the
+    // server unless the device may actually sit the exam.
+    //
+    // A SUBMITTED attempt is exempt: the examination is over, and reviewing what you
+    // submitted is submission history, which the platform deliberately keeps available on
+    // any device.
+    const device = checkExamDevice(req, lab, 'START');
+    const withholdExamContent = !device.eligible && !workspace.isSubmitted;
+
     return NextResponse.json({
       lab: {
         ...lab,
-        problemStatement,
+        problemStatement: withholdExamContent ? '' : problemStatement,
         status: getExamStatus(lab),
         allowedLanguages: parseAllowedLanguages(lab.allowedLanguages),
       },
-      workspace: workspaceForStudent,
-      questions: paper,
-      answerSheetSections,
+      workspace: withholdExamContent ? { ...workspaceForStudent, files: [] } : workspaceForStudent,
+      questions: withholdExamContent ? [] : paper,
+      answerSheetSections: withholdExamContent ? [] : answerSheetSections,
+      examContentWithheld: withholdExamContent,
       submission,
       effectiveDeadline: getEffectiveDeadline(lab, workspace),
-      // Advisory for the pre-exam gate; the binding decision is re-made server-side on
-      // start_exam and on every action inside the attempt.
-      deviceEligibility: checkExamDevice(req, lab, 'START'),
+      // The gate the UI renders. The binding decision is re-made server-side on start_exam
+      // and on every action inside the attempt; this response has already acted on it.
+      deviceEligibility: device,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });

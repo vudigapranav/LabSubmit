@@ -6,6 +6,7 @@ import { getExamStatus, getEffectiveDeadline, parseAllowedLanguages, isLanguageA
 import { finalizeSubmission } from '@/lib/examSubmission';
 import { checkExamDevice } from '@/lib/deviceEligibility';
 import { findIncompleteRequiredSections } from '@/lib/answerSheet';
+import { assignableSets, chooseSetId, toStudentPaper, paperToPlainText } from '@/lib/questionSets';
 
 const DEFAULT_BOILERPLATE: Record<string, { filename: string; content: string }> = {
   c: {
@@ -35,9 +36,12 @@ const DEFAULT_BOILERPLATE: Record<string, { filename: string; content: string }>
 async function pickQuestionSetId(labId: string): Promise<string | null> {
   const sets = await prisma.questionSet.findMany({
     where: { labId, isActive: true },
-    select: { id: true },
+    select: { id: true, label: true, isActive: true, questions: { select: { order: true, text: true, marks: true } } },
   });
-  if (sets.length === 0) return null;
+
+  // An empty set would hand the student a blank paper, so it is never assignable.
+  const eligible = assignableSets(sets);
+  if (eligible.length === 0) return null;
 
   const usage = await prisma.labWorkspace.groupBy({
     by: ['questionSetId'],
@@ -46,11 +50,7 @@ async function pickQuestionSetId(labId: string): Promise<string | null> {
   });
   const usageById = new Map(usage.map((u) => [u.questionSetId as string, u._count.questionSetId]));
 
-  const counts = sets.map((set) => usageById.get(set.id) || 0);
-  const fewest = Math.min(...counts);
-  const candidates = sets.filter((set, i) => counts[i] === fewest);
-
-  return candidates[Math.floor(Math.random() * candidates.length)].id;
+  return chooseSetId(eligible, usageById);
 }
 
 // GET workspace for lab
@@ -80,7 +80,7 @@ export async function GET(req: Request) {
       include: {
         files: { orderBy: { createdAt: 'asc' } },
         answerSheetResponses: true,
-        questionSet: true,
+        questionSet: { include: { questions: { orderBy: { order: 'asc' } } } },
       },
     });
 
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
         include: {
           files: { orderBy: { createdAt: 'asc' } },
           answerSheetResponses: true,
-          questionSet: true,
+          questionSet: { include: { questions: { orderBy: { order: 'asc' } } } },
         },
       });
     }
@@ -122,16 +122,26 @@ export async function GET(req: Request) {
       orderBy: { order: 'asc' },
     });
 
-    // The assigned set's statement stands in for the exam's own, and the set's identity
-    // (its label, and how many sets exist) is never included in a student-facing payload.
-    const hasQuestionSets = (await prisma.questionSet.count({ where: { labId, isActive: true } })) > 0;
+    // The assigned set's questions stand in for the exam's own statement. Set identity —
+    // label, id, how many sets exist — is never included in a student-facing payload; the
+    // paper is built by toStudentPaper() from what a student may know, not by deleting
+    // fields from the internal object.
+    const assignableCount = await prisma.questionSet.count({
+      where: { labId, isActive: true, questions: { some: {} } },
+    });
+    const paper = toStudentPaper(workspace.questionSet);
     const problemStatement = workspace.questionSet
-      ? workspace.questionSet.problemStatement
-      : hasQuestionSets
+      ? paperToPlainText(paper)
+      : assignableCount > 0
         ? '' // sets exist but none assigned yet — withheld until the attempt starts
         : lab.problemStatement;
 
-    const { questionSet, ...workspaceForStudent } = workspace as typeof workspace & { questionSet: unknown };
+    // BOTH the joined set and the raw foreign key are stripped. questionSetId is not a
+    // label, but it is a stable identifier two students could compare to discover they hold
+    // the same paper — which is exactly what set identity is meant to hide.
+    const { questionSet, questionSetId, ...workspaceForStudent } = workspace as typeof workspace & {
+      questionSet: unknown;
+    };
 
     return NextResponse.json({
       lab: {
@@ -141,6 +151,7 @@ export async function GET(req: Request) {
         allowedLanguages: parseAllowedLanguages(lab.allowedLanguages),
       },
       workspace: workspaceForStudent,
+      questions: paper,
       answerSheetSections,
       submission,
       effectiveDeadline: getEffectiveDeadline(lab, workspace),
@@ -217,16 +228,22 @@ export async function POST(req: Request) {
           ...(workspace.sessionId || !sessionId ? {} : { sessionId }),
           lastActivityAt: new Date(),
         },
-        include: { files: { orderBy: { createdAt: 'asc' } }, answerSheetResponses: true, questionSet: true },
+        include: {
+          files: { orderBy: { createdAt: 'asc' } },
+          answerSheetResponses: true,
+          questionSet: { include: { questions: { orderBy: { order: 'asc' } } } },
+        },
       });
 
-      const { questionSet, ...startedWorkspace } = updated;
+      const { questionSet, questionSetId: _assignedSetId, ...startedWorkspace } = updated;
+      const startedPaper = toStudentPaper(questionSet);
 
       return NextResponse.json({
         message: 'Exam started',
         workspace: startedWorkspace,
-        // Only the statement travels to the student — never which set it came from.
-        problemStatement: questionSet ? questionSet.problemStatement : lab.problemStatement,
+        // Only the questions travel to the student — never which set they came from.
+        questions: startedPaper,
+        problemStatement: questionSet ? paperToPlainText(startedPaper) : lab.problemStatement,
         effectiveDeadline: getEffectiveDeadline(lab, updated),
       });
     }

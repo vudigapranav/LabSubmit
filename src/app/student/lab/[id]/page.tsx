@@ -68,6 +68,9 @@ export default function StudentLabWorkspacePage() {
   // The most recent program run, lifted out of the IDE so the answer sheet's Input and
   // Output sections can be filled from the real execution instead of retyped.
   const [lastRun, setLastRun] = useState<CapturedRun | null>(null);
+  // The questions on this student's assigned paper. The API never tells us which set they
+  // came from, so there is nothing here that could leak the set's identity.
+  const [questions, setQuestions] = useState<{ order: number; text: string; marks: number | null }[]>([]);
   const [loadingLab, setLoadingLab] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -92,6 +95,7 @@ export default function StudentLabWorkspacePage() {
         setWorkspace(data.workspace);
         setEffectiveDeadline(data.effectiveDeadline);
         setSections(data.answerSheetSections || []);
+        setQuestions(data.questions || []);
         setDeviceEligibility(data.deviceEligibility || null);
       } else {
         setLabData(null);
@@ -145,6 +149,7 @@ export default function StudentLabWorkspacePage() {
         if (data.problemStatement !== undefined) {
           setLabData((prev: any) => (prev ? { ...prev, problemStatement: data.problemStatement } : prev));
         }
+        if (data.questions) setQuestions(data.questions);
       } else {
         if (data.deviceBlocked) {
           setDeviceEligibility({ eligible: false, reason: data.error, deviceClass: data.deviceClass });
@@ -347,6 +352,7 @@ export default function StudentLabWorkspacePage() {
                 initialFiles={workspace?.files || []}
                 isSubmitted={true}
                 fillParent
+                questions={questions}
               />
             </div>
           </div>
@@ -406,6 +412,7 @@ export default function StudentLabWorkspacePage() {
                   allowedLanguages={labData.allowedLanguages}
                   fillParent
                   onRunCaptured={setLastRun}
+                  questions={questions}
                 />
               </div>
             </div>

@@ -53,7 +53,11 @@ export async function GET(req: Request) {
           },
         },
         workspace: {
-          include: { files: true, answerSheetResponses: true, questionSet: true },
+          include: {
+            files: true,
+            answerSheetResponses: true,
+            questionSet: { include: { questions: { orderBy: { order: 'asc' } } } },
+          },
         },
       },
       orderBy: {
@@ -92,8 +96,17 @@ export async function GET(req: Request) {
       startedAt: sub.workspace.startedAt,
       startDeviceClass: sub.workspace.startDeviceClass,
       // Which set this student sat. Faculty-facing only — the student is never told.
+      // Faculty-facing: which set this student sat, and the exact paper they were given.
+      // This is the internal mapping the student is never shown.
       questionSetLabel: sub.workspace.questionSet?.label || null,
-      problemStatement: sub.workspace.questionSet?.problemStatement || sub.lab.problemStatement,
+      questions: (sub.workspace.questionSet?.questions || []).map((q: any) => ({
+        order: q.order,
+        text: q.text,
+        marks: q.marks,
+      })),
+      problemStatement: sub.workspace.questionSet
+        ? sub.workspace.questionSet.questions.map((q: any) => `${q.order}. ${q.text}`).join('\n\n')
+        : sub.lab.problemStatement,
       // The completed answer sheet: the exam's format, with this student's writing in it.
       answerSheet: sub.lab.answerSheetSections
         .filter((section: any) => section.enabled)

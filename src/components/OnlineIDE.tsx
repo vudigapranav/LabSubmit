@@ -60,6 +60,12 @@ interface OnlineIDEProps {
   fillParent?: boolean;
   /** Surfaces each program run so the answer sheet can offer its real input/output. */
   onRunCaptured?: (run: CapturedRun) => void;
+  /**
+   * The questions on this student's assigned paper. Carries no set identity — see
+   * toStudentPaper() in src/lib/questionSets.ts. Falls back to `problemStatement` for exams
+   * that have no question sets.
+   */
+  questions?: { order: number; text: string; marks: number | null }[];
 }
 
 export const OnlineIDE: React.FC<OnlineIDEProps> = ({
@@ -79,6 +85,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   allowedLanguages,
   fillParent = false,
   onRunCaptured,
+  questions,
 }) => {
   const { token, theme } = useApp();
   const newFileLanguageOptions = allowedLanguages && allowedLanguages.length > 0
@@ -568,8 +575,26 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
                 </button>
               </div>
 
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-slate-200 leading-relaxed max-h-96 overflow-y-auto whitespace-pre-wrap">
-                {problemStatement}
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-slate-200 leading-relaxed max-h-96 overflow-y-auto">
+                {questions && questions.length > 0 ? (
+                  <ol className="space-y-4">
+                    {questions.map((q) => (
+                      <li key={q.order} className="flex gap-3">
+                        <span className="font-mono font-bold text-brand-olive-400 flex-shrink-0">{q.order}.</span>
+                        <div className="min-w-0 space-y-1">
+                          <p className="whitespace-pre-wrap">{q.text}</p>
+                          {q.marks !== null && (
+                            <span className="inline-block text-[10px] font-semibold text-slate-400 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5">
+                              {q.marks} marks
+                            </span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <div className="font-mono whitespace-pre-wrap">{problemStatement}</div>
+                )}
               </div>
 
               <div className="flex justify-end pt-2">

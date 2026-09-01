@@ -268,19 +268,38 @@ model AnswerSheetResponse {
 // student starts their attempt and pins it to that workspace. Falls back to
 // Lab.problemStatement when an exam has no sets, so existing exams are unaffected.
 model QuestionSet {
-  id               String   @id @default(uuid())
-  labId            String
-  label            String // e.g. "Set A" — faculty-facing only, never shown to students
-  problemStatement String
-  order            Int      @default(0)
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id        String   @id @default(uuid())
+  labId     String
+  label     String // e.g. "Set A" — faculty-facing only, never shown to students
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   lab        Lab            @relation(fields: [labId], references: [id], onDelete: Cascade)
+  questions  Question[]
   workspaces LabWorkspace[]
 
   @@index([labId])
+}
+
+// A set holds as many questions as the lecturer chooses. Questions live in their own rows
+// rather than as one blob on the set, so a set's size is lecturer-defined and each question
+// can carry its own marks. Deliberately NOT called a "problem statement": Lab.problemStatement
+// remains the single-question fallback for exams with no sets, and the two must not be
+// conflated.
+model Question {
+  id            String   @id @default(uuid())
+  questionSetId String
+  order         Int
+  text          String
+  marks         Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  questionSet QuestionSet @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+
+  @@index([questionSetId])
 }
 
 // One persisted record per program run during an attempt: what was compiled, what was

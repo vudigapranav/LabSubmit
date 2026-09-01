@@ -12,6 +12,7 @@ import {
   buildDefaultDrafts,
   draftsFromSections,
 } from '@/components/AnswerSheetConfigurator';
+import { QuestionSetManager } from '@/components/QuestionSetManager';
 import { deriveIntegrityStatus, type IntegrityStatus, type Severity } from '@/lib/examIntegrity';
 import {
   GraduationCap,
@@ -29,6 +30,7 @@ import {
   Clock,
   FileText,
   Code,
+  Layers,
 } from 'lucide-react';
 
 const LANGUAGE_OPTIONS = [
@@ -105,6 +107,7 @@ export default function LecturerDashboard() {
   const [sectionDrafts, setSectionDrafts] = useState<SectionDraft[]>(buildDefaultDrafts());
   // Drives the configurator's warning when a format is edited under a live exam.
   const [editingLabAttempts, setEditingLabAttempts] = useState(0);
+  const [questionSetsLab, setQuestionSetsLab] = useState<any | null>(null);
 
   // Anti-Cheat Permissions
   const [allowCopy, setAllowCopy] = useState(false);
@@ -626,6 +629,14 @@ export default function LecturerDashboard() {
                             {lab.status}
                           </span>
                           <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => setQuestionSetsLab(lab)}
+                              title="Question sets"
+                              aria-label={`Question sets for ${lab.title}`}
+                              className="p-1 rounded text-slate-400 hover:text-indigo-400"
+                            >
+                              <Layers className="w-4 h-4" />
+                            </button>
                             <button onClick={() => openEditModal(lab)} className="p-1 rounded text-slate-400 hover:text-brand-blue-500">
                               <Edit2 className="w-4 h-4" />
                             </button>
@@ -874,6 +885,16 @@ export default function LecturerDashboard() {
             </form>
           </div>
         </div>
+      )}
+
+      {questionSetsLab && (
+        <QuestionSetManager
+          labId={questionSetsLab.id}
+          labTitle={questionSetsLab.title}
+          token={token || ''}
+          onClose={() => setQuestionSetsLab(null)}
+          onChanged={fetchWorkspaceData}
+        />
       )}
 
       {/* Submission Inspector Modal */}

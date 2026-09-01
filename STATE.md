@@ -3,8 +3,8 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after completing the customizable digital answer sheet
-(configuration, preview, and execution-connected Input/Output) on
+**Last updated:** 2026-09-01, after completing randomized multi-question question sets
+(authoring, assignment, hidden student identity, faculty mapping) on
 `claude/labsubmit-development-y605fv`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
@@ -118,6 +118,32 @@ only* and belongs under In Progress, not Completed.
   lab record contains the program's output and nothing else. This reuses the existing
   execution path — no second editor, no second execution route.
 
+### Randomized question sets — *completed this session*
+- A lecturer authors **multiple sets per examination**, each holding a **lecturer-defined
+  number of questions** (`Question` rows under `QuestionSet`, not one blob per set), with
+  optional per-question marks and reordering.
+- Question Sets manager opened from the exam row: create/rename/delete sets, toggle a set
+  active, add/edit/reorder/delete questions, with live counts of how many students hold
+  each set.
+- **Random assignment** on `start_exam`, drawn from the least-used eligible sets so a cohort
+  spreads evenly while the individual draw stays random. The assignment is pinned to the
+  workspace and never re-drawn.
+- A set is eligible only if it is active **and has at least one question**, so a student can
+  never be handed a blank paper.
+- **Student set identity is hidden.** `toStudentPaper()` builds the student payload from
+  what a student may know (question order, text, marks) rather than by deleting fields from
+  the internal object. Set id, set label, how many sets exist and sibling-set content are all
+  absent — verified by scanning entire raw student responses for each. The workspace's own
+  `questionSetId` foreign key is stripped too: it is not a label, but it is a stable
+  identifier two students could compare to discover they hold the same paper.
+- **Faculty see the full mapping**: a student→set table (roll number, name, set, start time,
+  status) plus per-set assignment counts, and the submission inspector shows which set a
+  student sat and the exact questions they were given.
+- Deleting a set students are already sitting is **refused** (it would blank their paper
+  mid-exam); the lecturer is told to deactivate it instead, which stops future assignment
+  while leaving existing attempts intact.
+- Exams with no sets are unaffected: they continue to serve `Lab.problemStatement`.
+
 ### Device policy — *added this session*
 - Server-side device classification from request headers (`User-Agent`,
   `Sec-CH-UA-Mobile`, `Sec-CH-UA-Platform`) in `src/lib/deviceEligibility.ts`.
@@ -151,27 +177,23 @@ only* and belongs under In Progress, not Completed.
 - **Execution regression:** real C source compiled and run through the live WebSocket
   engine with interactive stdin (`7` → `square=49`), verifying exit code 0, that captured
   output excludes platform banners, and that it contains no ANSI escapes. Captured Output
-  content was exactly `"Enter n: 7\nsquare=49\n"`.
+  content was exactly `"Enter n: 7\nsquare=49\n"`. Re-run after the question-set work on an
+  exam that uses sets, together with the answer-sheet save/validate path.
+- **Question sets:** 19 unit assertions (normalisation, assignability, identity stripping,
+  and a simulated 60-student cohort spreading exactly 20/20/20 while drawing randomly) and
+  18 end-to-end assertions against a live database with 12 real students — two sets of
+  differing size authored, a 6/6 random-but-even split observed, every student's full raw
+  payload scanned for set ids, labels, sibling-set content and counts (none present),
+  assignment pinned across repeated fetches, inactive and empty sets never assigned, the
+  faculty mapping visible, deletion of an in-use set refused, and an exam with no sets still
+  serving its own statement. 11 browser assertions over the authoring UI and mapping table.
+- **A real leak was found and fixed by this testing:** the student's workspace object still
+  carried `questionSetId`. It is now stripped alongside the joined set.
 
 ## 2. In progress
 
 These have **database schema and, where noted, partial runtime support**, but are not
 usable end to end.
-
-### Randomized question sets — runtime path done, authoring missing
-- `QuestionSet` model and `LabWorkspace.questionSetId` exist.
-- Random assignment **is implemented and live**: `pickQuestionSetId()` draws at random from
-  the least-used active sets (random, but evenly spread), pins the set to the workspace on
-  `start_exam`, and never re-draws.
-- Student payloads resolve the assigned set's statement and **strip the set identity**;
-  when sets exist but none is assigned yet, the statement is withheld entirely.
-- Lecturer submission payloads expose `questionSetLabel` — the student-to-set mapping is
-  visible to evaluators, as required.
-- **Missing:** any way for a lecturer to *create* a set. There is no authoring API and no
-  UI. With no sets in the database the code falls back to `Lab.problemStatement`, which is
-  exactly today's behaviour — so the feature is currently inert in practice.
-- **Missing:** a set currently holds a *single* `problemStatement` string. The requirement
-  that a set contain a lecturer-defined number of questions is **not** modelled yet.
 
 ### Input/output capture — client-side capture done, persistence not
 - Runs **are** captured client-side and can be inserted into the Input/Output sections of
@@ -204,9 +226,9 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
 | # | Requirement | Status |
 |---|---|---|
 | 1 | Unified customizable answer-sheet examination model | ✅ Complete, including preview |
-| 2 | Multiple randomized question sets | ⏳ Assignment done; authoring and multi-question sets outstanding |
-| 3 | Hidden student set identity | ✅ Complete (payloads strip it server-side) |
-| 4 | Lecturer-visible assignment mapping | ✅ Complete (`questionSetLabel` in the inspector) |
+| 2 | Multiple randomized question sets | ✅ Complete, with lecturer-defined question counts |
+| 3 | Hidden student set identity | ✅ Complete (payload built from what a student may know; ids, labels and counts all absent) |
+| 4 | Lecturer-visible assignment mapping | ✅ Complete (student→set table plus per-set counts and the inspector badge) |
 | 5 | Mobile-compatible general application | ⏳ Partial, unaudited |
 | 6 | Desktop/laptop-only active exams | ✅ Complete, enforced server-side at all entry points |
 | 7 | Digital record containing configurable sections | ✅ Complete |
@@ -217,10 +239,12 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
 
 ## 4. Known limitations
 
-- **Question sets are inert.** Because no authoring path exists, no examination can
-  actually have more than one set today.
-- **A question set holds one statement, not many questions.** The model does not yet match
-  the requirement.
+- **Set assignment is not re-balanced retroactively.** Adding a set mid-exam means students
+  who already started keep their original paper, so the spread across sets can end uneven if
+  sets are added after an exam opens. This is deliberate — re-drawing a live attempt would
+  swap a student's paper underneath them — but it is worth knowing.
+- **A deactivated set still counts toward nothing.** Deactivating removes a set from future
+  assignment but does not redistribute the students already holding it.
 - **Input/Output sections remain student-attested.** "Use last run" fills them from a real
   execution, but a student may still edit the text afterwards or type it by hand, and runs
   are not persisted server-side. The captured content is a convenience and an accuracy aid,

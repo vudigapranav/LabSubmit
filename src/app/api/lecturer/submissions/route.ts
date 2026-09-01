@@ -39,7 +39,11 @@ export async function GET(req: Request) {
       where: whereClause,
       include: {
         lab: {
-          include: { branch: true, subject: true },
+          include: {
+            branch: true,
+            subject: true,
+            answerSheetSections: { orderBy: { order: 'asc' } },
+          },
         },
         student: {
           include: {
@@ -49,7 +53,7 @@ export async function GET(req: Request) {
           },
         },
         workspace: {
-          include: { files: true },
+          include: { files: true, answerSheetResponses: true, questionSet: true },
         },
       },
       orderBy: {
@@ -86,6 +90,24 @@ export async function GET(req: Request) {
       evaluatedAt: sub.evaluatedAt,
       autoSubmitted: sub.workspace.autoSubmitted,
       startedAt: sub.workspace.startedAt,
+      startDeviceClass: sub.workspace.startDeviceClass,
+      // Which set this student sat. Faculty-facing only — the student is never told.
+      questionSetLabel: sub.workspace.questionSet?.label || null,
+      problemStatement: sub.workspace.questionSet?.problemStatement || sub.lab.problemStatement,
+      // The completed answer sheet: the exam's format, with this student's writing in it.
+      answerSheet: sub.lab.answerSheetSections
+        .filter((section: any) => section.enabled)
+        .map((section: any) => ({
+          id: section.id,
+          key: section.key,
+          label: section.label,
+          order: section.order,
+          required: section.required,
+          maxMarks: section.maxMarks,
+          contentSource: section.contentSource,
+          content:
+            sub.workspace.answerSheetResponses.find((r: any) => r.sectionId === section.id)?.content || '',
+        })),
       fullscreenExitCount: sub.workspace.fullscreenExitCount,
       fullscreenExitThreshold: sub.lab.fullscreenExitThreshold,
       violationCount: violationCountMap.get(`${sub.labId}:${sub.studentId}`) || 0,

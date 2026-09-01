@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { defaultSectionConfig } from '../src/lib/answerSheet';
 
 const prisma = new PrismaClient();
 
@@ -7,6 +8,11 @@ async function main() {
   console.log('Seeding CBIT LabSubmit database with Academic Hierarchy & Branch Ranges...');
 
   // Clean all existing data
+  await prisma.sectionEvaluation.deleteMany();
+  await prisma.executionRecord.deleteMany();
+  await prisma.answerSheetResponse.deleteMany();
+  await prisma.answerSheetSection.deleteMany();
+  await prisma.questionSet.deleteMany();
   await prisma.examViolation.deleteMany();
   await prisma.submission.deleteMany();
   await prisma.labFile.deleteMany();
@@ -150,6 +156,20 @@ async function main() {
   // 6. Sample Programming Exams
   const now = new Date();
 
+  // Every exam ships with the unified answer sheet in its default arrangement — the same
+  // format a lecturer gets when they create one through the dashboard.
+  const answerSheetSections = {
+    create: defaultSectionConfig().map((s) => ({
+      key: s.key,
+      label: s.label,
+      order: s.order,
+      enabled: s.enabled,
+      required: s.required,
+      maxMarks: s.maxMarks,
+      contentSource: s.contentSource,
+    })),
+  };
+
   const labJava1 = await prisma.lab.create({
     data: {
       title: 'Exam 1: Java Classes, Objects & Methods',
@@ -172,6 +192,8 @@ async function main() {
       examModeEnabled: true,
       isPublished: true,
       fullscreenExitThreshold: 3,
+      requireDesktopDevice: true,
+      answerSheetSections,
     },
   });
 
@@ -197,6 +219,8 @@ async function main() {
       examModeEnabled: true,
       isPublished: true,
       fullscreenExitThreshold: 3,
+      requireDesktopDevice: true,
+      answerSheetSections,
     },
   });
 
@@ -222,6 +246,8 @@ async function main() {
       examModeEnabled: true,
       isPublished: true,
       fullscreenExitThreshold: 3,
+      requireDesktopDevice: true,
+      answerSheetSections,
     },
   });
 

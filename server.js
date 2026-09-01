@@ -51,10 +51,13 @@ app.prepare().then(() => {
     // Note: Do NOT call socket.destroy() here so Next.js HMR /_next/webpack-hmr and other upgrade handlers work properly!
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, request) => {
     console.log('[STAGE: WS CONNECTED] Client connected to PTY WebSocket endpoint');
 
-    const controller = new ExecutionControllerClass(ws);
+    // The upgrade request's headers are forwarded so the controller can apply the same
+    // server-side exam-device restriction the REST routes do. A phone cannot reach the
+    // execution engine directly to sidestep the check in /api/student/workspace.
+    const controller = new ExecutionControllerClass(ws, request && request.headers);
 
     ws.on('message', async (data) => {
       console.log(`[STAGE: WS MESSAGE] Received ${data.length} bytes`);

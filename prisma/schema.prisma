@@ -11,99 +11,99 @@ generator client {
 }
 
 model User {
-  id           String          @id @default(uuid())
-  email        String?         @unique
-  rollNumber   String?         @unique
-  password     String
-  name         String
-  role         String          // ADMIN, LECTURER, STUDENT
-  theme        String          @default("light") // light, dark
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id         String   @id @default(uuid())
+  email      String?  @unique
+  rollNumber String?  @unique
+  password   String
+  name       String
+  role       String // ADMIN, LECTURER, STUDENT
+  theme      String   @default("light") // light, dark
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // Profile relations
   lecturerProfile LecturerProfile?
   studentProfile  StudentProfile?
 
   // Lecturer relations
-  createdLabs          Lab[]             @relation("LecturerLabs")
-  assignedSubjects     Subject[]         @relation("LecturerSubjects")
-  evaluatedSubmissions Submission[]      @relation("EvaluatedSubmissions")
+  createdLabs          Lab[]        @relation("LecturerLabs")
+  assignedSubjects     Subject[]    @relation("LecturerSubjects")
+  evaluatedSubmissions Submission[] @relation("EvaluatedSubmissions")
 
   // Student relations
-  workspaces   LabWorkspace[] @relation("StudentWorkspaces")
-  submissions  Submission[]   @relation("StudentSubmissions")
-  violations   ExamViolation[]
+  workspaces  LabWorkspace[]  @relation("StudentWorkspaces")
+  submissions Submission[]    @relation("StudentSubmissions")
+  violations  ExamViolation[]
 }
 
 model LecturerProfile {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  maxStudents Int      @default(60)
-  department  String   @default("Computer Science & Engineering")
-  phone       String   @default("")
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String @id @default(uuid())
+  userId      String @unique
+  maxStudents Int    @default(60)
+  department  String @default("Computer Science & Engineering")
+  phone       String @default("")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Branch {
-  id          String   @id @default(uuid())
-  name        String   // e.g. CSE-1, CSE-2, CSE-3, IT-1, IT-2, ECE-A, ECE-B
-  year        Int      // 1, 2, 3, 4
-  rollStart   String?  // e.g. 160125733001
-  rollEnd     String?  // e.g. 160125733060
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  name      String // e.g. CSE-1, CSE-2, CSE-3, IT-1, IT-2, ECE-A, ECE-B
+  year      Int // 1, 2, 3, 4
+  rollStart String? // e.g. 160125733001
+  rollEnd   String? // e.g. 160125733060
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  students    StudentProfile[]
-  subjects    Subject[]
-  labs        Lab[]
+  students StudentProfile[]
+  subjects Subject[]
+  labs     Lab[]
 }
 
 model Subject {
-  id          String   @id @default(uuid())
-  name        String   // e.g. Java Programming Lab, Operating Systems Lab, DBMS Lab
-  code        String   // e.g. CS201L
-  semester    Int?     // e.g. 3, 4
-  year        Int      // 1, 2, 3, 4
-  branchId    String
-  lecturerId  String?  // Assigned Lecturer
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  name       String // e.g. Java Programming Lab, Operating Systems Lab, DBMS Lab
+  code       String // e.g. CS201L
+  semester   Int? // e.g. 3, 4
+  year       Int // 1, 2, 3, 4
+  branchId   String
+  lecturerId String? // Assigned Lecturer
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  lecturer    User?    @relation("LecturerSubjects", fields: [lecturerId], references: [id], onDelete: SetNull)
-  labs        Lab[]
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  lecturer User?  @relation("LecturerSubjects", fields: [lecturerId], references: [id], onDelete: SetNull)
+  labs     Lab[]
 }
 
 model StudentProfile {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  rollNumber  String   @unique // 1601XXXXXXXX
-  year        Int      // 1, 2, 3, 4
-  branchId    String?
+  id         String  @id @default(uuid())
+  userId     String  @unique
+  rollNumber String  @unique // 1601XXXXXXXX
+  year       Int // 1, 2, 3, 4
+  branchId   String?
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  branch      Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 }
 
 model Lab {
-  id               String        @id @default(uuid())
+  id               String    @id @default(uuid())
   title            String
   description      String
   problemStatement String
-  year             Int           // 1, 2, 3, 4
+  year             Int // 1, 2, 3, 4
   branchId         String?
   subjectId        String?
   lecturerId       String
   dueDate          DateTime?
-  allowCopy        Boolean       @default(false)
-  allowPaste       Boolean       @default(false)
-  allowCut         Boolean       @default(false)
-  allowRightClick  Boolean       @default(false)
-  allowDragDrop    Boolean       @default(false)
-  createdAt        DateTime      @default(now())
+  allowCopy        Boolean   @default(false)
+  allowPaste       Boolean   @default(false)
+  allowCut         Boolean   @default(false)
+  allowRightClick  Boolean   @default(false)
+  allowDragDrop    Boolean   @default(false)
+  createdAt        DateTime  @default(now())
 
   // Exam scheduling
   examDate                DateTime?
@@ -112,15 +112,23 @@ model Lab {
   durationMinutes         Int?
   allowedLanguages        String    @default("c,cpp,java,python") // CSV: c, cpp, java, python
   examModeEnabled         Boolean   @default(true)
-  isPublished              Boolean   @default(false)
+  isPublished             Boolean   @default(false)
   fullscreenExitThreshold Int       @default(3)
 
-  lecturer         User          @relation("LecturerLabs", fields: [lecturerId], references: [id], onDelete: Cascade)
-  branch           Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  subject          Subject?      @relation(fields: [subjectId], references: [id], onDelete: SetNull)
-  workspaces       LabWorkspace[]
-  submissions      Submission[]
-  violations       ExamViolation[]
+  // Exam-device restriction. An active attempt may only be STARTED and continued from a
+  // desktop-class device; dashboards, notices and results stay reachable from any device.
+  // Enforced server-side from request headers (see src/lib/deviceEligibility.ts), never
+  // from CSS or client-only checks.
+  requireDesktopDevice Boolean @default(true)
+
+  lecturer            User                 @relation("LecturerLabs", fields: [lecturerId], references: [id], onDelete: Cascade)
+  branch              Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  subject             Subject?             @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  workspaces          LabWorkspace[]
+  submissions         Submission[]
+  violations          ExamViolation[]
+  answerSheetSections AnswerSheetSection[]
+  questionSets        QuestionSet[]
 }
 
 model LabWorkspace {
@@ -136,25 +144,36 @@ model LabWorkspace {
   startedAt           DateTime? // set when the student clicks "Start Exam" — begins their personal countdown
   fullscreenExitCount Int       @default(0)
   autoSubmitted       Boolean   @default(false)
-  sessionId           String?   // active browser-session claim, for duplicate-session detection
+  sessionId           String? // active browser-session claim, for duplicate-session detection
   lastActivityAt      DateTime? // updated by the heartbeat endpoint while the exam is open
 
-  lab         Lab       @relation(fields: [labId], references: [id], onDelete: Cascade)
-  student     User      @relation("StudentWorkspaces", fields: [studentId], references: [id], onDelete: Cascade)
-  files       LabFile[]
-  submissions Submission[]
+  // Question set randomly assigned by the server when the attempt starts. Deliberately
+  // never surfaced to the student by name — they see only the statement it carries.
+  questionSetId String?
+
+  // Device class recorded at start_exam, for the audit trail (see deviceEligibility.ts).
+  startDeviceClass String?
+  startUserAgent   String?
+
+  lab                  Lab                   @relation(fields: [labId], references: [id], onDelete: Cascade)
+  student              User                  @relation("StudentWorkspaces", fields: [studentId], references: [id], onDelete: Cascade)
+  questionSet          QuestionSet?          @relation(fields: [questionSetId], references: [id], onDelete: SetNull)
+  files                LabFile[]
+  submissions          Submission[]
+  answerSheetResponses AnswerSheetResponse[]
+  executionRecords     ExecutionRecord[]
 }
 
 model LabFile {
-  id          String       @id @default(uuid())
+  id          String   @id @default(uuid())
   workspaceId String
-  filename    String       // e.g. main.c, solution.cpp, App.java, script.js
+  filename    String // e.g. main.c, solution.cpp, App.java, script.js
   content     String
-  language    String       // c, cpp, java, javascript
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  language    String // c, cpp, java, javascript
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  workspace   LabWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace LabWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model Submission {
@@ -171,19 +190,20 @@ model Submission {
   evaluatedAt DateTime?
   evaluatorId String?
 
-  lab         Lab          @relation(fields: [labId], references: [id], onDelete: Cascade)
-  student     User         @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)
-  workspace   LabWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  evaluator   User?        @relation("EvaluatedSubmissions", fields: [evaluatorId], references: [id], onDelete: SetNull)
+  lab                Lab                 @relation(fields: [labId], references: [id], onDelete: Cascade)
+  student            User                @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)
+  workspace          LabWorkspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  evaluator          User?               @relation("EvaluatedSubmissions", fields: [evaluatorId], references: [id], onDelete: SetNull)
+  sectionEvaluations SectionEvaluation[]
 }
 
 model ExamViolation {
   id        String   @id @default(uuid())
   labId     String
   studentId String
-  type      String   // FULLSCREEN_EXIT, FULLSCREEN_ENTER, WINDOW_BLUR, VISIBILITY_HIDDEN, DEVTOOLS_ATTEMPT,
-                     // COPY_ATTEMPT, CUT_ATTEMPT, PASTE_ATTEMPT, CONTEXT_MENU_ATTEMPT, SELECT_ALL_ATTEMPT,
-                     // DUPLICATE_SESSION, EXAM_TIMEOUT — see src/lib/examIntegrity.ts for the severity mapping
+  type      String // FULLSCREEN_EXIT, FULLSCREEN_ENTER, WINDOW_BLUR, VISIBILITY_HIDDEN, DEVTOOLS_ATTEMPT,
+  // COPY_ATTEMPT, CUT_ATTEMPT, PASTE_ATTEMPT, CONTEXT_MENU_ATTEMPT, SELECT_ALL_ATTEMPT,
+  // DUPLICATE_SESSION, EXAM_TIMEOUT — see src/lib/examIntegrity.ts for the severity mapping
   severity  String   @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL — server-computed, never client-supplied
   details   String?
   createdAt DateTime @default(now())
@@ -193,4 +213,110 @@ model ExamViolation {
 
   @@index([labId, studentId])
   @@index([labId])
+}
+
+// ---------------------------------------------------------------------------
+// Unified digital answer sheet
+//
+// ONE examination model, not several formats: every exam uses the same answer
+// sheet, and the lecturer decides which of its sections are switched on, in what
+// order, under what label, whether each is mandatory, and what it is worth. A lab
+// with no rows here behaves exactly as before this model existed — code-only —
+// so every pre-existing exam keeps working untouched.
+// ---------------------------------------------------------------------------
+
+model AnswerSheetSection {
+  id       String  @id @default(uuid())
+  labId    String
+  key      String // AIM, DESCRIPTION, ALGORITHM, PROCEDURE, CODE, INPUT, OUTPUT, CONCLUSION, ITERATION
+  label    String // lecturer-editable display heading, e.g. "Aim / Objective"
+  order    Int // ascending render order
+  enabled  Boolean @default(true)
+  required Boolean @default(false)
+  maxMarks Float? // optional per-section weighting; null = not separately weighted
+
+  // Where this section's content comes from:
+  //   TEXT          — the student writes it in the answer sheet
+  //   CODE_FILES    — satisfied by the workspace's source files (the IDE), not a textarea
+  //   EXECUTION_IO  — the input fed to / output produced by a program run
+  contentSource String @default("TEXT")
+
+  lab         Lab                   @relation(fields: [labId], references: [id], onDelete: Cascade)
+  responses   AnswerSheetResponse[]
+  evaluations SectionEvaluation[]
+
+  @@unique([labId, key])
+  @@index([labId])
+}
+
+model AnswerSheetResponse {
+  id          String   @id @default(uuid())
+  workspaceId String
+  sectionId   String
+  content     String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace LabWorkspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  section   AnswerSheetSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, sectionId])
+  @@index([workspaceId])
+}
+
+// A lecturer authors several sets per exam; the server picks one at random when a
+// student starts their attempt and pins it to that workspace. Falls back to
+// Lab.problemStatement when an exam has no sets, so existing exams are unaffected.
+model QuestionSet {
+  id               String   @id @default(uuid())
+  labId            String
+  label            String // e.g. "Set A" — faculty-facing only, never shown to students
+  problemStatement String
+  order            Int      @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  lab        Lab            @relation(fields: [labId], references: [id], onDelete: Cascade)
+  workspaces LabWorkspace[]
+
+  @@index([labId])
+}
+
+// One persisted record per program run during an attempt: what was compiled, what was
+// typed into it, and what it printed — the evidence an evaluator needs to judge the
+// Input and Output sections of the answer sheet.
+model ExecutionRecord {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  filename      String
+  language      String
+  stdin         String   @default("")
+  stdout        String   @default("")
+  exitCode      Int?
+  durationMs    Int?
+  compileFailed Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  workspace LabWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+// Per-section marks. Submission.marks stays the authoritative total the student sees;
+// these rows are the breakdown behind it.
+model SectionEvaluation {
+  id           String   @id @default(uuid())
+  submissionId String
+  sectionId    String
+  marks        Float?
+  remarks      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  submission Submission         @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  section    AnswerSheetSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, sectionId])
+  @@index([submissionId])
 }

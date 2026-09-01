@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import { detectClientDeviceClass } from '@/lib/useDeviceClass';
 import {
   Terminal as TerminalIcon,
   Square,
@@ -247,6 +248,9 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
               rows,
               labId,
               token,
+              // Narrow-only hint for the server's exam-device check (iPadOS reports a
+              // desktop UA); the server decides, and ignores this unless it is stricter.
+              deviceClass: detectClientDeviceClass(),
             })
           );
           setTimeout(() => {

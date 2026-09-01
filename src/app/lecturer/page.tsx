@@ -6,6 +6,12 @@ import { useApp } from '@/context/AppContext';
 import { Navbar } from '@/components/Navbar';
 import { ProfileModal } from '@/components/ProfileModal';
 import { OnlineIDE } from '@/components/OnlineIDE';
+import {
+  AnswerSheetConfigurator,
+  SectionDraft,
+  buildDefaultDrafts,
+  draftsFromSections,
+} from '@/components/AnswerSheetConfigurator';
 import { deriveIntegrityStatus, type IntegrityStatus, type Severity } from '@/lib/examIntegrity';
 import {
   GraduationCap,
@@ -21,6 +27,8 @@ import {
   Hourglass,
   PlayCircle,
   Clock,
+  FileText,
+  Code,
 } from 'lucide-react';
 
 const LANGUAGE_OPTIONS = [
@@ -93,6 +101,8 @@ export default function LecturerDashboard() {
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(['c', 'cpp', 'java', 'python']);
   const [examModeEnabled, setExamModeEnabled] = useState(true);
   const [fullscreenThresholdInput, setFullscreenThresholdInput] = useState('3');
+  const [requireDesktopDevice, setRequireDesktopDevice] = useState(true);
+  const [sectionDrafts, setSectionDrafts] = useState<SectionDraft[]>(buildDefaultDrafts());
 
   // Anti-Cheat Permissions
   const [allowCopy, setAllowCopy] = useState(false);
@@ -104,6 +114,7 @@ export default function LecturerDashboard() {
   const [evalRemarks, setEvalRemarks] = useState('');
   const [evalStatus, setEvalStatus] = useState('APPROVED');
   const [evalPublish, setEvalPublish] = useState(true);
+  const [inspectorPane, setInspectorPane] = useState<'sheet' | 'code'>('sheet');
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -203,6 +214,8 @@ export default function LecturerDashboard() {
     setSelectedLanguages(['c', 'cpp', 'java', 'python']);
     setExamModeEnabled(true);
     setFullscreenThresholdInput('3');
+    setRequireDesktopDevice(true);
+    setSectionDrafts(buildDefaultDrafts());
   };
 
   const openCreateModal = () => {
@@ -228,6 +241,8 @@ export default function LecturerDashboard() {
     );
     setExamModeEnabled(lab.examModeEnabled !== undefined ? lab.examModeEnabled : true);
     setFullscreenThresholdInput(String(lab.fullscreenExitThreshold ?? 3));
+    setRequireDesktopDevice(lab.requireDesktopDevice !== undefined ? lab.requireDesktopDevice : true);
+    setSectionDrafts(draftsFromSections(lab.answerSheetSections));
     setShowLabModal(true);
   };
 
@@ -245,6 +260,10 @@ export default function LecturerDashboard() {
     }
     if (selectedLanguages.length === 0) {
       showToast('error', 'Select at least one allowed programming language');
+      return;
+    }
+    if (!sectionDrafts.some((d) => d.enabled)) {
+      showToast('error', 'Enable at least one answer sheet section');
       return;
     }
 
@@ -273,7 +292,16 @@ export default function LecturerDashboard() {
           allowedLanguages: selectedLanguages,
           examModeEnabled,
           fullscreenExitThreshold: parseInt(fullscreenThresholdInput) || 3,
+          requireDesktopDevice,
           isPublished: publish,
+          answerSheetSections: sectionDrafts.map((d, i) => ({
+            key: d.key,
+            label: d.label,
+            order: i + 1,
+            enabled: d.enabled,
+            required: d.required,
+            maxMarks: d.maxMarks,
+          })),
         }),
       });
       const data = await res.json();
@@ -815,7 +843,20 @@ export default function LecturerDashboard() {
                   <label className="flex items-center space-x-2"><input type="checkbox" checked={allowCopy} onChange={(e) => setAllowCopy(e.target.checked)} /><span>Allow Copy</span></label>
                   <label className="flex items-center space-x-2"><input type="checkbox" checked={allowPaste} onChange={(e) => setAllowPaste(e.target.checked)} /><span>Allow Paste</span></label>
                 </div>
+
+                <label className="flex items-start space-x-2 text-xs font-semibold text-slate-900 dark:text-white pt-1">
+                  <input type="checkbox" checked={requireDesktopDevice} onChange={(e) => setRequireDesktopDevice(e.target.checked)} className="mt-0.5" />
+                  <span>
+                    Require a computer to sit this exam
+                    <span className="block font-normal text-[10px] text-slate-500 dark:text-slate-400">
+                      Blocks phones and tablets from starting or continuing an attempt, checked on the server. Students can still
+                      use a phone for their dashboard, notices and results.
+                    </span>
+                  </span>
+                </label>
               </div>
+
+              <AnswerSheetConfigurator drafts={sectionDrafts} onChange={setSectionDrafts} />
 
               <div className="flex justify-end space-x-2 pt-2">
                 <button type="button" onClick={() => setShowLabModal(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">Cancel</button>
@@ -836,13 +877,88 @@ export default function LecturerDashboard() {
                 <span className="font-mono font-bold text-white text-base mr-3">{selectedSubmission.studentRollNumber}</span>
                 <span className="text-slate-300 font-semibold">{selectedSubmission.studentName}</span>
                 {selectedSubmission.autoSubmitted && <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-amber-950/40 text-amber-300 border border-amber-800/50">AUTO-SUBMITTED</span>}
+                {/* Faculty-facing only — the student is never shown which set they sat. */}
+                {selectedSubmission.questionSetLabel && (
+                  <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-indigo-950/40 text-indigo-300 border border-indigo-800/50">
+                    {selectedSubmission.questionSetLabel}
+                  </span>
+                )}
+                {selectedSubmission.startDeviceClass && (
+                  <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400 border border-slate-700">
+                    {selectedSubmission.startDeviceClass}
+                  </span>
+                )}
               </div>
               <button onClick={() => setSelectedSubmission(null)} className="px-3 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold">Close</button>
             </div>
 
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-4 gap-4">
-              <div className="flex-1 h-full overflow-hidden">
-                <OnlineIDE labId={selectedSubmission.labId} labTitle={selectedSubmission.labTitle} problemStatement="" readOnly={true} initialFiles={selectedSubmission.files || []} isSubmitted={true} />
+              <div className="flex-1 h-full overflow-hidden flex flex-col min-h-0">
+                {(selectedSubmission.answerSheet?.length || 0) > 0 && (
+                  <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setInspectorPane('sheet')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'sheet' ? 'bg-brand-blue-600 border-brand-blue-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Answer Sheet</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInspectorPane('code')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'code' ? 'bg-brand-olive-700 border-brand-olive-600 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                    >
+                      <Code className="w-3.5 h-3.5" />
+                      <span>Code</span>
+                    </button>
+                  </div>
+                )}
+
+                {(selectedSubmission.answerSheet?.length || 0) > 0 && inspectorPane === 'sheet' ? (
+                  <div className="flex-1 min-h-0 overflow-y-auto bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-5">
+                    {selectedSubmission.problemStatement && (
+                      <div className="space-y-1.5 border-b border-slate-800 pb-4">
+                        <h4 className="text-xs font-bold text-slate-300">Question</h4>
+                        <p className="text-[11px] text-slate-400 whitespace-pre-wrap leading-relaxed">{selectedSubmission.problemStatement}</p>
+                      </div>
+                    )}
+
+                    {selectedSubmission.answerSheet.map((section: any, i: number) => (
+                      <div key={section.id} className="space-y-1.5">
+                        <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                          <span className="text-slate-500 font-mono">{i + 1}.</span>
+                          <span>{section.label}</span>
+                          {section.maxMarks !== null && (
+                            <span className="text-[10px] font-semibold text-slate-400 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5">
+                              {section.maxMarks} marks
+                            </span>
+                          )}
+                        </h4>
+
+                        {section.contentSource === 'CODE_FILES' ? (
+                          <p className="text-[11px] text-slate-500 italic">
+                            See the Code tab — {(selectedSubmission.files || []).length} file(s) submitted.
+                          </p>
+                        ) : section.content.trim() ? (
+                          <p
+                            className={`text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed bg-slate-900 border border-slate-800 rounded-xl p-3 ${section.contentSource === 'EXECUTION_IO' ? 'font-mono' : ''}`}
+                          >
+                            {section.content}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-rose-400/80 italic">
+                            Left blank{section.required ? ' (required section)' : ''}.
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <OnlineIDE labId={selectedSubmission.labId} labTitle={selectedSubmission.labTitle} problemStatement="" readOnly={true} initialFiles={selectedSubmission.files || []} isSubmitted={true} fillParent />
+                  </div>
+                )}
               </div>
 
               <div className="w-full md:w-80 flex flex-col space-y-4 overflow-y-auto">

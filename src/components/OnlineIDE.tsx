@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { useApp } from '@/context/AppContext';
 import { AntiCheatWrapper } from './AntiCheatWrapper';
+import { detectClientDeviceClass } from '@/lib/useDeviceClass';
 import { Terminal, TerminalRef } from './Terminal';
 import {
   Play,
@@ -51,6 +52,12 @@ interface OnlineIDEProps {
   allowDragDrop?: boolean;
   onViolation?: (type: string, details?: string) => void;
   allowedLanguages?: string[];
+  /**
+   * Fill the parent's height instead of assuming the IDE owns the viewport. Set when the
+   * IDE shares the page with the answer sheet; left off elsewhere (e.g. the faculty
+   * Submission Inspector modal) so those layouts are unchanged.
+   */
+  fillParent?: boolean;
 }
 
 export const OnlineIDE: React.FC<OnlineIDEProps> = ({
@@ -68,6 +75,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   allowDragDrop = false,
   onViolation,
   allowedLanguages,
+  fillParent = false,
 }) => {
   const { token, theme } = useApp();
   const newFileLanguageOptions = allowedLanguages && allowedLanguages.length > 0
@@ -136,6 +144,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token || localStorage.getItem('cbit_token')}`,
+          'X-LabSubmit-Device-Class': detectClientDeviceClass(),
         },
         body: JSON.stringify({
           action: 'save_file',
@@ -164,6 +173,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token || localStorage.getItem('cbit_token')}`,
+          'X-LabSubmit-Device-Class': detectClientDeviceClass(),
         },
         body: JSON.stringify({
           action: 'create_file',
@@ -194,6 +204,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token || localStorage.getItem('cbit_token')}`,
+          'X-LabSubmit-Device-Class': detectClientDeviceClass(),
         },
         body: JSON.stringify({
           action: 'rename_file',
@@ -228,6 +239,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token || localStorage.getItem('cbit_token')}`,
+          'X-LabSubmit-Device-Class': detectClientDeviceClass(),
         },
         body: JSON.stringify({
           action: 'delete_file',
@@ -284,6 +296,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('cbit_token')}`,
+          'X-LabSubmit-Device-Class': detectClientDeviceClass(),
         },
         body: JSON.stringify({
           action: 'submit_lab',
@@ -329,7 +342,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
       allowDragDrop={allowDragDrop}
       onViolation={onViolation}
     >
-      <div className="flex flex-col h-[calc(100vh-5rem)] w-full bg-slate-950 text-slate-100 rounded-2xl overflow-hidden shadow-md border border-slate-800">
+      <div className={`flex flex-col ${fillParent ? 'h-full' : 'h-[calc(100vh-5rem)]'} w-full bg-slate-950 text-slate-100 rounded-2xl overflow-hidden shadow-md border border-slate-800`}>
         {notification && (
           <div
             className={`px-4 py-2 text-xs font-semibold flex items-center justify-between transition-colors ${

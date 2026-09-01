@@ -63,7 +63,19 @@ export interface CodeExecutionResult {
 }
 
 export type WsClientMessage =
-  | { type: 'run'; filename: string; code: string; files?: SourceFile[]; cols?: number; rows?: number; token: string; labId: string }
+  | {
+      type: 'run';
+      filename: string;
+      code: string;
+      files?: SourceFile[];
+      cols?: number;
+      rows?: number;
+      token: string;
+      labId: string;
+      // Client-volunteered device class. Only ever narrows eligibility server-side —
+      // see src/lib/deviceEligibility.ts.
+      deviceClass?: string;
+    }
   | { type: 'input'; data: string }
   | { type: 'resize'; cols: number; rows: number }
   | { type: 'stop' };

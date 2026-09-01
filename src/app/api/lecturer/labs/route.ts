@@ -2,6 +2,76 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getExamStatus, serializeAllowedLanguages } from '@/lib/examTiming';
+import { defaultSectionConfig, normalizeSectionConfig, NormalizedSection } from '@/lib/answerSheet';
+
+// The lecturer's answer-sheet format, resolved for a brand-new exam. An empty or absent
+// payload falls back to the standard unified format rather than to no sheet at all, so an
+// exam is never created without one.
+function sectionsForCreate(input: unknown) {
+  const normalized = normalizeSectionConfig(input);
+  const sections: NormalizedSection[] =
+    normalized.length > 0
+      ? normalized
+      : defaultSectionConfig().map((s) => ({
+          key: s.key,
+          label: s.label,
+          order: s.order,
+          enabled: s.enabled,
+          required: s.required,
+          maxMarks: s.maxMarks,
+          contentSource: s.contentSource,
+        }));
+
+  return sections.map((s) => ({
+    key: s.key,
+    label: s.label,
+    order: s.order,
+    enabled: s.enabled,
+    required: s.required,
+    maxMarks: s.maxMarks,
+    contentSource: s.contentSource,
+  }));
+}
+
+// Reconfiguring the format of an exam that students may already have answered: sections
+// are matched by key and UPDATED IN PLACE, never dropped and recreated, so a section that
+// is merely switched off keeps the answers already written into it (and gets them back if
+// the lecturer switches it on again). Only a key the lecturer removed from the format
+// entirely is deleted, which cascades its responses — the one genuinely destructive case,
+// and an explicit one.
+async function syncAnswerSheetSections(labId: string, input: unknown) {
+  const sections = normalizeSectionConfig(input);
+  if (sections.length === 0) return;
+
+  const keptKeys = sections.map((s) => s.key);
+
+  await prisma.$transaction([
+    prisma.answerSheetSection.deleteMany({ where: { labId, key: { notIn: keptKeys } } }),
+    ...sections.map((s) =>
+      prisma.answerSheetSection.upsert({
+        where: { labId_key: { labId, key: s.key } },
+        create: {
+          labId,
+          key: s.key,
+          label: s.label,
+          order: s.order,
+          enabled: s.enabled,
+          required: s.required,
+          maxMarks: s.maxMarks,
+          contentSource: s.contentSource,
+        },
+        update: {
+          label: s.label,
+          order: s.order,
+          enabled: s.enabled,
+          required: s.required,
+          maxMarks: s.maxMarks,
+          contentSource: s.contentSource,
+        },
+      })
+    ),
+  ]);
+}
 
 export async function GET(req: Request) {
   const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN', 'STUDENT']);
@@ -35,6 +105,7 @@ export async function GET(req: Request) {
         branch: true,
         subject: true,
         lecturer: { select: { name: true, email: true } },
+        answerSheetSections: { orderBy: { order: 'asc' } },
         _count: { select: { submissions: true, workspaces: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -93,6 +164,8 @@ export async function POST(req: Request) {
       examModeEnabled = true,
       isPublished = false,
       fullscreenExitThreshold = 3,
+      requireDesktopDevice = true,
+      answerSheetSections,
     } = body;
 
     if (!title || !problemStatement || !year || !branchId || !subjectId) {
@@ -126,8 +199,12 @@ export async function POST(req: Request) {
         examModeEnabled: Boolean(examModeEnabled),
         isPublished: Boolean(isPublished),
         fullscreenExitThreshold: parseInt(fullscreenExitThreshold) || 3,
+        requireDesktopDevice: Boolean(requireDesktopDevice),
+        // A new exam always gets the unified answer sheet — the lecturer's own layout if
+        // they configured one in the create form, otherwise the standard default format.
+        answerSheetSections: { create: sectionsForCreate(answerSheetSections) },
       },
-      include: { branch: true, subject: true },
+      include: { branch: true, subject: true, answerSheetSections: { orderBy: { order: 'asc' } } },
     });
 
     return NextResponse.json({ message: 'Exam created successfully', lab });
@@ -164,6 +241,8 @@ export async function PUT(req: Request) {
       examModeEnabled,
       isPublished,
       fullscreenExitThreshold,
+      requireDesktopDevice,
+      answerSheetSections,
     } = body;
 
     if (!id) {
@@ -208,11 +287,21 @@ export async function PUT(req: Request) {
         ...(examModeEnabled !== undefined && { examModeEnabled: Boolean(examModeEnabled) }),
         ...(isPublished !== undefined && { isPublished: Boolean(isPublished) }),
         ...(fullscreenExitThreshold !== undefined && { fullscreenExitThreshold: parseInt(fullscreenExitThreshold) || 3 }),
+        ...(requireDesktopDevice !== undefined && { requireDesktopDevice: Boolean(requireDesktopDevice) }),
       },
       include: { branch: true, subject: true },
     });
 
-    return NextResponse.json({ message: 'Exam updated successfully', lab });
+    if (answerSheetSections !== undefined) {
+      await syncAnswerSheetSections(id, answerSheetSections);
+    }
+
+    const labWithSections = await prisma.lab.findUnique({
+      where: { id },
+      include: { branch: true, subject: true, answerSheetSections: { orderBy: { order: 'asc' } } },
+    });
+
+    return NextResponse.json({ message: 'Exam updated successfully', lab: labWithSections ?? lab });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
   }

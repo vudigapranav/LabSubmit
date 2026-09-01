@@ -7,10 +7,50 @@ import { Navbar } from '@/components/Navbar';
 import { OnlineIDE } from '@/components/OnlineIDE';
 import { ExamGuard } from '@/components/ExamGuard';
 import { ProfileModal } from '@/components/ProfileModal';
+import { AnswerSheet, AnswerSheetSection } from '@/components/AnswerSheet';
 import { useViolationLogger } from '@/lib/useViolationLogger';
 import { getOrCreateExamSessionId } from '@/lib/examSession';
-import { ArrowLeft, BookOpen, AlertCircle, ShieldAlert, Maximize, Clock, CheckCircle2, Hourglass } from 'lucide-react';
+import { detectClientDeviceClass, useDeviceClass } from '@/lib/useDeviceClass';
+import { ArrowLeft, BookOpen, AlertCircle, ShieldAlert, Maximize, Clock, CheckCircle2, Hourglass, Laptop, FileText, Code2 } from 'lucide-react';
 import Link from 'next/link';
+
+// Switches between the two halves of one attempt: the written record and the code
+// workspace. Rendered only when the lecturer enabled any answer-sheet section, so an exam
+// configured as code-only looks and behaves exactly as it did before the sheet existed.
+function ExamPaneTabs({ active, onChange }: { active: 'sheet' | 'code'; onChange: (pane: 'sheet' | 'code') => void }) {
+  const base =
+    'flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-colors border';
+  return (
+    <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => onChange('sheet')}
+        aria-pressed={active === 'sheet'}
+        className={`${base} ${
+          active === 'sheet'
+            ? 'bg-brand-blue-600 border-brand-blue-500 text-white'
+            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+        }`}
+      >
+        <FileText className="w-3.5 h-3.5" />
+        <span>Answer Sheet</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('code')}
+        aria-pressed={active === 'code'}
+        className={`${base} ${
+          active === 'code'
+            ? 'bg-brand-olive-700 border-brand-olive-600 text-white'
+            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+        }`}
+      >
+        <Code2 className="w-3.5 h-3.5" />
+        <span>Code &amp; Run</span>
+      </button>
+    </div>
+  );
+}
 
 export default function StudentLabWorkspacePage() {
   const params = useParams();
@@ -21,11 +61,15 @@ export default function StudentLabWorkspacePage() {
   const [labData, setLabData] = useState<any | null>(null);
   const [workspace, setWorkspace] = useState<any | null>(null);
   const [effectiveDeadline, setEffectiveDeadline] = useState<string | null>(null);
+  const [sections, setSections] = useState<AnswerSheetSection[]>([]);
+  const [deviceEligibility, setDeviceEligibility] = useState<{ eligible: boolean; reason: string; deviceClass: string } | null>(null);
+  const [activePane, setActivePane] = useState<'sheet' | 'code'>('sheet');
   const [loadingLab, setLoadingLab] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const logClipboardViolation = useViolationLogger(labId, token || '');
+  const { viewportTooSmall } = useDeviceClass();
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'STUDENT')) {
@@ -43,6 +87,8 @@ export default function StudentLabWorkspacePage() {
         setLabData(data.lab);
         setWorkspace(data.workspace);
         setEffectiveDeadline(data.effectiveDeadline);
+        setSections(data.answerSheetSections || []);
+        setDeviceEligibility(data.deviceEligibility || null);
       } else {
         setLabData(null);
       }
@@ -74,14 +120,32 @@ export default function StudentLabWorkspacePage() {
     try {
       const res = await fetch('/api/student/workspace', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: 'start_exam', labId, sessionId: getOrCreateExamSessionId(labId) }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'X-LabSubmit-Device-Class': detectClientDeviceClass(),
+        },
+        body: JSON.stringify({
+          action: 'start_exam',
+          labId,
+          sessionId: getOrCreateExamSessionId(labId),
+          deviceClass: detectClientDeviceClass(),
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         setWorkspace(data.workspace);
         setEffectiveDeadline(data.effectiveDeadline);
+        // The assigned question set's statement replaces the exam's own. Which set it is
+        // never reaches this client.
+        if (data.problemStatement !== undefined) {
+          setLabData((prev: any) => (prev ? { ...prev, problemStatement: data.problemStatement } : prev));
+        }
       } else {
+        if (data.deviceBlocked) {
+          setDeviceEligibility({ eligible: false, reason: data.error, deviceClass: data.deviceClass });
+          if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+        }
         setStartError(data.error || 'Failed to start exam');
       }
     } catch (e) {
@@ -179,24 +243,52 @@ export default function StudentLabWorkspacePage() {
                       </li>
                       <li>Copy, paste, and right-click are restricted per your instructor's settings.</li>
                       <li>This is your one and only submission attempt.</li>
+                      <li>The examination can only be taken on a laptop or desktop computer.</li>
                     </ul>
                   </div>
                 )}
 
-                {startError && (
-                  <div className="text-xs text-red-400 bg-red-950/40 border border-red-800/60 rounded-lg p-2">
-                    {startError}
+                {/* Exam-device restriction. This card is the courtesy notice; the binding
+                    refusal is made server-side on start_exam and on every action after it. */}
+                {deviceEligibility && !deviceEligibility.eligible ? (
+                  <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-4 space-y-2 text-left">
+                    <div className="flex items-center space-x-2 text-rose-300 font-bold text-xs">
+                      <Laptop className="w-4 h-4" />
+                      <span>A computer is required for this examination</span>
+                    </div>
+                    <p className="text-[11px] text-rose-200/90 leading-relaxed">{deviceEligibility.reason}</p>
+                    <Link
+                      href="/student"
+                      className="inline-block text-[11px] font-semibold text-rose-200 underline underline-offset-2"
+                    >
+                      Return to your dashboard
+                    </Link>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {viewportTooSmall && (
+                      <div className="bg-amber-950/40 border border-amber-800/60 rounded-xl p-3 text-left text-[11px] text-amber-200/90">
+                        Your window is quite narrow for an examination. Maximise your browser before starting so the
+                        editor and answer sheet both fit.
+                      </div>
+                    )}
 
-                <button
-                  onClick={handleStartExam}
-                  disabled={starting}
-                  className="w-full py-3 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-600 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center space-x-2 transition-colors shadow-md"
-                >
-                  <Maximize className="w-4 h-4" />
-                  <span>{starting ? 'Starting...' : 'Start Exam'}</span>
-                </button>
+                    {startError && (
+                      <div className="text-xs text-red-400 bg-red-950/40 border border-red-800/60 rounded-lg p-2">
+                        {startError}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleStartExam}
+                      disabled={starting}
+                      className="w-full py-3 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-600 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center space-x-2 transition-colors shadow-md"
+                    >
+                      <Maximize className="w-4 h-4" />
+                      <span>{starting ? 'Starting...' : 'Start Exam'}</span>
+                    </button>
+                  </>
+                )}
               </>
             ) : labData.status === 'UPCOMING' ? (
               <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 flex items-center justify-center space-x-2 text-slate-300 text-xs font-semibold">
@@ -226,15 +318,33 @@ export default function StudentLabWorkspacePage() {
               read-only.
             </span>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <OnlineIDE
-              labId={labData.id}
-              labTitle={labData.title}
-              problemStatement={labData.problemStatement}
-              readOnly={true}
-              initialFiles={workspace?.files || []}
-              isSubmitted={true}
-            />
+          {sections.length > 0 && <ExamPaneTabs active={activePane} onChange={setActivePane} />}
+
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            {sections.length > 0 && (
+              <div className={`flex-1 min-h-0 ${activePane === 'sheet' ? '' : 'hidden'}`}>
+                <AnswerSheet
+                  labId={labData.id}
+                  token={token || ''}
+                  sections={sections}
+                  initialResponses={workspace?.answerSheetResponses || []}
+                  readOnly={true}
+                  codeFilenames={(workspace?.files || []).map((f: any) => f.filename)}
+                />
+              </div>
+            )}
+
+            <div className={`flex-1 min-h-0 ${sections.length > 0 && activePane !== 'code' ? 'hidden' : ''}`}>
+              <OnlineIDE
+                labId={labData.id}
+                labTitle={labData.title}
+                problemStatement={labData.problemStatement}
+                readOnly={true}
+                initialFiles={workspace?.files || []}
+                isSubmitted={true}
+                fillParent
+              />
+            </div>
           </div>
         </div>
       )}
@@ -253,22 +363,46 @@ export default function StudentLabWorkspacePage() {
             isSubmitted={isSubmitted}
             onAutoSubmit={handleAutoSubmit}
           >
-            <OnlineIDE
-              labId={labData.id}
-              labTitle={labData.title}
-              problemStatement={labData.problemStatement}
-              readOnly={false}
-              initialFiles={workspace?.files || []}
-              isSubmitted={false}
-              onSubmittedSuccess={fetchWorkspace}
-              allowCopy={labData.allowCopy}
-              allowPaste={labData.allowPaste}
-              allowCut={labData.allowCut}
-              allowRightClick={labData.allowRightClick}
-              allowDragDrop={labData.allowDragDrop}
-              onViolation={logClipboardViolation}
-              allowedLanguages={labData.allowedLanguages}
-            />
+            <div className="h-full flex flex-col min-h-0">
+              {sections.length > 0 && <ExamPaneTabs active={activePane} onChange={setActivePane} />}
+
+              {/* Both panes stay MOUNTED and are toggled with `hidden`, never unmounted:
+                  switching to the answer sheet must not tear down the Monaco model, the
+                  terminal buffer or the execution WebSocket mid-exam. */}
+              {sections.length > 0 && (
+                <div className={`flex-1 min-h-0 ${activePane === 'sheet' ? '' : 'hidden'}`}>
+                  <AnswerSheet
+                    labId={labData.id}
+                    token={token || ''}
+                    sections={sections}
+                    initialResponses={workspace?.answerSheetResponses || []}
+                    readOnly={false}
+                    codeFilenames={(workspace?.files || []).map((f: any) => f.filename)}
+                    onOpenEditor={() => setActivePane('code')}
+                  />
+                </div>
+              )}
+
+              <div className={`flex-1 min-h-0 ${sections.length > 0 && activePane !== 'code' ? 'hidden' : ''}`}>
+                <OnlineIDE
+                  labId={labData.id}
+                  labTitle={labData.title}
+                  problemStatement={labData.problemStatement}
+                  readOnly={false}
+                  initialFiles={workspace?.files || []}
+                  isSubmitted={false}
+                  onSubmittedSuccess={fetchWorkspace}
+                  allowCopy={labData.allowCopy}
+                  allowPaste={labData.allowPaste}
+                  allowCut={labData.allowCut}
+                  allowRightClick={labData.allowRightClick}
+                  allowDragDrop={labData.allowDragDrop}
+                  onViolation={logClipboardViolation}
+                  allowedLanguages={labData.allowedLanguages}
+                  fillParent
+                />
+              </div>
+            </div>
           </ExamGuard>
         </div>
       )}

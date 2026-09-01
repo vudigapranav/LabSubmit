@@ -20,13 +20,20 @@ import { verifyToken } from '../jwt';
 import { prisma } from '../db';
 import { getExamStatus, getEffectiveDeadline, isLanguageAllowed } from '../examTiming';
 import { finalizeSubmission } from '../examSubmission';
+import {
+  evaluateDeviceEligibility,
+  headerReaderFromNodeHeaders,
+  readDeviceSignals,
+} from '../deviceEligibility';
 
 export class ExecutionController {
   private ws: WebSocket;
+  private requestHeaders: Record<string, string | string[] | undefined> | undefined;
   private currentSessionId: string | null = null;
 
-  constructor(ws: WebSocket) {
+  constructor(ws: WebSocket, requestHeaders?: Record<string, string | string[] | undefined>) {
     this.ws = ws;
+    this.requestHeaders = requestHeaders;
   }
 
   private sendWs(message: WsServerMessage): void {
@@ -76,7 +83,7 @@ export class ExecutionController {
     // Authorization: verify identity, workspace ownership, and exam window before
     // touching the filesystem or spawning any process. This is the actual security
     // boundary for code execution — everything the client sends is otherwise untrusted.
-    const rejection = await this.authorizeRun(token, labId, filename);
+    const rejection = await this.authorizeRun(token, labId, filename, msg.deviceClass);
     if (rejection) {
       this.sendWs({ type: 'error', code: rejection.code, message: rejection.message });
       this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
@@ -196,7 +203,8 @@ export class ExecutionController {
   private async authorizeRun(
     token: string | undefined,
     labId: string | undefined,
-    filename: string
+    filename: string,
+    deviceClassHint?: string
   ): Promise<{ code: string; message: string } | null> {
     if (!token || !labId) {
       return { code: 'UNAUTHORIZED', message: 'Missing authentication or exam context.' };
@@ -224,6 +232,17 @@ export class ExecutionController {
 
     if (payload.role !== 'STUDENT') {
       return { code: 'UNAUTHORIZED', message: 'Invalid or expired session. Please log in again.' };
+    }
+
+    // Exam-device restriction, from the WebSocket upgrade's own headers — the same rule
+    // the REST layer applies, enforced again here because this socket is a separate entry
+    // point into the same attempt.
+    const device = evaluateDeviceEligibility(
+      readDeviceSignals(headerReaderFromNodeHeaders(this.requestHeaders), deviceClassHint),
+      { requireDesktopDevice: lab.requireDesktopDevice, phase: 'CONTINUE' }
+    );
+    if (!device.eligible) {
+      return { code: 'DEVICE_NOT_ELIGIBLE', message: device.reason };
     }
 
     const workspace = await prisma.labWorkspace.findFirst({

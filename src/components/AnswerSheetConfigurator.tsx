@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
-import { ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowUp, ArrowDown, GripVertical, Eye, X, AlertTriangle } from 'lucide-react';
 import { SECTION_CATALOGUE, SectionContentSource, templateForKey } from '@/lib/answerSheet';
+import { AnswerSheet, AnswerSheetSection } from './AnswerSheet';
 
 // Where the lecturer customises the ONE answer sheet for an examination: which sections
 // appear, in what order, under what heading, which are mandatory, and what each is worth.
@@ -67,12 +68,39 @@ export function draftsFromSections(saved: any[] | undefined | null): SectionDraf
   return drafts;
 }
 
+/**
+ * Turns the working draft into exactly the payload the student answer sheet consumes, so
+ * the preview renders through the real component rather than a lookalike. Ids are
+ * synthetic — a preview never touches the database.
+ */
+export function draftsToPreviewSections(drafts: SectionDraft[]): AnswerSheetSection[] {
+  return drafts
+    .filter((d) => d.enabled)
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((d, i) => ({
+      id: `preview-${d.key}`,
+      key: d.key,
+      label: d.label,
+      order: i + 1,
+      required: d.required,
+      maxMarks: d.maxMarks.trim() === '' ? null : parseFloat(d.maxMarks),
+      contentSource: d.contentSource,
+    }));
+}
+
 interface Props {
   drafts: SectionDraft[];
   onChange: (drafts: SectionDraft[]) => void;
+  /**
+   * How many students have already begun this exam. Reconfiguring a format underneath a
+   * live attempt is legal but consequential, so the lecturer is warned rather than blocked.
+   */
+  startedAttempts?: number;
 }
 
-export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange }) => {
+export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange, startedAttempts = 0 }) => {
+  const [showPreview, setShowPreview] = useState(false);
   const update = (key: string, patch: Partial<SectionDraft>) => {
     onChange(drafts.map((d) => (d.key === key ? { ...d, ...patch } : d)));
   };
@@ -92,17 +120,39 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange }) =
 
   return (
     <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
-      <div className="flex items-center justify-between flex-wrap gap-1">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <label className="text-xs font-semibold text-slate-900 dark:text-white block">Answer Sheet Format</label>
-        <span className="text-[10px] font-mono text-slate-500">
-          {enabledCount} section{enabledCount === 1 ? '' : 's'} enabled
-          {totalMarks > 0 && ` · ${totalMarks} marks allocated`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono text-slate-500">
+            {enabledCount} section{enabledCount === 1 ? '' : 's'} enabled
+            {totalMarks > 0 && ` · ${totalMarks} marks allocated`}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowPreview(true)}
+            disabled={enabledCount === 0}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Preview
+          </button>
+        </div>
       </div>
       <p className="text-[10px] text-slate-500 dark:text-slate-400">
         The student&apos;s digital lab record. Switch sections on or off, rename their headings, set the order, and
         mark which must be filled in before a student can submit.
       </p>
+
+      {startedAttempts > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-[10px] text-amber-800 dark:text-amber-200/90 leading-relaxed">
+            {startedAttempts} student{startedAttempts === 1 ? ' has' : 's have'} already started this exam. Answers
+            already written are kept, but newly required sections will apply to them too — a student who has not filled
+            one in will be asked to complete it before submitting.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         {drafts.map((draft, index) => (
@@ -197,6 +247,55 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange }) =
           </div>
         ))}
       </div>
+
+      {/* Preview. Renders the REAL student component with persistence switched off, so what
+          the lecturer sees here cannot drift from what students actually get. Reflects the
+          unsaved working draft, which is the point: preview before publishing. */}
+      {showPreview && (
+        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex flex-col p-4 sm:p-8">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl max-w-3xl w-full mx-auto">
+            <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-brand-blue-400" />
+                <h4 className="font-bold text-white text-sm">Student Answer Sheet Preview</h4>
+                <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+                  unsaved draft · {enabledCount} section{enabledCount === 1 ? '' : 's'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPreview(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                aria-label="Close preview"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-0 p-4">
+              <AnswerSheet
+                preview
+                labId="preview"
+                token=""
+                sections={draftsToPreviewSections(drafts)}
+                initialResponses={[]}
+                readOnly={false}
+                codeFilenames={['Main.java']}
+              />
+            </div>
+
+            <div className="border-t border-slate-800 px-5 py-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowPreview(false)}
+                className="px-4 py-2 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-bold"
+              >
+                Back to configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

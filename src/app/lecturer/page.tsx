@@ -103,6 +103,8 @@ export default function LecturerDashboard() {
   const [fullscreenThresholdInput, setFullscreenThresholdInput] = useState('3');
   const [requireDesktopDevice, setRequireDesktopDevice] = useState(true);
   const [sectionDrafts, setSectionDrafts] = useState<SectionDraft[]>(buildDefaultDrafts());
+  // Drives the configurator's warning when a format is edited under a live exam.
+  const [editingLabAttempts, setEditingLabAttempts] = useState(0);
 
   // Anti-Cheat Permissions
   const [allowCopy, setAllowCopy] = useState(false);
@@ -216,6 +218,7 @@ export default function LecturerDashboard() {
     setFullscreenThresholdInput('3');
     setRequireDesktopDevice(true);
     setSectionDrafts(buildDefaultDrafts());
+    setEditingLabAttempts(0);
   };
 
   const openCreateModal = () => {
@@ -243,6 +246,7 @@ export default function LecturerDashboard() {
     setFullscreenThresholdInput(String(lab.fullscreenExitThreshold ?? 3));
     setRequireDesktopDevice(lab.requireDesktopDevice !== undefined ? lab.requireDesktopDevice : true);
     setSectionDrafts(draftsFromSections(lab.answerSheetSections));
+    setEditingLabAttempts(lab.appearedCount || 0);
     setShowLabModal(true);
   };
 
@@ -856,7 +860,11 @@ export default function LecturerDashboard() {
                 </label>
               </div>
 
-              <AnswerSheetConfigurator drafts={sectionDrafts} onChange={setSectionDrafts} />
+              <AnswerSheetConfigurator
+                drafts={sectionDrafts}
+                onChange={setSectionDrafts}
+                startedAttempts={editingLabAttempts}
+              />
 
               <div className="flex justify-end space-x-2 pt-2">
                 <button type="button" onClick={() => setShowLabModal(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">Cancel</button>

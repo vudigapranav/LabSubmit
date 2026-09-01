@@ -3,8 +3,9 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after full repository inspection and the answer-sheet /
-device-policy work on `claude/labsubmit-development-y605fv`.
+**Last updated:** 2026-09-01, after completing the customizable digital answer sheet
+(configuration, preview, and execution-connected Input/Output) on
+`claude/labsubmit-development-y605fv`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
 exists in the repository. A database model with no code reading or writing it is *schema
@@ -102,6 +103,20 @@ only* and belongs under In Progress, not Completed.
   deleted.
 - Evaluator view renders the completed sheet alongside the code.
 - An exam with no sections configured behaves exactly as before — code-only, no tab strip.
+- **Preview.** The configurator previews the sheet before the exam is published, rendering
+  the *real* student component with persistence switched off, driven by the unsaved working
+  draft. The preview cannot drift from what students receive because it is the same
+  component, not a lookalike.
+- **Reconfiguration warning.** Editing the format of an exam students have already begun
+  shows how many attempts are affected and what changing a required section will mean for
+  them. Warned, not blocked — the lecturer decides.
+- **Input/Output connected to the execution engine.** The existing terminal now captures
+  each run (stdin the student typed, stdout the program produced), and the Input and Output
+  sections offer a "Use last run" control that fills them from the real execution instead of
+  retyping. Platform banners ("Compilation Successful", "Program Finished") are marked
+  `system` server-side and excluded from the capture, and ANSI escapes are stripped, so a
+  lab record contains the program's output and nothing else. This reuses the existing
+  execution path — no second editor, no second execution route.
 
 ### Device policy — *added this session*
 - Server-side device classification from request headers (`User-Agent`,
@@ -117,18 +132,26 @@ only* and belongs under In Progress, not Completed.
 - Dashboards, results and non-exam pages remain reachable from any device.
 
 ### Verification performed
-- `tsc --noEmit` and `next build` clean.
+- `tsc --noEmit` clean; `next build` compiles successfully (35/35 pages).
 - Unit assertions over device classification (real UA strings for Windows, macOS, Linux,
   Android phone/tablet, iPhone, iPad, absent UA) and over answer-sheet normalisation and
   required-section validation.
-- End-to-end run against a live PostgreSQL instance covering: device block on phone,
-  a phone spoofing a desktop header, desktop start succeeding, section save/overwrite,
-  rejection of a foreign section id, rejection of typing into the Code section, submit
-  blocked while required sections are blank, submit succeeding once complete, custom
-  format authoring, injected-unknown-section rejection, and format reconfiguration
-  preserving answers.
-
----
+- End-to-end API run against a live PostgreSQL instance — 20 assertions covering:
+  configuration persistence (labels, marks, required and disabled flags round-trip);
+  student rendering following the lecturer's order rather than the catalogue's; disabled
+  sections absent from the student payload even when marked required; required-section
+  validation naming the lecturer's *custom* labels, releasing each as it is filled, and
+  never demanding optional or disabled sections; reordering reaching the student while
+  existing answers survive; and a legacy exam with no configuration loading, running and
+  submitting with no sheet validation at all.
+- Browser verification (headless Chromium) — 11 assertions covering the configurator
+  rendering all nine sections with reorder and marks controls, and the preview opening,
+  declaring itself unsaved, honouring a renamed label, omitting a disabled section,
+  reflecting a reorder, and rendering Code as an editor pointer rather than a textarea.
+- **Execution regression:** real C source compiled and run through the live WebSocket
+  engine with interactive stdin (`7` → `square=49`), verifying exit code 0, that captured
+  output excludes platform banners, and that it contains no ANSI escapes. Captured Output
+  content was exactly `"Enter n: 7\nsquare=49\n"`.
 
 ## 2. In progress
 
@@ -150,12 +173,15 @@ usable end to end.
 - **Missing:** a set currently holds a *single* `problemStatement` string. The requirement
   that a set contain a lecturer-defined number of questions is **not** modelled yet.
 
-### Input/output capture
-- `ExecutionRecord` model exists. **Zero code reads or writes it.**
-- Execution output is currently ephemeral: it streams to the student's terminal and is
-  gone. Nothing about a program run is persisted for the evaluator.
-- The Input and Output answer-sheet sections are presently free-text — the student types
-  what they ran, and it is not cross-checked against an actual execution.
+### Input/output capture — client-side capture done, persistence not
+- Runs **are** captured client-side and can be inserted into the Input/Output sections of
+  the answer sheet (see Completed). Once inserted, the text persists as an ordinary answer.
+- `ExecutionRecord` model exists but **zero code reads or writes it**. Nothing about a run
+  is stored as a run: there is no server-side execution history, no record of runs the
+  student chose not to insert, and no way for an evaluator to see what else was executed.
+- Because insertion is student-initiated, Input/Output remain *attested* rather than
+  *proven*. A student can still type something a program never produced. Closing that gap
+  needs the `ExecutionRecord` write path.
 
 ### Section-wise evaluation
 - `SectionEvaluation` model exists. **Zero code reads or writes it.**
@@ -177,14 +203,14 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
 
 | # | Requirement | Status |
 |---|---|---|
-| 1 | Unified customizable answer-sheet examination model | ✅ Complete |
+| 1 | Unified customizable answer-sheet examination model | ✅ Complete, including preview |
 | 2 | Multiple randomized question sets | ⏳ Assignment done; authoring and multi-question sets outstanding |
 | 3 | Hidden student set identity | ✅ Complete (payloads strip it server-side) |
 | 4 | Lecturer-visible assignment mapping | ✅ Complete (`questionSetLabel` in the inspector) |
 | 5 | Mobile-compatible general application | ⏳ Partial, unaudited |
 | 6 | Desktop/laptop-only active exams | ✅ Complete, enforced server-side at all entry points |
 | 7 | Digital record containing configurable sections | ✅ Complete |
-| 8 | Code execution with input/output capture | ⏳ Execution complete; capture not started |
+| 8 | Code execution with input/output capture | ⏳ Execution complete; capture wired into the answer sheet; server-side persistence outstanding |
 | 9 | Lecturer manual evaluation workflow | ⏳ Works at submission level; section-wise marking not started |
 
 ---
@@ -195,8 +221,12 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
   actually have more than one set today.
 - **A question set holds one statement, not many questions.** The model does not yet match
   the requirement.
-- **Input/Output sections are unverified self-reports.** A student types what they claim
-  they ran; nothing ties it to a real execution.
+- **Input/Output sections remain student-attested.** "Use last run" fills them from a real
+  execution, but a student may still edit the text afterwards or type it by hand, and runs
+  are not persisted server-side. The captured content is a convenience and an accuracy aid,
+  not proof of what executed.
+- **Run capture is in-memory and per-session.** Only the most recent run is offered, and it
+  is lost on reload. Nothing is stored.
 - **Devtools detection is shortcut-only.** F12 and Ctrl+Shift+I/J/C are intercepted; an
   already-open panel, or one opened via the browser menu, is not detected. There is no
   reliable cross-browser API for this.
@@ -224,8 +254,11 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
   folder structure predating the execution engine and exam layers. It should not be trusted
   as documentation.
 - **No automated test suite in the repository.** The verification described above was run
-  as throwaway scripts against a temporary database, not committed as tests. There is no
-  `npm test`, no CI, and no regression safety net.
+  as throwaway scripts against a temporary database and a headless browser, not committed as
+  tests. There is no `npm test`, no CI, and no regression safety net.
+- **`npm run lint` is not usable.** The script exists but no ESLint config does, so
+  `next lint` drops into interactive first-time setup instead of linting. Either configure
+  it or remove the script.
 - **No `prisma/migrations/`.** Schema evolves by `db push`. Additive changes are safe;
   renames and drops carry real data-loss risk on a live database, and there is no history
   of how the schema reached its current shape.
@@ -260,11 +293,12 @@ Ordered by dependency. Steps 1 and 2 finish work whose schema already exists.
    path already exists and should be reused unchanged. Keep the identity-stripping rule
    intact as the payload grows — a question list must not leak set size or ordering.
 
-2. **Input/output capture.**
-   Accumulate the stdin keystroke stream and stdout per run in `ExecutionController` and
-   persist an `ExecutionRecord` on exit. Surface the student's runs in the evaluator view,
-   and let the student attach a real run to their Input/Output sections instead of
-   retyping it. Mind the 5 MB output cap and truncate before persisting.
+2. **Persist execution records.**
+   Client-side capture and answer-sheet insertion are done; the server still stores nothing.
+   Persist an `ExecutionRecord` per run in `ExecutionController` (the `system` output flag
+   already separates program output from platform banners), surface a student's run history
+   in the evaluator view, and mark whether an Output section matches a real recorded run.
+   Mind the 5 MB output cap and truncate before persisting.
 
 3. **Section-wise evaluation.**
    Write `SectionEvaluation` rows from the inspector, roll them up into

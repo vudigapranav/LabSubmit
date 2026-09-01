@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FileText, Check, Loader2, AlertCircle, Code2 } from 'lucide-react';
+import { FileText, Check, Loader2, AlertCircle, Code2, TerminalSquare } from 'lucide-react';
 import { detectClientDeviceClass } from '@/lib/useDeviceClass';
+import type { CapturedRun } from './Terminal';
 
 // The student's digital lab record. One sheet per attempt, laid out exactly as the
 // lecturer configured this exam's format — same model for every exam, only the enabled
@@ -27,6 +28,18 @@ interface AnswerSheetProps {
   /** Filenames currently in the workspace, shown against the Code section. */
   codeFilenames: string[];
   onOpenEditor?: () => void;
+  /**
+   * The student's most recent program run, so the Input and Output sections can be filled
+   * from what actually executed. Comes from the existing execution system — this component
+   * never runs anything itself.
+   */
+  lastRun?: CapturedRun | null;
+  /**
+   * Lecturer preview: renders exactly what a student would see, but writes nothing. Used
+   * by the configurator so the preview cannot drift from the real sheet — it IS the real
+   * sheet, with persistence switched off.
+   */
+  preview?: boolean;
 }
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
@@ -41,6 +54,8 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
   readOnly,
   codeFilenames,
   onOpenEditor,
+  lastRun,
+  preview = false,
 }) => {
   const [values, setValues] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
@@ -64,6 +79,7 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
 
   const persist = useCallback(
     async (sectionId: string, content: string) => {
+      if (preview) return; // a preview is a rehearsal, never a save
       setSaveState((prev) => ({ ...prev, [sectionId]: 'saving' }));
       try {
         const res = await fetch('/api/student/workspace', {
@@ -80,7 +96,7 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
         setSaveState((prev) => ({ ...prev, [sectionId]: 'error' }));
       }
     },
-    [labId, token]
+    [labId, token, preview]
   );
 
   const handleChange = (sectionId: string, content: string) => {
@@ -107,13 +123,30 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
           <h3 className="text-sm font-bold text-white">Digital Lab Record</h3>
         </div>
         <span className="text-[11px] text-slate-500 font-mono">
-          {sections.length} section{sections.length === 1 ? '' : 's'}
+          {preview ? 'Preview — nothing is saved' : `${sections.length} section${sections.length === 1 ? '' : 's'}`}
         </span>
       </div>
 
       {sections.map((section, index) => {
         const state = saveState[section.id] || 'idle';
         const isCodeSection = section.contentSource === 'CODE_FILES';
+        const isIoSection = section.contentSource === 'EXECUTION_IO';
+
+        // Input takes what the student typed into the program; Output takes what it
+        // printed. Both come from the run the existing execution engine just performed.
+        const runText = !isIoSection
+          ? ''
+          : section.key === 'INPUT'
+            ? lastRun?.stdin || ''
+            : lastRun?.stdout || '';
+        const canInsertRun = isIoSection && !readOnly && !preview && runText.trim().length > 0;
+
+        const insertRun = () => {
+          const text = runText.replace(/\s+$/, '');
+          setValues((prev) => ({ ...prev, [section.id]: text }));
+          clearTimeout(timersRef.current[section.id]);
+          persist(section.id, text);
+        };
 
         return (
           <div key={section.id} className="space-y-2">
@@ -128,6 +161,19 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
                   </span>
                 )}
               </label>
+
+              <span className="flex items-center gap-2">
+                {canInsertRun && (
+                  <button
+                    type="button"
+                    onClick={insertRun}
+                    title={`Fill this section with the ${section.key === 'INPUT' ? 'input you gave' : 'output produced'} in your last run`}
+                    className="text-[10px] font-bold flex items-center gap-1 text-brand-olive-400 hover:text-brand-olive-300 border border-brand-olive-800/70 bg-brand-olive-950/40 rounded px-1.5 py-0.5"
+                  >
+                    <TerminalSquare className="w-3 h-3" />
+                    Use last run
+                  </button>
+                )}
 
               {!readOnly && !isCodeSection && (
                 <span className="text-[10px] font-semibold flex items-center gap-1">
@@ -148,6 +194,7 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
                   )}
                 </span>
               )}
+              </span>
             </div>
 
             {isCodeSection ? (
@@ -192,8 +239,17 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
       })}
 
       <p className="text-[11px] text-slate-500 border-t border-slate-800 pt-3">
-        Sections marked <span className="text-rose-400">*</span> must be completed before you can submit. Your work
-        saves automatically as you write.
+        {preview ? (
+          <>
+            This is exactly what students will see. Sections marked <span className="text-rose-400">*</span> must be
+            completed before they can submit.
+          </>
+        ) : (
+          <>
+            Sections marked <span className="text-rose-400">*</span> must be completed before you can submit. Your work
+            saves automatically as you write.
+          </>
+        )}
       </p>
     </div>
   );

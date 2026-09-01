@@ -82,7 +82,11 @@ export type WsClientMessage =
 
 export type WsServerMessage =
   | { type: 'status'; status: 'compiling' | 'running' | 'idle' }
-  | { type: 'output'; data: string }
+  // `system: true` marks output the platform itself wrote (compilation banners, exit
+  // notices, limit warnings) as opposed to the program's own stdout/stderr. The terminal
+  // renders both identically; only unmarked output is captured as the program's output
+  // for the answer sheet, so a student's Output section never contains our banners.
+  | { type: 'output'; data: string; system?: boolean }
   | { type: 'exit'; exitCode: number; executionTimeMs: number }
   | { type: 'error'; code: string; message: string };
 

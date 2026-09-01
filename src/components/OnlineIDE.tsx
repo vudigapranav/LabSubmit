@@ -5,7 +5,7 @@ import Editor from '@monaco-editor/react';
 import { useApp } from '@/context/AppContext';
 import { AntiCheatWrapper } from './AntiCheatWrapper';
 import { detectClientDeviceClass } from '@/lib/useDeviceClass';
-import { Terminal, TerminalRef } from './Terminal';
+import { Terminal, TerminalRef, CapturedRun } from './Terminal';
 import {
   Play,
   Send,
@@ -58,6 +58,8 @@ interface OnlineIDEProps {
    * Submission Inspector modal) so those layouts are unchanged.
    */
   fillParent?: boolean;
+  /** Surfaces each program run so the answer sheet can offer its real input/output. */
+  onRunCaptured?: (run: CapturedRun) => void;
 }
 
 export const OnlineIDE: React.FC<OnlineIDEProps> = ({
@@ -76,6 +78,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   onViolation,
   allowedLanguages,
   fillParent = false,
+  onRunCaptured,
 }) => {
   const { token, theme } = useApp();
   const newFileLanguageOptions = allowedLanguages && allowedLanguages.length > 0
@@ -543,6 +546,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
             <Terminal
               ref={terminalRef}
               onStatusChange={(running) => setIsRunning(running)}
+              onRunCaptured={onRunCaptured}
             />
           </div>
         </div>

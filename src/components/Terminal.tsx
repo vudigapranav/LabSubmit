@@ -10,6 +10,18 @@ import {
   Loader2,
 } from 'lucide-react';
 
+// A single program run, captured so the answer sheet's Input and Output sections can be
+// filled from what actually executed rather than retyped from memory. Capture is
+// client-side and in-memory only — this does not persist an execution record.
+export interface CapturedRun {
+  filename: string;
+  /** Keystrokes the student typed into the running program, newline-separated. */
+  stdin: string;
+  /** The program's own output, ANSI stripped. Excludes the platform's own banners. */
+  stdout: string;
+  finished: boolean;
+}
+
 export interface TerminalRef {
   runCode: (params: {
     filename: string;
@@ -25,9 +37,25 @@ export interface TerminalRef {
 
 interface TerminalProps {
   onStatusChange?: (isRunning: boolean) => void;
+  /** Fires as a run progresses and when it ends, with what the program read and wrote. */
+  onRunCaptured?: (run: CapturedRun) => void;
 }
 
-export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange }, ref) => {
+// xterm renders ANSI; a lab record should not contain escape codes. Strips CSI/OSC
+// sequences and normalises CRLF, leaving the plain text a student would write down.
+export function stripAnsi(input: string): string {
+  return input
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b[@-Z\\-_]/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+}
+
+export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange, onRunCaptured }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<any>(null);
   const fitAddonRef = useRef<any>(null);
@@ -39,6 +67,16 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
 
   const isRunningRef = useRef(isRunning);
   isRunningRef.current = isRunning;
+
+  // Live capture of the current run. Refs, not state: output arrives in many small chunks
+  // and re-rendering the terminal on each one would be wasteful and jittery.
+  const captureRef = useRef<CapturedRun>({ filename: '', stdin: '', stdout: '', finished: false });
+  const onRunCapturedRef = useRef(onRunCaptured);
+  onRunCapturedRef.current = onRunCaptured;
+
+  const emitCapture = () => {
+    onRunCapturedRef.current?.({ ...captureRef.current });
+  };
 
   // Initialize WebSocket connection
   const connectWebSocket = () => {
@@ -74,6 +112,10 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
             onStatusChange(msg.status === 'compiling' || msg.status === 'running');
           }
         } else if (msg.type === 'output') {
+          // Only the program's own output is captured; platform banners carry system:true.
+          if (!msg.system) {
+            captureRef.current.stdout += stripAnsi(msg.data);
+          }
           if (term) {
             term.write(msg.data);
           } else {
@@ -82,6 +124,8 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
         } else if (msg.type === 'exit') {
           setStatus('idle');
           setExecutionTimeMs(msg.executionTimeMs ?? null);
+          captureRef.current.finished = true;
+          emitCapture();
           if (onStatusChange) {
             onStatusChange(false);
           }
@@ -170,6 +214,16 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ type: 'input', data }));
           }
+
+          // Reconstruct what the student actually entered: apply backspace, keep newlines,
+          // and drop control keys (arrows, escapes) that are not part of the input.
+          if (data === '\x7f' || data === '\b') {
+            captureRef.current.stdin = captureRef.current.stdin.slice(0, -1);
+          } else if (data === '\r' || data === '\n') {
+            captureRef.current.stdin += '\n';
+          } else if (!/[\x00-\x1f]/.test(data)) {
+            captureRef.current.stdin += data;
+          }
         });
 
         // Resize listener -> WebSocket
@@ -222,6 +276,10 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
     runCode: ({ filename, code, files, labId, token }) => {
       console.log(`[STAGE: 1. RUN CODE CALLED IN TERMINAL] Target: "${filename}"`);
       setExecutionTimeMs(null);
+      // Each run captures itself from scratch — the answer sheet offers the LAST run,
+      // never an accumulation across runs.
+      captureRef.current = { filename, stdin: '', stdout: '', finished: false };
+      emitCapture();
       const term = xtermRef.current;
       if (term) {
         term.reset();

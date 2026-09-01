@@ -8,6 +8,7 @@ import { OnlineIDE } from '@/components/OnlineIDE';
 import { ExamGuard } from '@/components/ExamGuard';
 import { ProfileModal } from '@/components/ProfileModal';
 import { AnswerSheet, AnswerSheetSection } from '@/components/AnswerSheet';
+import type { CapturedRun } from '@/components/Terminal';
 import { useViolationLogger } from '@/lib/useViolationLogger';
 import { getOrCreateExamSessionId } from '@/lib/examSession';
 import { detectClientDeviceClass, useDeviceClass } from '@/lib/useDeviceClass';
@@ -64,6 +65,9 @@ export default function StudentLabWorkspacePage() {
   const [sections, setSections] = useState<AnswerSheetSection[]>([]);
   const [deviceEligibility, setDeviceEligibility] = useState<{ eligible: boolean; reason: string; deviceClass: string } | null>(null);
   const [activePane, setActivePane] = useState<'sheet' | 'code'>('sheet');
+  // The most recent program run, lifted out of the IDE so the answer sheet's Input and
+  // Output sections can be filled from the real execution instead of retyped.
+  const [lastRun, setLastRun] = useState<CapturedRun | null>(null);
   const [loadingLab, setLoadingLab] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -379,6 +383,7 @@ export default function StudentLabWorkspacePage() {
                     readOnly={false}
                     codeFilenames={(workspace?.files || []).map((f: any) => f.filename)}
                     onOpenEditor={() => setActivePane('code')}
+                    lastRun={lastRun}
                   />
                 </div>
               )}
@@ -400,6 +405,7 @@ export default function StudentLabWorkspacePage() {
                   onViolation={logClipboardViolation}
                   allowedLanguages={labData.allowedLanguages}
                   fillParent
+                  onRunCaptured={setLastRun}
                 />
               </div>
             </div>

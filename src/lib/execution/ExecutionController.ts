@@ -75,7 +75,7 @@ export class ExecutionController {
     const { filename, code, files = [], cols = 80, rows = 24, token, labId } = msg;
 
     if (!filename || code === undefined) {
-      this.sendWs({ type: 'output', data: '\r\n\x1b[31mError: Filename and code content are required.\x1b[0m\r\n' });
+      this.sendWs({ type: 'output', data: '\r\n\x1b[31mError: Filename and code content are required.\x1b[0m\r\n', system: true });
       this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
       return;
     }
@@ -123,6 +123,7 @@ export class ExecutionController {
       this.sendWs({
         type: 'output',
         data: `\r\n\x1b[31mCompilation Failed:\r\n${compileResult.stderr.replace(/\n/g, '\r\n')}\x1b[0m\r\n`,
+        system: true,
       });
       this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: compileResult.compilationTimeMs });
       await SessionManager.remove(sessionId);
@@ -131,16 +132,16 @@ export class ExecutionController {
     }
 
     if (compileResult.compileCmd) {
-      this.sendWs({ type: 'output', data: '\x1b[32mCompilation Successful.\x1b[0m\r\n' });
+      this.sendWs({ type: 'output', data: '\x1b[32mCompilation Successful.\x1b[0m\r\n', system: true });
     }
 
     // 3. Runtime Stage
     this.sendWs({ type: 'status', status: 'running' });
-    this.sendWs({ type: 'output', data: '\x1b[32mProgram Started.\x1b[0m\r\n\r\n' });
+    this.sendWs({ type: 'output', data: '\x1b[32mProgram Started.\x1b[0m\r\n\r\n', system: true });
 
     // Set up runtime timeout limit guard
     session.timeoutTimer = RuntimeSandbox.setupTimeoutGuard(session, async (reasonMessage) => {
-      this.sendWs({ type: 'output', data: reasonMessage });
+      this.sendWs({ type: 'output', data: reasonMessage, system: true });
       this.sendWs({ type: 'exit', exitCode: 124, executionTimeMs: Date.now() - session.startTime });
       await SessionManager.remove(sessionId);
       this.currentSessionId = null;
@@ -155,7 +156,7 @@ export class ExecutionController {
         rows,
         onData: (data) => {
           const exceeded = RuntimeSandbox.checkOutputLimit(session, data.length, async (limitMessage) => {
-            this.sendWs({ type: 'output', data: limitMessage });
+            this.sendWs({ type: 'output', data: limitMessage, system: true });
             this.sendWs({ type: 'exit', exitCode: 137, executionTimeMs: Date.now() - session.startTime });
             await SessionManager.remove(sessionId);
             this.currentSessionId = null;
@@ -173,11 +174,13 @@ export class ExecutionController {
               this.sendWs({
                 type: 'output',
                 data: `\r\n\x1b[32m✓ Program Finished. (Exit Code 0, Execution Time: ${executionTimeMs}ms)\x1b[0m\r\n`,
+                system: true,
               });
             } else {
               this.sendWs({
                 type: 'output',
                 data: `\r\n\x1b[31m⚠ Program Exited with Code ${exitCode} (Execution Time: ${executionTimeMs}ms)\x1b[0m\r\n`,
+                system: true,
               });
             }
 
@@ -193,7 +196,7 @@ export class ExecutionController {
       });
     } catch (spawnErr: any) {
       console.error(`[ExecutionController FULL STACK ERROR]`, spawnErr.stack || spawnErr);
-      this.sendWs({ type: 'output', data: `\r\n\x1b[31mExecution Error: ${spawnErr.message || spawnErr}\x1b[0m\r\n` });
+      this.sendWs({ type: 'output', data: `\r\n\x1b[31mExecution Error: ${spawnErr.message || spawnErr}\x1b[0m\r\n`, system: true });
       this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: Date.now() - session.startTime });
       await SessionManager.remove(sessionId);
       this.currentSessionId = null;
@@ -298,7 +301,7 @@ export class ExecutionController {
 
     if (session) {
       PtyService.killPty(session);
-      this.sendWs({ type: 'output', data: '\r\n\x1b[33m[Process terminated manually (SIGKILL)]\x1b[0m\r\n' });
+      this.sendWs({ type: 'output', data: '\r\n\x1b[33m[Process terminated manually (SIGKILL)]\x1b[0m\r\n', system: true });
       this.sendWs({ type: 'exit', exitCode: 137, executionTimeMs: 0 });
       await SessionManager.remove(sessionId);
     }

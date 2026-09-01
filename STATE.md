@@ -3,9 +3,9 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after completing randomized multi-question question sets
-(authoring, assignment, hidden student identity, faculty mapping) on
-`claude/labsubmit-development-y605fv`.
+**Last updated:** 2026-09-01, after completing the multi-set randomized examination system
+(authoring, per-set preview, explicit assignment generation, administrative reassignment and
+an audit trail) on `claude/labsubmit-development-y605fv`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
 exists in the repository. A database model with no code reading or writing it is *schema
@@ -118,7 +118,7 @@ only* and belongs under In Progress, not Completed.
   lab record contains the program's output and nothing else. This reuses the existing
   execution path — no second editor, no second execution route.
 
-### Randomized question sets — *completed this session*
+### Multi-set randomized examination — *completed this session*
 - A lecturer authors **multiple sets per examination**, each holding a **lecturer-defined
   number of questions** (`Question` rows under `QuestionSet`, not one blob per set), with
   optional per-question marks and reordering.
@@ -143,6 +143,29 @@ only* and belongs under In Progress, not Completed.
   mid-exam); the lecturer is told to deactivate it instead, which stops future assignment
   while leaving existing attempts intact.
 - Exams with no sets are unaffected: they continue to serve `Lab.problemStatement`.
+- **Per-set preview** renders the paper through the same `QuestionPaper` component the
+  student's exam uses, so a preview cannot drift from what students read.
+- **Explicit assignment generation.** `POST /api/lecturer/assignments {action:'generate'}`
+  assigns every eligible student (same year and branch the exam targets) who does not
+  already hold a set, creating their workspace with the same starter file a student would
+  get by opening the exam — and deliberately WITHOUT `startedAt`, so pre-assigning never
+  starts anyone's clock. It is idempotent: an existing assignment is never re-drawn, and the
+  balance tally is seeded from assignments that already exist so a second run keeps the whole
+  cohort even rather than balancing only the newcomers.
+- **Assignment is immutable except by explicit administrative action.** Two guards, both
+  audited:
+  - Replacing the questions of a set students are *currently sitting* is refused (HTTP 409)
+    unless the lecturer passes `acknowledgeLiveEdit`. Renaming or deactivating a live set
+    stays freely allowed — neither changes anyone's questions, and deactivating is the safe
+    way to retire a bad set.
+  - Reassigning one student's set is a deliberate lecturer action, warns when the attempt is
+    already in progress, and is **refused outright once the student has submitted** — their
+    answers were written against the paper they sat.
+- **`ExamAdminAction` audit trail** records generation, reassignment and live-set edits with
+  actor and timestamp, surfaced in the manager's mapping tab.
+- Students cannot influence assignment: a client-supplied `questionSetId` on `start_exam` is
+  ignored (the server resolves the set from persisted state), and both faculty routes reject
+  student tokens with 403.
 
 ### Device policy — *added this session*
 - Server-side device classification from request headers (`User-Agent`,
@@ -179,6 +202,16 @@ only* and belongs under In Progress, not Completed.
   output excludes platform banners, and that it contains no ANSI escapes. Captured Output
   content was exactly `"Enter n: 7\nsquare=49\n"`. Re-run after the question-set work on an
   exam that uses sets, together with the answer-sheet save/validate path.
+- **Multi-set examination:** 39 end-to-end assertions covering 8 sets of differing size over
+  25 students — generation assigning all 25 with a 3/3/3/3/3/3/3/4 spread, a second run
+  assigning nobody new and every student keeping their set, a pre-assigned paper surviving
+  start and reconnect unchanged, pre-assignment not starting anyone's clock, a
+  client-supplied `questionSetId` being ignored, student tokens rejected by both faculty
+  routes, a live set edit refused then permitted on acknowledgement and audited, renaming a
+  live set needing no acknowledgement, reassignment warning on a live attempt and refused
+  after submission, and the full evaluator chain (student → set → questions → submission →
+  evaluation). 10 browser assertions over preview, generation, reassign controls and the
+  audit panel.
 - **Question sets:** 19 unit assertions (normalisation, assignability, identity stripping,
   and a simulated 60-student cohort spreading exactly 20/20/20 while drawing randomly) and
   18 end-to-end assertions against a live database with 12 real students — two sets of
@@ -226,7 +259,7 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
 | # | Requirement | Status |
 |---|---|---|
 | 1 | Unified customizable answer-sheet examination model | ✅ Complete, including preview |
-| 2 | Multiple randomized question sets | ✅ Complete, with lecturer-defined question counts |
+| 2 | Multiple randomized question sets | ✅ Complete — any number of sets, any number of questions each, preview, explicit generation |
 | 3 | Hidden student set identity | ✅ Complete (payload built from what a student may know; ids, labels and counts all absent) |
 | 4 | Lecturer-visible assignment mapping | ✅ Complete (student→set table plus per-set counts and the inspector badge) |
 | 5 | Mobile-compatible general application | ⏳ Partial, unaudited |
@@ -240,11 +273,19 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
 ## 4. Known limitations
 
 - **Set assignment is not re-balanced retroactively.** Adding a set mid-exam means students
-  who already started keep their original paper, so the spread across sets can end uneven if
-  sets are added after an exam opens. This is deliberate — re-drawing a live attempt would
-  swap a student's paper underneath them — but it is worth knowing.
-- **A deactivated set still counts toward nothing.** Deactivating removes a set from future
-  assignment but does not redistribute the students already holding it.
+  who already hold one keep it, so the spread can end uneven if sets are added after
+  assignments exist. This is deliberate — re-drawing would swap a student's paper underneath
+  them — and the lecturer can even it out with per-student reassignment if they choose.
+- **A deactivated set does not redistribute its students.** Deactivating removes a set from
+  future assignment only; students already holding it keep it.
+- **Eligibility is year plus branch.** Assignment generation targets every student matching
+  the exam's year and branch. There is no per-exam enrolment list, so a student in that
+  cohort who was never meant to sit the paper would still receive an assignment (they simply
+  never start it).
+- **Overriding a live set edit rewrites papers in place.** The override exists because a
+  lecturer may need to fix a broken question mid-exam, and it is audited — but a student who
+  already answered against the old wording is not notified, and their existing answers are
+  not migrated.
 - **Input/Output sections remain student-attested.** "Use last run" fills them from a real
   execution, but a student may still edit the text afterwards or type it by hand, and runs
   are not persisted server-side. The captured content is a convenience and an accuracy aid,
@@ -317,26 +358,29 @@ Ordered by dependency. Steps 1 and 2 finish work whose schema already exists.
    path already exists and should be reused unchanged. Keep the identity-stripping rule
    intact as the payload grows — a question list must not leak set size or ordering.
 
-2. **Persist execution records.**
+2. **Per-exam enrolment (optional).** Assignment eligibility is currently year plus branch.
+   An explicit enrolment list per exam would let a lecturer sit a subset of a cohort.
+
+3. **Persist execution records.**
    Client-side capture and answer-sheet insertion are done; the server still stores nothing.
    Persist an `ExecutionRecord` per run in `ExecutionController` (the `system` output flag
    already separates program output from platform banners), surface a student's run history
    in the evaluator view, and mark whether an Output section matches a real recorded run.
    Mind the 5 MB output cap and truncate before persisting.
 
-3. **Section-wise evaluation.**
+4. **Section-wise evaluation.**
    Write `SectionEvaluation` rows from the inspector, roll them up into
    `Submission.marks`, and show the breakdown to the student alongside published results.
 
-4. **Mobile audit of the general UI.**
+5. **Mobile audit of the general UI.**
    Verify and fix dashboards, results, login and registration at phone widths. The exam
    page is deliberately out of scope — it is desktop-only by policy.
 
-5. **Notices module.**
+6. **Notices module.**
    A lecturer/admin-authored notice feed visible to students, mobile-first, outside the
    exam flow.
 
-6. **Debt reduction, ongoing.**
+7. **Debt reduction, ongoing.**
    Rewrite `README.md`; commit the verification scripts as a real test suite; introduce
    shared API types; extract dashboard tabs into components; remove the JWT fallback
    secret.

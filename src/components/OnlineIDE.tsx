@@ -5,6 +5,7 @@ import Editor from '@monaco-editor/react';
 import { useApp } from '@/context/AppContext';
 import { AntiCheatWrapper } from './AntiCheatWrapper';
 import { detectClientDeviceClass } from '@/lib/useDeviceClass';
+import { QuestionPaper } from './QuestionPaper';
 import { Terminal, TerminalRef, CapturedRun } from './Terminal';
 import {
   Play,
@@ -576,25 +577,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
               </div>
 
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-slate-200 leading-relaxed max-h-96 overflow-y-auto">
-                {questions && questions.length > 0 ? (
-                  <ol className="space-y-4">
-                    {questions.map((q) => (
-                      <li key={q.order} className="flex gap-3">
-                        <span className="font-mono font-bold text-brand-olive-400 flex-shrink-0">{q.order}.</span>
-                        <div className="min-w-0 space-y-1">
-                          <p className="whitespace-pre-wrap">{q.text}</p>
-                          {q.marks !== null && (
-                            <span className="inline-block text-[10px] font-semibold text-slate-400 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5">
-                              {q.marks} marks
-                            </span>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <div className="font-mono whitespace-pre-wrap">{problemStatement}</div>
-                )}
+                <QuestionPaper questions={questions || []} fallbackStatement={problemStatement} />
               </div>
 
               <div className="flex justify-end pt-2">

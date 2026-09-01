@@ -7,25 +7,8 @@ import { finalizeSubmission } from '@/lib/examSubmission';
 import { checkExamDevice } from '@/lib/deviceEligibility';
 import { findIncompleteRequiredSections } from '@/lib/answerSheet';
 import { assignableSets, chooseSetId, toStudentPaper, paperToPlainText } from '@/lib/questionSets';
+import { initialFileForLab } from '@/lib/workspaceBootstrap';
 
-const DEFAULT_BOILERPLATE: Record<string, { filename: string; content: string }> = {
-  c: {
-    filename: 'main.c',
-    content: `#include <stdio.h>\n\nint main() {\n    printf("Welcome to CBIT Programming Exam!\\n");\n    return 0;\n}\n`,
-  },
-  cpp: {
-    filename: 'main.cpp',
-    content: `#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Welcome to CBIT Programming Exam!" << endl;\n    return 0;\n}\n`,
-  },
-  java: {
-    filename: 'Main.java',
-    content: `public class Main {\n    public static void main(String[] args) {\n        System.out.println("Welcome to CBIT Programming Exam!");\n    }\n}\n`,
-  },
-  python: {
-    filename: 'main.py',
-    content: `print("Welcome to CBIT Programming Exam!")\n`,
-  },
-};
 
 /**
  * Picks the question set for a student's attempt. Random, but drawn from the sets that are
@@ -87,8 +70,7 @@ export async function GET(req: Request) {
     if (!workspace) {
       // Create initial workspace with a default file matching the exam's first allowed language.
       // Note: this does NOT start the exam clock — that only happens via the start_exam action.
-      const allowed = parseAllowedLanguages(lab.allowedLanguages);
-      const boilerplate = DEFAULT_BOILERPLATE[allowed[0]] || DEFAULT_BOILERPLATE.c;
+      const boilerplate = initialFileForLab(lab.allowedLanguages);
 
       workspace = await prisma.labWorkspace.create({
         data: {

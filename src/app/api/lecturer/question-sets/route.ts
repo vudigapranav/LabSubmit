@@ -51,6 +51,8 @@ export async function GET(req: Request) {
       select: {
         startedAt: true,
         isSubmitted: true,
+        studentId: true,
+        questionSetId: true,
         questionSet: { select: { label: true } },
         student: { select: { name: true, rollNumber: true } },
       },
@@ -59,9 +61,14 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       sets: sets.map((s) => ({ ...s, assignedCount: usageById.get(s.id) || 0 })),
+      // studentId and questionSetId are included so faculty can act on a row (reassign).
+      // This is a lecturer-only route; the student payload is built elsewhere and never
+      // carries either field.
       assignments: assignments.map((a) => ({
+        studentId: a.studentId,
         studentName: a.student.name,
         rollNumber: a.student.rollNumber,
+        questionSetId: a.questionSetId,
         setLabel: a.questionSet?.label || null,
         startedAt: a.startedAt,
         isSubmitted: a.isSubmitted,
@@ -110,7 +117,7 @@ export async function PUT(req: Request) {
   if (errorResponse) return errorResponse;
 
   try {
-    const { id, label, isActive, questions } = await req.json();
+    const { id, label, isActive, questions, acknowledgeLiveEdit } = await req.json();
     if (!id) return NextResponse.json({ error: 'Question set ID is required' }, { status: 400 });
 
     const existing = await prisma.questionSet.findUnique({ where: { id } });
@@ -118,6 +125,41 @@ export async function PUT(req: Request) {
 
     const { error } = await assertLabAccess(existing.labId, session!);
     if (error) return error;
+
+    // Once students are sitting a set, its questions are effectively frozen: replacing them
+    // rewrites the paper of an attempt already under way, which is the single most damaging
+    // thing this endpoint can do. It is refused by default and permitted only when the
+    // lecturer explicitly acknowledges the consequence — and that override is audited.
+    //
+    // Renaming the set or deactivating it stays freely allowed: neither changes any
+    // student's questions, and deactivating is the safe way to retire a bad set.
+    if (questions !== undefined) {
+      const liveAttempts = await prisma.labWorkspace.count({
+        where: { questionSetId: id, startedAt: { not: null }, isSubmitted: false },
+      });
+
+      if (liveAttempts > 0 && !acknowledgeLiveEdit) {
+        return NextResponse.json(
+          {
+            error: `${liveAttempts} student${liveAttempts === 1 ? ' is' : 's are'} sitting this set right now. Changing its questions would rewrite the paper in front of them mid-examination. Deactivate the set instead to keep it out of future assignments, or confirm explicitly if you intend to change a live paper.`,
+            requiresAcknowledgement: true,
+            liveAttempts,
+          },
+          { status: 409 }
+        );
+      }
+
+      if (liveAttempts > 0) {
+        await prisma.examAdminAction.create({
+          data: {
+            labId: existing.labId,
+            actorId: session!.userId,
+            action: 'EDIT_LIVE_QUESTION_SET',
+            details: `Replaced the questions of "${existing.label}" while ${liveAttempts} attempt(s) were in progress`,
+          },
+        });
+      }
+    }
 
     // Questions are replaced wholesale rather than diffed. They carry no student-authored
     // content — answers live on the workspace, never here — so nothing is lost, and a

@@ -30,10 +30,11 @@ model User {
   assignedSubjects     Subject[]    @relation("LecturerSubjects")
   evaluatedSubmissions Submission[] @relation("EvaluatedSubmissions")
 
+  examAdminActions ExamAdminAction[] @relation("ExamAdminActions")
   // Student relations
-  workspaces  LabWorkspace[]  @relation("StudentWorkspaces")
-  submissions Submission[]    @relation("StudentSubmissions")
-  violations  ExamViolation[]
+  workspaces       LabWorkspace[]    @relation("StudentWorkspaces")
+  submissions      Submission[]      @relation("StudentSubmissions")
+  violations       ExamViolation[]
 }
 
 model LecturerProfile {
@@ -129,6 +130,7 @@ model Lab {
   violations          ExamViolation[]
   answerSheetSections AnswerSheetSection[]
   questionSets        QuestionSet[]
+  adminActions        ExamAdminAction[]
 }
 
 model LabWorkspace {
@@ -338,4 +340,24 @@ model SectionEvaluation {
 
   @@unique([submissionId, sectionId])
   @@index([submissionId])
+}
+
+// Administrative actions taken against a live examination — generating assignments,
+// reassigning a student's set, or editing a question set students are already sitting.
+//
+// These are the operations the platform normally refuses. Where a lecturer is permitted to
+// override that refusal, the override is recorded here rather than happening silently, so
+// an examiner can later answer "who changed this paper, and when?".
+model ExamAdminAction {
+  id        String   @id @default(uuid())
+  labId     String
+  actorId   String
+  action    String // GENERATE_ASSIGNMENTS, REASSIGN_SET, EDIT_LIVE_QUESTION_SET
+  details   String
+  createdAt DateTime @default(now())
+
+  lab   Lab  @relation(fields: [labId], references: [id], onDelete: Cascade)
+  actor User @relation("ExamAdminActions", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([labId])
 }

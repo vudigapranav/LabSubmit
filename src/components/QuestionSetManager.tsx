@@ -13,7 +13,11 @@ import {
   Loader2,
   AlertTriangle,
   EyeOff,
+  Eye,
+  Shuffle,
+  History,
 } from 'lucide-react';
+import { QuestionPaper } from './QuestionPaper';
 
 // Faculty authoring for an exam's question sets, plus the student-to-set mapping.
 //
@@ -37,11 +41,20 @@ interface SetDraft {
 }
 
 interface Assignment {
+  studentId: string;
   studentName: string;
   rollNumber: string | null;
+  questionSetId: string | null;
   setLabel: string | null;
   startedAt: string | null;
   isSubmitted: boolean;
+}
+
+interface AdminAction {
+  action: string;
+  details: string;
+  actorName: string;
+  createdAt: string;
 }
 
 interface Props {
@@ -57,7 +70,12 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<'sets' | 'mapping'>('sets');
+  const [previewSet, setPreviewSet] = useState<SetDraft | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [coverage, setCoverage] = useState<{ eligibleCount: number; assignedCount: number; assignableSetCount: number } | null>(null);
+  const [adminActions, setAdminActions] = useState<AdminAction[]>([]);
 
   const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 
@@ -87,6 +105,15 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
         }))
       );
       setAssignments(data.assignments || []);
+
+      const cov = await fetch(`/api/lecturer/assignments?labId=${labId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (cov.ok) {
+        const c = await cov.json();
+        setCoverage({ eligibleCount: c.eligibleCount, assignedCount: c.assignedCount, assignableSetCount: c.assignableSetCount });
+        setAdminActions(c.adminActions || []);
+      }
     } catch (e) {
       setError('Server error loading question sets');
     } finally {
@@ -120,8 +147,9 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
     onChanged?.();
   };
 
-  const saveSet = async (set: SetDraft) => {
+  const saveSet = async (set: SetDraft, acknowledgeLiveEdit = false) => {
     setError(null);
+    setNotice(null);
     setSets((prev) => prev.map((s) => (s.id === set.id ? { ...s, saving: true } : s)));
     const res = await fetch('/api/lecturer/question-sets', {
       method: 'PUT',
@@ -131,16 +159,77 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
         label: set.label,
         isActive: set.isActive,
         questions: set.questions.map((q) => ({ order: q.order, text: q.text, marks: q.marks })),
+        ...(acknowledgeLiveEdit ? { acknowledgeLiveEdit: true } : {}),
       }),
     });
     const data = await res.json();
+
     if (!res.ok) {
-      setError(data.error || 'Failed to save set');
       setSets((prev) => prev.map((s) => (s.id === set.id ? { ...s, saving: false } : s)));
+      // The server refuses to rewrite a paper students are sitting unless the lecturer says
+      // so deliberately. Surface its exact wording, then ask once.
+      if (data.requiresAcknowledgement) {
+        if (confirm(`${data.error}\n\nChange the live paper anyway? This is recorded against your name.`)) {
+          await saveSet(set, true);
+        }
+        return;
+      }
+      setError(data.error || 'Failed to save set');
       return;
     }
     await load();
     onChanged?.();
+  };
+
+  const generateAssignments = async () => {
+    setError(null);
+    setNotice(null);
+    if (
+      !confirm(
+        'Assign a question set to every eligible student who does not already have one?\n\nStudents who already hold a set keep it — nothing is re-drawn.'
+      )
+    )
+      return;
+    setGenerating(true);
+    try {
+      const res = await fetch('/api/lecturer/assignments', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ labId, action: 'generate' }),
+      });
+      const data = await res.json();
+      if (!res.ok) setError(data.error || 'Failed to generate assignments');
+      else setNotice(data.message);
+      await load();
+      onChanged?.();
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const reassign = async (a: Assignment, questionSetId: string) => {
+    setError(null);
+    setNotice(null);
+    const target = sets.find((s) => s.id === questionSetId);
+    const live = Boolean(a.startedAt) && !a.isSubmitted;
+    if (
+      !confirm(
+        `Reassign ${a.rollNumber || a.studentName} to ${target?.label}?` +
+          (live ? '\n\nTheir attempt is already in progress — their questions will change in front of them.' : '') +
+          '\n\nThis is recorded against your name.'
+      )
+    )
+      return;
+
+    const res = await fetch('/api/lecturer/assignments', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ labId, action: 'reassign', studentId: a.studentId, questionSetId }),
+    });
+    const data = await res.json();
+    if (!res.ok) setError(data.error || 'Failed to reassign');
+    else setNotice(data.message);
+    await load();
   };
 
   const deleteSet = async (set: SetDraft) => {
@@ -165,7 +254,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex flex-col p-4 sm:p-6">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl max-w-5xl w-full mx-auto">
+      <div className="relative bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl max-w-5xl w-full mx-auto">
         {/* Header */}
         <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
@@ -205,6 +294,12 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
           </div>
         )}
 
+        {notice && (
+          <div className="mx-5 mt-3 rounded-xl border border-emerald-800/60 bg-emerald-950/40 px-3 py-2">
+            <p className="text-[11px] text-emerald-200 leading-relaxed">{notice}</p>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {loading ? (
             <div className="flex items-center justify-center py-16 text-slate-400 text-xs gap-2">
@@ -223,6 +318,24 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                     ? 'No set is assignable yet, so every student receives the exam’s own problem statement. A set becomes assignable once it is active and has at least one question.'
                     : `${assignable.length} set${assignable.length === 1 ? '' : 's'} in rotation. Each student is given one at random when they start, spread evenly across sets, and it stays fixed for their whole attempt.`}
                 </p>
+
+                {coverage && (
+                  <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-slate-800/70">
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {coverage.assignedCount} of {coverage.eligibleCount} eligible student
+                      {coverage.eligibleCount === 1 ? '' : 's'} assigned
+                      {coverage.assignedCount < coverage.eligibleCount && ' — the rest are assigned when they start'}
+                    </span>
+                    <button
+                      onClick={generateAssignments}
+                      disabled={generating || assignable.length === 0}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-700 hover:bg-indigo-600 disabled:opacity-40 text-white text-[11px] font-bold"
+                    >
+                      {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Shuffle className="w-3.5 h-3.5" />}
+                      Generate Assignments
+                    </button>
+                  </div>
+                )}
               </div>
 
               {sets.map((set) => (
@@ -256,6 +369,15 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                     )}
 
                     <div className="ml-auto flex items-center gap-2">
+                      <button
+                        onClick={() => setPreviewSet(set)}
+                        disabled={set.questions.length === 0}
+                        aria-label={`Preview ${set.label}`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 text-[11px] font-bold"
+                      >
+                        <Eye className="w-3 h-3" />
+                        Preview
+                      </button>
                       <button
                         onClick={() => saveSet(set)}
                         disabled={!set.dirty || set.saving}
@@ -393,9 +515,29 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                           <td className="p-3 font-mono font-bold text-white">{a.rollNumber || '—'}</td>
                           <td className="p-3 text-slate-300">{a.studentName}</td>
                           <td className="p-3">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950/40 text-indigo-300 border border-indigo-800/50">
-                              {a.setLabel || '—'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950/40 text-indigo-300 border border-indigo-800/50">
+                                {a.setLabel || '—'}
+                              </span>
+                              {/* Administrative reassignment. A submitted attempt is a
+                                  finished record, so its set is fixed and the control is
+                                  withheld — the server refuses it too. */}
+                              {!a.isSubmitted && (
+                                <select
+                                  value=""
+                                  aria-label={`Reassign ${a.rollNumber || a.studentName}`}
+                                  onChange={(e) => { if (e.target.value) reassign(a, e.target.value); e.target.value = ''; }}
+                                  className="bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:text-white"
+                                >
+                                  <option value="">Reassign…</option>
+                                  {sets
+                                    .filter((st) => st.id !== a.questionSetId && st.questions.length > 0)
+                                    .map((st) => (
+                                      <option key={st.id} value={st.id}>{st.label}</option>
+                                    ))}
+                                </select>
+                              )}
+                            </div>
                           </td>
                           <td className="p-3 text-slate-500 font-mono">
                             {a.startedAt ? new Date(a.startedAt).toLocaleString() : '—'}
@@ -413,7 +555,70 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
               )}
             </div>
           )}
+
+          {tab === 'mapping' && adminActions.length > 0 && (
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
+                <History className="w-3.5 h-3.5 text-slate-400" />
+                <h4 className="text-xs font-bold text-white">Administrative Actions</h4>
+              </div>
+              <ul className="divide-y divide-slate-800/60">
+                {adminActions.map((a, i) => (
+                  <li key={i} className="px-4 py-2.5 flex items-start gap-3">
+                    <span className="text-[9px] font-mono font-bold text-indigo-300 bg-indigo-950/40 border border-indigo-800/50 rounded px-1.5 py-0.5 flex-shrink-0 mt-0.5">
+                      {a.action.replace(/_/g, ' ')}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-slate-300">{a.details}</p>
+                      <p className="text-[10px] text-slate-500 font-mono">
+                        {a.actorName} · {new Date(a.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
+
+        {/* Per-set preview: the paper exactly as a student will read it, rendered through
+            the same component the student's exam uses. */}
+        {previewSet && (
+          <div className="absolute inset-0 z-10 bg-black/80 backdrop-blur-sm flex flex-col p-6" onClick={() => setPreviewSet(null)}>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl max-w-2xl w-full mx-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-brand-blue-400" />
+                  <h4 className="font-bold text-white text-sm">Preview — {previewSet.label}</h4>
+                  <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">as the student sees it</span>
+                </div>
+                <button onClick={() => setPreviewSet(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800" aria-label="Close preview">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto p-5">
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs text-slate-200 leading-relaxed">
+                  <QuestionPaper
+                    questions={previewSet.questions.map((q, i) => ({
+                      order: i + 1,
+                      text: q.text || '(empty question — it will not be shown to students)',
+                      marks: q.marks.trim() === '' ? null : parseFloat(q.marks),
+                    }))}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 pt-3">
+                  The student sees these questions and nothing else — no set name, no set number, and no indication that
+                  other sets exist.
+                </p>
+              </div>
+              <div className="border-t border-slate-800 px-5 py-3 flex justify-end">
+                <button onClick={() => setPreviewSet(null)} className="px-4 py-2 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-bold">
+                  Back to sets
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="border-t border-slate-800 px-5 py-3 flex justify-end">
           <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold">

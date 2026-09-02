@@ -113,18 +113,33 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
     persist(sectionId, values[sectionId] || '');
   };
 
+  // Mirrors the server's completeness rule so the counter can never disagree with what
+  // submit will actually accept.
+  const requiredSections = sections.filter((sec) => sec.required);
+  const requiredTotal = requiredSections.length;
+  const requiredDone = requiredSections.filter((sec) =>
+    sec.contentSource === 'CODE_FILES' ? codeFilenames.length > 0 : (values[sec.id] || '').trim().length > 0
+  ).length;
+
   if (sections.length === 0) return null;
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-950 rounded-2xl border border-slate-800 p-4 sm:p-6 space-y-5">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-        <div className="flex items-center space-x-2">
-          <FileText className="w-4 h-4 text-brand-blue-400" />
-          <h3 className="text-sm font-bold text-white">Digital Lab Record</h3>
+    <div className="h-full overflow-y-auto bg-slate-950 rounded-card border border-slate-800 p-4 sm:p-6 space-y-5">
+      <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-3">
+        <div className="flex items-start gap-2.5 min-w-0">
+          <FileText className="w-4 h-4 text-brand-blue-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-white">Digital Lab Record</h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {preview ? 'Preview — nothing is saved' : 'Complete each section as you work. Your writing saves automatically.'}
+            </p>
+          </div>
         </div>
-        <span className="text-[11px] text-slate-500 font-mono">
-          {preview ? 'Preview — nothing is saved' : `${sections.length} section${sections.length === 1 ? '' : 's'}`}
-        </span>
+        {!preview && requiredTotal > 0 && (
+          <span className="text-[11px] font-mono text-slate-400 flex-shrink-0 tabular">
+            {requiredDone}/{requiredTotal} required
+          </span>
+        )}
       </div>
 
       {sections.map((section, index) => {
@@ -149,12 +164,20 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
         };
 
         return (
-          <div key={section.id} className="space-y-2">
+          <section key={section.id} className="space-y-2">
             <div className="flex items-center justify-between flex-wrap gap-1">
               <label htmlFor={`section-${section.id}`} className="text-xs font-bold text-slate-200 flex items-center gap-2">
                 <span className="text-slate-500 font-mono">{index + 1}.</span>
                 <span>{section.label}</span>
-                {section.required && <span className="text-rose-400" title="Required">*</span>}
+                {section.required ? (
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded px-1.5 py-0.5">
+                    Required
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-slate-500 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5">
+                    Optional
+                  </span>
+                )}
                 {section.maxMarks !== null && (
                   <span className="text-[10px] font-semibold text-slate-400 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5">
                     {section.maxMarks} marks
@@ -200,7 +223,7 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
             {isCodeSection ? (
               // The Code section is not a textarea: it is the workspace itself, so a
               // student can never have code in the record that differs from what ran.
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
+              <div className="bg-slate-900 border border-slate-800 rounded-control p-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <Code2 className="w-4 h-4 text-brand-olive-400 flex-shrink-0" />
                   <span className="text-[11px] text-slate-400 truncate">
@@ -229,25 +252,25 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
                 rows={section.contentSource === 'EXECUTION_IO' ? 4 : 6}
                 spellCheck={false}
                 placeholder={readOnly ? '' : `Write your ${section.label.toLowerCase()} here...`}
-                className={`w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs leading-relaxed text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-brand-blue-600 resize-y ${
+                className={`w-full bg-slate-900 border border-slate-800 rounded-control px-3 py-2.5 text-xs leading-relaxed text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-brand-blue-600 resize-y ${
                   section.contentSource === 'EXECUTION_IO' ? 'font-mono' : ''
                 } ${readOnly ? 'opacity-80 cursor-default' : ''}`}
               />
             )}
-          </div>
+          </section>
         );
       })}
 
       <p className="text-[11px] text-slate-500 border-t border-slate-800 pt-3">
         {preview ? (
           <>
-            This is exactly what students will see. Sections marked <span className="text-rose-400">*</span> must be
-            completed before they can submit.
+            This is exactly what students will see. Sections marked <span className="font-bold text-rose-300">Required</span>{' '}
+            must be completed before they can submit.
           </>
         ) : (
           <>
-            Sections marked <span className="text-rose-400">*</span> must be completed before you can submit. Your work
-            saves automatically as you write.
+            Sections marked <span className="font-bold text-rose-300">Required</span> must be completed before you can
+            submit. Your work saves automatically as you write.
           </>
         )}
       </p>

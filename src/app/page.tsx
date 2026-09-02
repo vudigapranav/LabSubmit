@@ -39,7 +39,7 @@ export default function Home() {
               priority
             />
           ) : (
-            <div className="w-16 h-16 rounded-xl bg-brand-olive-700 text-white flex items-center justify-center font-bold text-xl">
+            <div className="w-16 h-16 rounded-control bg-brand-olive-700 text-white flex items-center justify-center font-bold text-xl">
               CBIT
             </div>
           )}
@@ -62,7 +62,7 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
           <Link
             href="/login"
-            className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-800 dark:bg-brand-olive-700 dark:hover:bg-brand-olive-600 text-white font-semibold text-sm transition-colors flex items-center justify-center space-x-2 shadow-sm"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 dark:bg-brand-olive-700 dark:hover:bg-brand-olive-600 text-white font-semibold text-sm transition-colors flex items-center justify-center space-x-2 shadow-card"
           >
             <span>Access Portal Login</span>
             <ArrowRight className="w-4 h-4" />
@@ -70,7 +70,7 @@ export default function Home() {
 
           <Link
             href="/register"
-            className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-white dark:bg-slate-800 text-brand-blue-600 dark:text-brand-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/60 border border-slate-200 dark:border-slate-700 font-semibold text-sm transition-colors flex items-center justify-center space-x-2 shadow-sm"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-control bg-white dark:bg-slate-800 text-brand-blue-600 dark:text-brand-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700/60 border border-slate-200 dark:border-slate-700 font-semibold text-sm transition-colors flex items-center justify-center space-x-2 shadow-card"
           >
             <GraduationCap className="w-4 h-4" />
             <span>Student Registration</span>

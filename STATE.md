@@ -3,8 +3,8 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after establishing the shared UI design system and
-application shell on `claude/labsubmit-development-y605fv`.
+**Last updated:** 2026-09-01, after applying the design system across the lecturer, admin,
+evaluation and answer-sheet surfaces on `claude/labsubmit-development-y605fv`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
 exists in the repository. A database model with no code reading or writing it is *schema
@@ -306,41 +306,42 @@ tabular-numerals helper.
 provides the persistent sidebar, mobile drawer and top bar.
 
 ### Routes redesigned
-| Route | State |
+| Route / surface | State |
 |---|---|
-| `/student` | **Fully redesigned** — shell, page header, four stat cards, exam cards rebuilt on the primitives, per-section copy, empty/loading states, results as cards below `md` |
-| `/lecturer` | **Shell applied** — sidebar navigation driving the existing tabs, `PageHeader`, shared `Toast`; inner tab panels still use their original markup |
-| `/admin` | **Shell applied** — sidebar navigation, `PageHeader` retaining its action buttons, shared `Toast`, shared `LoadingState`; inner tab panels still original |
-| `/login`, `/register` | Card surfaces moved onto the design tokens |
-| `/student/lab/[id]` | Deliberately **not** shell-wrapped — an active examination stays distraction-free. Gate and instructions polished in the previous change |
-
-### Remaining routes / work
-- `/lecturer` and `/admin` inner panels (tables, forms, modals) still use per-page markup
-  rather than the shared primitives. They are visually consistent enough to ship but are
-  the next candidates for conversion.
-- `QuestionSetManager`, `AnswerSheetConfigurator`, `AnswerSheet` and the Submission
-  Inspector predate the library and carry their own styling.
-- `/` (landing page) untouched by this pass.
-- Faculty tables are not yet converted to mobile card layouts (they scroll instead).
+| `/student` | **Fully redesigned** — shell, stats, exam cards, results as cards below `md`, empty/loading states |
+| `/lecturer` | **Fully redesigned** — shell + `PageHeader`; exam cards, students, evaluations and integrity-log panels rebuilt on `Card`/table primitives/`StatusBadge`/`EmptyState`; evaluations and integrity log become card lists below `lg`; creation form grouped into labelled sections (Details → Schedule → Languages → Integrity & devices → Answer sheet) with a note pointing at question sets |
+| `/admin` | **Shell + tokens** — shell, `PageHeader` retaining its actions, shared `Toast`/`LoadingState`; both tables adopted the shared table language; all 25 form controls and buttons on the tokens |
+| `/login`, `/register` | Card surfaces and all controls on the tokens |
+| `/` (landing) | Radius and shadow tokens applied |
+| Submission Inspector | Header rebuilt on `StatusBadge` — identity, faculty-visible set label, auto-submit and device class read at a glance; integrity status uses the shared badge |
+| `AnswerSheet` | Refined into a structured laboratory record: titled header with a live `n/n required` counter derived from the same rule the server enforces, explicit **Required**/**Optional** chips (no longer an asterisk, so state is not colour-only), semantic `<section>` per entry |
+| `QuestionSetManager`, `AnswerSheetConfigurator` | Surface tokens applied; still carry their own internal layout |
+| `/student/lab/[id]` | Deliberately **not** shell-wrapped — an active examination stays distraction-free |
 
 ### Responsive status
 Sidebar collapses to a drawer below `lg`; the drawer opens, traps a backdrop, closes on
-Escape and dismisses on selection. Verified at 1440px (student, lecturer, admin) and 390px
-(student): no horizontal page scroll, navigation reachable, sections render.
+Escape and dismisses on selection. Dense faculty tables become card lists below `lg`
+(evaluations, integrity log) or scroll with an enforced minimum width (students, admin).
+Verified with no horizontal page scroll at **1440px, 834px and 390px** for lecturer, and at
+1440px/834px for student and 1440px for admin.
 
 ### Known UI issues / limitations
-- Verified at two viewport widths, not a device matrix.
+- Verified at three viewport widths (1440/834/390), not a full device matrix.
+- `QuestionSetManager` and `AnswerSheetConfigurator` use design tokens but still carry their
+  own internal layout rather than composing from the primitives.
+- Admin tables adopted the shared table *language* by class replacement rather than being
+  rebuilt on the `TableWrap`/`Th`/`Td` components, and have no mobile card fallback.
+- The lecturer/admin modals are still hand-rolled rather than using the shared `Modal`.
 - Two navigation surfaces coexist below `lg` on lecturer/admin: the drawer and the original
   tab strip (the strip is now `lg:hidden`). Intentional for now, but slightly redundant.
 - The shell renders navigation from a static per-role list; it does not reflect permissions
   beyond role.
 
 ### Next UI/UX tasks
-1. Convert lecturer/admin inner panels to the shared primitives.
-2. Bring `QuestionSetManager`, `AnswerSheetConfigurator` and the Submission Inspector onto
-   the library.
-3. Faculty tables → responsive card lists on small screens.
-4. Redesign the landing page to match.
+1. Rebuild `QuestionSetManager` and `AnswerSheetConfigurator` on the primitives.
+2. Move lecturer/admin modals onto the shared `Modal`.
+3. Rebuild admin tables on the table primitives and give them mobile card fallbacks.
+4. Give the landing page a proper layout pass (tokens only so far).
 
 ---
 

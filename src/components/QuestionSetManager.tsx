@@ -254,7 +254,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex flex-col p-2 sm:p-6">
-      <div className="relative bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl max-w-5xl w-full mx-auto">
+      <div className="relative bg-slate-900 border border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-5xl w-full mx-auto">
         {/* Header */}
         <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
@@ -585,7 +585,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
             the same component the student's exam uses. */}
         {previewSet && (
           <div className="absolute inset-0 z-10 bg-black/80 backdrop-blur-sm flex flex-col p-6" onClick={() => setPreviewSet(null)}>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl max-w-2xl w-full mx-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-slate-900 border border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-2xl w-full mx-auto" onClick={(e) => e.stopPropagation()}>
               <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Eye className="w-4 h-4 text-brand-blue-400" />

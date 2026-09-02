@@ -253,7 +253,7 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange, sta
           unsaved working draft, which is the point: preview before publishing. */}
       {showPreview && (
         <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex flex-col p-4 sm:p-8">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl max-w-3xl w-full mx-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-3xl w-full mx-auto">
             <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-brand-blue-400" />

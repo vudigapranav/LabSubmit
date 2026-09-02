@@ -567,7 +567,7 @@ export default function AdminDashboard() {
         {activeTab === 'branches' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {branches.map((b) => (
-              <div key={b.id} className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm space-y-3">
+              <div key={b.id} className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-card p-5 shadow-card space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-brand-olive-950/40 text-brand-olive-300 border border-brand-olive-800/50">
                     Year {b.year}
@@ -612,7 +612,7 @@ export default function AdminDashboard() {
         {activeTab === 'subjects' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {subjects.map((sub) => (
-              <div key={sub.id} className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm space-y-3">
+              <div key={sub.id} className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-card p-5 shadow-card space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-brand-blue-950/40 text-brand-blue-300 border border-brand-blue-800/50">
                     Year {sub.year} • {sub.branch?.name || 'Branch'}
@@ -656,25 +656,25 @@ export default function AdminDashboard() {
 
         {/* Tab 3: Faculty Lecturers Management */}
         {activeTab === 'lecturers' && (
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-card overflow-hidden shadow-card">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
                   <tr>
-                    <th className="p-4">Faculty Member</th>
-                    <th className="p-4">Email</th>
-                    <th className="p-4">Department</th>
-                    <th className="p-4">Assigned Subjects</th>
-                    <th className="p-4 text-right">Actions</th>
+                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Faculty Member</th>
+                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</th>
+                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</th>
+                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Assigned Subjects</th>
+                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                   {lecturers.map((lec) => (
-                    <tr key={lec.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                      <td className="p-4 font-bold text-slate-900 dark:text-white">{lec.name}</td>
-                      <td className="p-4 font-mono text-slate-600 dark:text-slate-300">{lec.email}</td>
-                      <td className="p-4 text-slate-600 dark:text-slate-300">{lec.lecturerProfile?.department || 'CSE'}</td>
-                      <td className="p-4 text-slate-600 dark:text-slate-300">
+                    <tr key={lec.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                      <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">{lec.name}</td>
+                      <td className="px-4 py-3 font-mono text-slate-600 dark:text-slate-300">{lec.email}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{lec.lecturerProfile?.department || 'CSE'}</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                         {lec.assignedSubjects && lec.assignedSubjects.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {lec.assignedSubjects.map((s: any) => (
@@ -687,7 +687,7 @@ export default function AdminDashboard() {
                           <span className="text-slate-400 italic">None</span>
                         )}
                       </td>
-                      <td className="p-4 text-right space-x-1.5">
+                      <td className="px-4 py-3 text-right space-x-1.5">
                         <button
                           onClick={() => {
                             setViewingUser({ ...lec, type: 'LECTURER' });
@@ -758,7 +758,7 @@ export default function AdminDashboard() {
                   <select
                     value={studentFilterYear}
                     onChange={(e) => setStudentFilterYear(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-medium"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-medium"
                   >
                     <option value="">Select Academic Year ▼</option>
                     <option value="1">1st Year</option>
@@ -775,7 +775,7 @@ export default function AdminDashboard() {
                     value={studentFilterBranchId}
                     onChange={(e) => setStudentFilterBranchId(e.target.value)}
                     disabled={!studentFilterYear}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {!studentFilterYear ? 'Select Academic Year first' : 'Select Branch ▼'}
@@ -812,32 +812,32 @@ export default function AdminDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-card overflow-hidden shadow-card">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[640px] text-left text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
                       <tr>
-                        <th className="p-4">Roll Number</th>
-                        <th className="p-4">Student Name</th>
-                        <th className="p-4">Email</th>
-                        <th className="p-4">Branch</th>
-                        <th className="p-4">Academic Year</th>
-                        <th className="p-4 text-right">Actions</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Roll Number</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Student Name</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Branch</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Academic Year</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                       {students.map((st) => (
-                        <tr key={st.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                          <td className="p-4 font-bold text-slate-900 dark:text-white">{st.rollNumber}</td>
-                          <td className="p-4 font-sans font-semibold text-slate-800 dark:text-slate-200">{st.name}</td>
-                          <td className="p-4 text-slate-600 dark:text-slate-300 font-sans">{st.email || 'N/A'}</td>
-                          <td className="p-4">
+                        <tr key={st.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                          <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">{st.rollNumber}</td>
+                          <td className="px-4 py-3 font-sans font-semibold text-slate-800 dark:text-slate-200">{st.name}</td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-sans">{st.email || 'N/A'}</td>
+                          <td className="px-4 py-3">
                             <span className="px-2 py-0.5 rounded font-mono font-bold bg-emerald-950/40 text-emerald-300 border border-emerald-800/50">
                               {st.branchName}
                             </span>
                           </td>
-                          <td className="p-4 text-slate-600 dark:text-slate-300">Year {st.year}</td>
-                          <td className="p-4 text-right space-x-1.5">
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">Year {st.year}</td>
+                          <td className="px-4 py-3 text-right space-x-1.5">
                             <button
                               onClick={() => {
                                 setViewingUser({ ...st, type: 'STUDENT' });
@@ -920,7 +920,7 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {labs.map((lab) => (
-                <div key={lab.id} className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm space-y-2">
+                <div key={lab.id} className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-card p-5 shadow-card space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                       Year {lab.year} • {lab.branch?.name || 'Branch'} • {lab.subject?.name || 'Subject'}
@@ -968,7 +968,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="flex justify-end pt-2">
-              <button onClick={() => setShowViewUserModal(false)} className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold">
+              <button onClick={() => setShowViewUserModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-slate-900 dark:bg-slate-100 hover:opacity-90 text-white dark:text-slate-900 text-xs font-semibold shadow-card transition-opacity">
                 Close
               </button>
             </div>
@@ -984,20 +984,20 @@ export default function AdminDashboard() {
             <form onSubmit={handleSaveEditStudent} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Full Name</label>
-                <input type="text" value={editStudentName} onChange={(e) => setEditStudentName(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
+                <input type="text" value={editStudentName} onChange={(e) => setEditStudentName(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Email Address</label>
-                <input type="email" value={editStudentEmail} onChange={(e) => setEditStudentEmail(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono" />
+                <input type="email" value={editStudentEmail} onChange={(e) => setEditStudentEmail(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Roll Number</label>
-                  <input type="text" value={editStudentRoll} onChange={(e) => setEditStudentRoll(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono" />
+                  <input type="text" value={editStudentRoll} onChange={(e) => setEditStudentRoll(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Academic Year</label>
-                  <select value={editStudentYear} onChange={(e) => setEditStudentYear(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white">
+                  <select value={editStudentYear} onChange={(e) => setEditStudentYear(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors">
                     <option value="1">1st Year</option>
                     <option value="2">2nd Year</option>
                     <option value="3">3rd Year</option>
@@ -1007,14 +1007,14 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Branch (Manual Override)</label>
-                <select value={editStudentBranchId} onChange={(e) => setEditStudentBranchId(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white">
+                <select value={editStudentBranchId} onChange={(e) => setEditStudentBranchId(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors">
                   {branches.map((b) => <option key={b.id} value={b.id}>{b.name} (Year {b.year})</option>)}
                 </select>
               </div>
 
               <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => setShowEditStudentModal(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">Cancel</button>
-                <button type="submit" className="px-4 py-2 rounded-xl bg-brand-olive-700 text-white text-xs font-semibold">Save Changes</button>
+                <button type="button" onClick={() => setShowEditStudentModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
+                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors">Save Changes</button>
               </div>
             </form>
           </div>
@@ -1032,12 +1032,12 @@ export default function AdminDashboard() {
             <form onSubmit={handleResetPassword} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">New Password</label>
-                <input type="password" placeholder="Enter new password" value={newPasswordInput} onChange={(e) => setNewPasswordInput(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
+                <input type="password" placeholder="Enter new password" value={newPasswordInput} onChange={(e) => setNewPasswordInput(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               </div>
 
               <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => setShowResetPasswordModal(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">Cancel</button>
-                <button type="submit" className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold">Reset Password</button>
+                <button type="button" onClick={() => setShowResetPasswordModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
+                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-card transition-colors">Reset Password</button>
               </div>
             </form>
           </div>
@@ -1052,11 +1052,11 @@ export default function AdminDashboard() {
             <form onSubmit={handleSaveBranch} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Branch Name (e.g. CSE-1, CSE-2)</label>
-                <input type="text" value={branchName} onChange={(e) => setBranchName(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
+                <input type="text" value={branchName} onChange={(e) => setBranchName(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Academic Year</label>
-                <select value={branchYear} onChange={(e) => setBranchYear(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white">
+                <select value={branchYear} onChange={(e) => setBranchYear(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors">
                   <option value="1">1st Year</option>
                   <option value="2">2nd Year</option>
                   <option value="3">3rd Year</option>
@@ -1066,16 +1066,16 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Roll Start</label>
-                  <input type="text" placeholder="160125733001" value={rollStart} onChange={(e) => setRollStart(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono" />
+                  <input type="text" placeholder="160125733001" value={rollStart} onChange={(e) => setRollStart(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Roll End</label>
-                  <input type="text" placeholder="160125733060" value={rollEnd} onChange={(e) => setRollEnd(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono" />
+                  <input type="text" placeholder="160125733060" value={rollEnd} onChange={(e) => setRollEnd(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
                 </div>
               </div>
               <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => setShowBranchModal(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">Cancel</button>
-                <button type="submit" className="px-4 py-2 rounded-xl bg-brand-olive-700 text-white text-xs font-semibold">Save Branch</button>
+                <button type="button" onClick={() => setShowBranchModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
+                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors">Save Branch</button>
               </div>
             </form>
           </div>
@@ -1090,22 +1090,22 @@ export default function AdminDashboard() {
             <form onSubmit={handleSaveSubject} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Subject Name (e.g. Java Programming Lab)</label>
-                <input type="text" value={subName} onChange={(e) => setSubName(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
+                <input type="text" value={subName} onChange={(e) => setSubName(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Subject Code</label>
-                  <input type="text" placeholder="CS202L" value={subCode} onChange={(e) => setSubCode(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono" />
+                  <input type="text" placeholder="CS202L" value={subCode} onChange={(e) => setSubCode(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Semester</label>
-                  <input type="number" placeholder="4" value={subSemester} onChange={(e) => setSubSemester(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
+                  <input type="number" placeholder="4" value={subSemester} onChange={(e) => setSubSemester(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Academic Year</label>
-                  <select value={subYear} onChange={(e) => setSubYear(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white">
+                  <select value={subYear} onChange={(e) => setSubYear(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors">
                     <option value="1">1st Year</option>
                     <option value="2">2nd Year</option>
                     <option value="3">3rd Year</option>
@@ -1114,21 +1114,21 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Target Branch</label>
-                  <select value={subBranchId} onChange={(e) => setSubBranchId(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white">
+                  <select value={subBranchId} onChange={(e) => setSubBranchId(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors">
                     {branches.map((b) => <option key={b.id} value={b.id}>{b.name} (Yr {b.year})</option>)}
                   </select>
                 </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Assigned Faculty Lecturer</label>
-                <select value={subLecturerId} onChange={(e) => setSubLecturerId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white">
+                <select value={subLecturerId} onChange={(e) => setSubLecturerId(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors">
                   <option value="">Unassigned</option>
                   {lecturers.map((lec) => <option key={lec.id} value={lec.id}>{lec.name} ({lec.email})</option>)}
                 </select>
               </div>
               <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => setShowSubjectModal(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">Cancel</button>
-                <button type="submit" className="px-4 py-2 rounded-xl bg-brand-blue-600 text-white text-xs font-semibold">Save Subject</button>
+                <button type="button" onClick={() => setShowSubjectModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
+                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-blue-600 hover:bg-brand-blue-500 text-white text-xs font-semibold shadow-card transition-colors">Save Subject</button>
               </div>
             </form>
           </div>
@@ -1141,15 +1141,15 @@ export default function AdminDashboard() {
           <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingLecturerId ? 'Edit Faculty Lecturer' : 'Add Faculty Lecturer'}</h3>
             <form onSubmit={handleSaveLecturer} className="space-y-3">
-              <input type="text" placeholder="Full Name (e.g. Dr. Ravi)" value={lecName} onChange={(e) => setLecName(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
-              <input type="email" placeholder="Email (e.g. ravi@cbit.in)" value={lecEmail} onChange={(e) => setLecEmail(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono" />
+              <input type="text" placeholder="Full Name (e.g. Dr. Ravi)" value={lecName} onChange={(e) => setLecName(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
+              <input type="email" placeholder="Email (e.g. ravi@cbit.in)" value={lecEmail} onChange={(e) => setLecEmail(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
               {!editingLecturerId && (
-                <input type="password" placeholder="Password" value={lecPassword} onChange={(e) => setLecPassword(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
+                <input type="password" placeholder="Password" value={lecPassword} onChange={(e) => setLecPassword(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               )}
-              <input type="text" placeholder="Department (e.g. CSE)" value={lecDepartment} onChange={(e) => setLecDepartment(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
+              <input type="text" placeholder="Department (e.g. CSE)" value={lecDepartment} onChange={(e) => setLecDepartment(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => setShowAddLecturerModal(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">Cancel</button>
-                <button type="submit" className="px-4 py-2 rounded-xl bg-brand-blue-600 text-white text-xs font-semibold">Save Faculty</button>
+                <button type="button" onClick={() => setShowAddLecturerModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
+                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-blue-600 hover:bg-brand-blue-500 text-white text-xs font-semibold shadow-card transition-colors">Save Faculty</button>
               </div>
             </form>
           </div>

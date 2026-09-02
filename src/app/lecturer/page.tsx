@@ -8,6 +8,12 @@ import {
   Button,
   Card,
   EmptyState,
+  TableWrap,
+  TBody,
+  Td,
+  Th,
+  THead,
+  Tr,
   EXAM_STATUS_TONE,
   LoadingState,
   PageHeader,
@@ -42,6 +48,7 @@ import {
   FileText,
   Code,
   Layers,
+  ClipboardCheck,
 } from 'lucide-react';
 
 const LANGUAGE_OPTIONS = [
@@ -635,19 +642,21 @@ export default function LecturerDashboard() {
             {activeMainTab === 'labs' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {labs.length === 0 ? (
-                  <div className="col-span-2 bg-white dark:bg-surface-darkCard p-8 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-2">
-                    <BookOpen className="w-8 h-8 text-slate-400 mx-auto" />
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-white">No Programming Exams Created Yet</h3>
-                    <p className="text-xs text-slate-500">Click &quot;Create Programming Exam&quot; to publish your first exam for {selectedSubject.name}.</p>
+                  <div className="col-span-full">
+                    <Card>
+                      <EmptyState
+                        icon={<BookOpen className="w-5 h-5" />}
+                        title="No examinations yet"
+                        description={`Create your first examination for ${selectedSubject.name} to configure its answer sheet and question sets.`}
+                      />
+                    </Card>
                   </div>
                 ) : (
                   labs.map((lab) => (
-                    <div key={lab.id} className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm flex flex-col justify-between space-y-4">
+                    <Card key={lab.id} interactive className="p-5 flex flex-col justify-between gap-4">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold ${STATUS_STYLES[lab.status] || STATUS_STYLES.DRAFT}`}>
-                            {lab.status}
-                          </span>
+                          <StatusBadge tone={EXAM_STATUS_TONE[lab.status] || 'neutral'}>{lab.status}</StatusBadge>
                           <div className="flex items-center space-x-1">
                             <button
                               onClick={() => setQuestionSetsLab(lab)}
@@ -683,10 +692,10 @@ export default function LecturerDashboard() {
                           <span className="text-amber-500">{lab.pendingCount ?? 0} pending</span>
                         </div>
                         <button onClick={() => setActiveMainTab('submissions')} className="text-brand-blue-600 dark:text-brand-blue-400 font-semibold hover:underline">
-                          View Submissions &rarr;
+                          View submissions &rarr;
                         </button>
                       </div>
-                    </div>
+                    </Card>
                   ))
                 )}
               </div>
@@ -694,123 +703,181 @@ export default function LecturerDashboard() {
 
             {/* Tab 2: Enrolled Students */}
             {activeMainTab === 'students' && (
-              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+              students.length === 0 ? (
+                <Card>
+                  <EmptyState icon={<Users className="w-5 h-5" />} title="No students enrolled" description={`No students are registered for ${selectedSubject.name} yet.`} />
+                </Card>
+              ) : (
+                <Card className="overflow-hidden">
+                  <TableWrap minWidth="520px">
+                    <THead>
                       <tr>
-                        <th className="p-4">Roll Number</th>
-                        <th className="p-4">Student Name</th>
-                        <th className="p-4">Year</th>
-                        <th className="p-4">Branch</th>
+                        <Th>Roll number</Th>
+                        <Th>Student</Th>
+                        <Th>Year</Th>
+                        <Th>Branch</Th>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                    </THead>
+                    <TBody>
                       {students.map((st) => (
-                        <tr key={st.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                          <td className="p-4 font-bold text-slate-900 dark:text-white">{st.rollNumber}</td>
-                          <td className="p-4 font-sans font-semibold text-slate-800 dark:text-slate-200">{st.name}</td>
-                          <td className="p-4 text-slate-600 dark:text-slate-300">Year {st.year}</td>
-                          <td className="p-4 text-slate-600 dark:text-slate-300">{st.branchName}</td>
-                        </tr>
+                        <Tr key={st.id}>
+                          <Td className="font-mono font-bold text-slate-900 dark:text-white">{st.rollNumber}</Td>
+                          <Td className="font-semibold text-slate-900 dark:text-white">{st.name}</Td>
+                          <Td>Year {st.year}</Td>
+                          <Td>{st.branchName}</Td>
+                        </Tr>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                    </TBody>
+                  </TableWrap>
+                </Card>
+              )
             )}
 
-            {/* Tab 3: Submissions & Grading */}
             {activeMainTab === 'submissions' && (
-              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
-                      <tr>
-                        <th className="p-4">Student Roll</th>
-                        <th className="p-4">Student Name</th>
-                        <th className="p-4">Programming Exam</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4">Violations</th>
-                        <th className="p-4">Marks</th>
-                        <th className="p-4 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
-                      {submissions.map((sub) => (
-                        <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                          <td className="p-4 font-bold text-slate-900 dark:text-white">{sub.studentRollNumber}</td>
-                          <td className="p-4 font-sans text-slate-800 dark:text-slate-200">{sub.studentName}</td>
-                          <td className="p-4 font-sans text-slate-800 dark:text-slate-200">
-                            {sub.labTitle}
-                            {sub.autoSubmitted && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] bg-amber-950/40 text-amber-300 border border-amber-800/50">AUTO</span>}
-                          </td>
-                          <td className="p-4">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sub.status === 'APPROVED' ? 'bg-emerald-950/40 text-emerald-300' : 'bg-amber-950/40 text-amber-300'}`}>
-                              {sub.status}
+              submissions.length === 0 ? (
+                <Card>
+                  <EmptyState
+                    icon={<ClipboardCheck className="w-5 h-5" />}
+                    title="No submissions yet"
+                    description={`Submissions for ${selectedSubject.name} appear here once students submit their examinations.`}
+                  />
+                </Card>
+              ) : (
+                <>
+                  {/* Below lg the evaluation queue is a card list: a seven-column table on a
+                      narrow screen is unreadable, and this is the evaluator's main surface. */}
+                  <div className="lg:hidden space-y-3">
+                    {submissions.map((sub) => (
+                      <Card key={sub.id} className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-slate-900 dark:text-white font-mono">{sub.studentRollNumber}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{sub.studentName}</p>
+                          </div>
+                          <StatusBadge tone={EXAM_STATUS_TONE[sub.status] || 'amber'}>{sub.status}</StatusBadge>
+                        </div>
+                        <p className="text-xs text-slate-700 dark:text-slate-300">{sub.labTitle}</p>
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-900 dark:text-white tabular">
+                              {sub.marks !== null ? `${sub.marks}/${sub.maxMarks ?? 100}` : 'Ungraded'}
                             </span>
-                          </td>
-                          <td className="p-4">
-                            {sub.violationCount > 0 ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-950/40 text-rose-300 border border-rose-800/50">{sub.violationCount}</span>
-                            ) : (
-                              <span className="text-slate-400 text-[10px]">None</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-slate-900 dark:text-white font-bold">{sub.marks !== null ? `${sub.marks}/100` : 'Ungraded'}</td>
-                          <td className="p-4 text-right">
-                            <button onClick={() => setSelectedSubmission(sub)} className="px-3 py-1 bg-brand-blue-600 text-white rounded-lg font-sans font-semibold text-xs">
-                              Inspect & Grade
-                            </button>
-                          </td>
+                            {sub.violationCount > 0 && <StatusBadge tone="rose">{sub.violationCount} flags</StatusBadge>}
+                            {sub.autoSubmitted && <StatusBadge tone="amber">Auto</StatusBadge>}
+                          </div>
+                          <Button size="sm" variant="secondary" onClick={() => setSelectedSubmission(sub)}>
+                            Inspect
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <Card className="hidden lg:block overflow-hidden">
+                    <TableWrap minWidth="760px">
+                      <THead>
+                        <tr>
+                          <Th>Roll number</Th>
+                          <Th>Student</Th>
+                          <Th>Examination</Th>
+                          <Th>Status</Th>
+                          <Th>Integrity</Th>
+                          <Th className="text-right">Marks</Th>
+                          <Th className="text-right">Action</Th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                      </THead>
+                      <TBody>
+                        {submissions.map((sub) => (
+                          <Tr key={sub.id}>
+                            <Td className="font-mono font-bold text-slate-900 dark:text-white">{sub.studentRollNumber}</Td>
+                            <Td className="font-semibold text-slate-900 dark:text-white">{sub.studentName}</Td>
+                            <Td>
+                              <span className="flex items-center gap-1.5">
+                                {sub.labTitle}
+                                {sub.autoSubmitted && <StatusBadge tone="amber">Auto</StatusBadge>}
+                              </span>
+                            </Td>
+                            <Td><StatusBadge tone={EXAM_STATUS_TONE[sub.status] || 'amber'}>{sub.status}</StatusBadge></Td>
+                            <Td>
+                              {sub.violationCount > 0 ? (
+                                <StatusBadge tone="rose">{sub.violationCount}</StatusBadge>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">Clean</span>
+                              )}
+                            </Td>
+                            <Td className="text-right font-bold text-slate-900 dark:text-white tabular">
+                              {sub.marks !== null ? `${sub.marks}/${sub.maxMarks ?? 100}` : '—'}
+                            </Td>
+                            <Td className="text-right">
+                              <Button size="sm" variant="secondary" onClick={() => setSelectedSubmission(sub)}>
+                                Inspect &amp; grade
+                              </Button>
+                            </Td>
+                          </Tr>
+                        ))}
+                      </TBody>
+                    </TableWrap>
+                  </Card>
+                </>
+              )
             )}
 
-            {/* Tab 4: Violation Logs */}
+            {/* Tab 4: Integrity log */}
             {activeMainTab === 'violations' && (
-              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
-                      <tr>
-                        <th className="p-4">Student</th>
-                        <th className="p-4">Roll Number</th>
-                        <th className="p-4">Exam</th>
-                        <th className="p-4">Violation Type</th>
-                        <th className="p-4">Timestamp</th>
-                        <th className="p-4">Running Count</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
-                      {violations.length === 0 ? (
+              violations.length === 0 ? (
+                <Card>
+                  <EmptyState
+                    icon={<ShieldAlert className="w-5 h-5" />}
+                    title="No integrity events"
+                    description={`Nothing has been flagged for ${selectedSubject.name}. Events appear here as students sit examinations.`}
+                  />
+                </Card>
+              ) : (
+                <>
+                  <div className="lg:hidden space-y-3">
+                    {violations.map((v) => (
+                      <Card key={v.id} className="p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-slate-900 dark:text-white">{v.studentName}</p>
+                            <p className="text-[11px] font-mono text-slate-500">{v.rollNumber}</p>
+                          </div>
+                          <StatusBadge tone="rose">{v.type}</StatusBadge>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-400">{v.examTitle}</p>
+                        <p className="text-[11px] text-slate-500 font-mono">{new Date(v.createdAt).toLocaleString()}</p>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <Card className="hidden lg:block overflow-hidden">
+                    <TableWrap minWidth="720px">
+                      <THead>
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">No violations logged for this subject.</td>
+                          <Th>Student</Th>
+                          <Th>Roll number</Th>
+                          <Th>Examination</Th>
+                          <Th>Event</Th>
+                          <Th>When</Th>
+                          <Th className="text-right">Count</Th>
                         </tr>
-                      ) : (
-                        violations.map((v) => (
-                          <tr key={v.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                            <td className="p-4 font-sans font-semibold text-slate-800 dark:text-slate-200">{v.studentName}</td>
-                            <td className="p-4 font-bold text-slate-900 dark:text-white">{v.rollNumber}</td>
-                            <td className="p-4 font-sans text-slate-700 dark:text-slate-300">{v.examTitle}</td>
-                            <td className="p-4">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-950/40 text-rose-300 border border-rose-800/50">
-                                {v.type}
-                              </span>
-                            </td>
-                            <td className="p-4 text-slate-500">{new Date(v.createdAt).toLocaleString()}</td>
-                            <td className="p-4 text-slate-900 dark:text-white font-bold">{v.violationCount}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                      </THead>
+                      <TBody>
+                        {violations.map((v) => (
+                          <Tr key={v.id}>
+                            <Td className="font-semibold text-slate-900 dark:text-white">{v.studentName}</Td>
+                            <Td className="font-mono font-bold text-slate-900 dark:text-white">{v.rollNumber}</Td>
+                            <Td>{v.examTitle}</Td>
+                            <Td><StatusBadge tone="rose">{v.type}</StatusBadge></Td>
+                            <Td className="text-slate-500 tabular">{new Date(v.createdAt).toLocaleString()}</Td>
+                            <Td className="text-right font-bold text-slate-900 dark:text-white tabular">{v.violationCount}</Td>
+                          </Tr>
+                        ))}
+                      </TBody>
+                    </TableWrap>
+                  </Card>
+                </>
+              )
             )}
           </div>
         )}
@@ -823,45 +890,59 @@ export default function LecturerDashboard() {
       {/* Modal: Create/Edit Programming Exam */}
       {showLabModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl w-full p-4 sm:p-6 shadow-xl space-y-4 max-h-[92vh] overflow-y-auto">
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingLabId ? 'Edit Programming Exam' : 'Create Programming Exam'}</h3>
+          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-xl w-full p-4 sm:p-6 shadow-overlay space-y-4 max-h-[92vh] overflow-y-auto">
+            <div className="space-y-1">
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                {editingLabId ? 'Edit examination' : 'Create examination'}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Configure the examination and its answer sheet here. Question sets, previews and student assignment are
+                managed from the examination&apos;s <span className="font-semibold">Question sets</span> action once it exists.
+              </p>
+            </div>
             <form className="space-y-3">
-              <input type="text" placeholder="Exam Name" value={labTitle} onChange={(e) => setLabTitle(e.target.value)} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
-              <input type="text" placeholder="Short Description" value={labDesc} onChange={(e) => setLabDesc(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white" />
-              <textarea placeholder="Programming Question / Problem Statement" value={labProblem} onChange={(e) => setLabProblem(e.target.value)} rows={4} required className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-900 dark:text-white" />
+              <input type="text" placeholder="Exam Name" value={labTitle} onChange={(e) => setLabTitle(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
+              <input type="text" placeholder="Short Description" value={labDesc} onChange={(e) => setLabDesc(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
+              <textarea placeholder="Programming Question / Problem Statement" value={labProblem} onChange={(e) => setLabProblem(e.target.value)} rows={4} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors leading-relaxed resize-y" />
 
               {/* Scheduling */}
-              <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
-                <label className="text-xs font-semibold text-slate-900 dark:text-white block">Exam Schedule</label>
+              <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-900 dark:text-white block">Schedule</label>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">When the examination opens, closes, and how long each student gets.</p>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
                     <label className="text-[10px] text-slate-500 block mb-0.5">Date</label>
-                    <input type="date" value={examDateInput} onChange={(e) => setExamDateInput(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white" />
+                    <input type="date" value={examDateInput} onChange={(e) => setExamDateInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-500 block mb-0.5">Start Time</label>
-                    <input type="time" value={startTimeInput} onChange={(e) => setStartTimeInput(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white" />
+                    <input type="time" value={startTimeInput} onChange={(e) => setStartTimeInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-500 block mb-0.5">End Time</label>
-                    <input type="time" value={endTimeInput} onChange={(e) => setEndTimeInput(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white" />
+                    <input type="time" value={endTimeInput} onChange={(e) => setEndTimeInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="text-[10px] text-slate-500 block mb-0.5">Duration (minutes)</label>
-                    <input type="number" min={1} placeholder="e.g. 90" value={durationMinutesInput} onChange={(e) => setDurationMinutesInput(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white" />
+                    <input type="number" min={1} placeholder="e.g. 90" value={durationMinutesInput} onChange={(e) => setDurationMinutesInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                   <div>
                     <label className="text-[10px] text-slate-500 block mb-0.5">Fullscreen Exit Threshold</label>
-                    <input type="number" min={1} value={fullscreenThresholdInput} onChange={(e) => setFullscreenThresholdInput(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white" />
+                    <input type="number" min={1} value={fullscreenThresholdInput} onChange={(e) => setFullscreenThresholdInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                 </div>
               </div>
 
               {/* Allowed languages */}
-              <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
-                <label className="text-xs font-semibold text-slate-900 dark:text-white block">Allowed Programming Languages</label>
+              <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-900 dark:text-white block">Allowed languages</label>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Students may only create source files in the languages you select.</p>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   {LANGUAGE_OPTIONS.map((lang) => (
                     <label key={lang.value} className="flex items-center space-x-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5">
@@ -873,7 +954,11 @@ export default function LecturerDashboard() {
               </div>
 
               {/* Exam mode + anti-cheat */}
-              <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
+              <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-900 dark:text-white block">Integrity &amp; devices</label>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">How the attempt is monitored, and what a student may do during it.</p>
+                </div>
                 <label className="flex items-center space-x-2 text-xs font-semibold text-slate-900 dark:text-white">
                   <input type="checkbox" checked={examModeEnabled} onChange={(e) => setExamModeEnabled(e.target.checked)} />
                   <span>Enable Secure Exam Mode (fullscreen, tab-switch &amp; devtools monitoring)</span>
@@ -902,9 +987,11 @@ export default function LecturerDashboard() {
               />
 
               <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => setShowLabModal(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold">Cancel</button>
-                <button type="button" disabled={saving} onClick={(e) => handleSaveLab(e, false)} className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs font-semibold disabled:opacity-50">Save Draft</button>
-                <button type="button" disabled={saving} onClick={(e) => handleSaveLab(e, true)} className="px-4 py-2 rounded-xl bg-brand-olive-700 text-white text-xs font-semibold disabled:opacity-50">Publish Exam</button>
+                <button type="button" onClick={() => setShowLabModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
+                <button type="button" disabled={saving} onClick={(e) => handleSaveLab(e, false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50">Save Draft</button>
+                <button type="button" disabled={saving} onClick={(e) => handleSaveLab(e, true)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors disabled:opacity-50">
+                  {editingLabId ? 'Save & publish' : 'Publish examination'}
+                </button>
               </div>
             </form>
           </div>
@@ -924,22 +1011,18 @@ export default function LecturerDashboard() {
       {/* Submission Inspector Modal */}
       {selectedSubmission && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex flex-col p-2 sm:p-6 overflow-hidden">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-2xl">
-            <div className="bg-slate-950 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
-              <div>
-                <span className="font-mono font-bold text-white text-base mr-3">{selectedSubmission.studentRollNumber}</span>
-                <span className="text-slate-300 font-semibold">{selectedSubmission.studentName}</span>
-                {selectedSubmission.autoSubmitted && <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-amber-950/40 text-amber-300 border border-amber-800/50">AUTO-SUBMITTED</span>}
+          <div className="bg-slate-900 border border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay">
+            <div className="bg-slate-950 border-b border-slate-800 px-4 sm:px-6 py-3.5 flex items-start sm:items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                <span className="font-mono font-bold text-white text-base">{selectedSubmission.studentRollNumber}</span>
+                <span className="text-slate-300 font-semibold text-sm">{selectedSubmission.studentName}</span>
+                {selectedSubmission.autoSubmitted && <StatusBadge tone="amber">Auto-submitted</StatusBadge>}
                 {/* Faculty-facing only — the student is never shown which set they sat. */}
                 {selectedSubmission.questionSetLabel && (
-                  <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-indigo-950/40 text-indigo-300 border border-indigo-800/50">
-                    {selectedSubmission.questionSetLabel}
-                  </span>
+                  <StatusBadge tone="indigo">{selectedSubmission.questionSetLabel}</StatusBadge>
                 )}
                 {selectedSubmission.startDeviceClass && (
-                  <span className="ml-2 px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400 border border-slate-700">
-                    {selectedSubmission.startDeviceClass}
-                  </span>
+                  <StatusBadge tone="neutral">{selectedSubmission.startDeviceClass}</StatusBadge>
                 )}
               </div>
               <button onClick={() => setSelectedSubmission(null)} className="px-3 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold">Close</button>
@@ -1022,9 +1105,9 @@ export default function LecturerDashboard() {
                         <ShieldAlert className="w-3.5 h-3.5" />
                         <span>Integrity Timeline</span>
                       </h4>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${INTEGRITY_STATUS_STYLES[integrityStatus]}`}>
+                      <StatusBadge tone={integrityStatus === 'FLAGGED' ? 'rose' : integrityStatus === 'WARNING' ? 'amber' : 'emerald'}>
                         {integrityStatus}
-                      </span>
+                      </StatusBadge>
                     </div>
                     {timelineEvents.length === 0 ? (
                       <p className="text-[11px] text-slate-500">No events recorded.</p>

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ArrowUp, ArrowDown, GripVertical, Eye, X, AlertTriangle } from 'lucide-react';
 import { SECTION_CATALOGUE, SectionContentSource, templateForKey } from '@/lib/answerSheet';
 import { AnswerSheet, AnswerSheetSection } from './AnswerSheet';
+import { Button, Modal } from '@/components/ui';
 
 // Where the lecturer customises the ONE answer sheet for an examination: which sections
 // appear, in what order, under what heading, which are mandatory, and what each is worth.
@@ -252,27 +253,20 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange, sta
           the lecturer sees here cannot drift from what students actually get. Reflects the
           unsaved working draft, which is the point: preview before publishing. */}
       {showPreview && (
-        <div className="fixed inset-0 z-[60] bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex flex-col p-4 sm:p-8">
-          <div className="bg-slate-900 border border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-3xl w-full mx-auto">
-            <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-brand-blue-400" />
-                <h4 className="font-bold text-white text-sm">Student Answer Sheet Preview</h4>
-                <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
-                  unsaved draft · {enabledCount} section{enabledCount === 1 ? '' : 's'}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPreview(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                aria-label="Close preview"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 min-h-0 p-4">
+        <Modal
+          open={showPreview}
+          onClose={() => setShowPreview(false)}
+          title="Student answer sheet preview"
+          description={`Unsaved draft · ${enabledCount} section${enabledCount === 1 ? '' : 's'}`}
+          size="lg"
+          elevated
+          footer={
+            <Button variant="primary" size="sm" onClick={() => setShowPreview(false)}>
+              Back to configuration
+            </Button>
+          }
+        >
+            <div className="min-h-0">
               <AnswerSheet
                 preview
                 labId="preview"
@@ -284,17 +278,7 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange, sta
               />
             </div>
 
-            <div className="border-t border-slate-800 px-5 py-3 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowPreview(false)}
-                className="px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-bold"
-              >
-                Back to configuration
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

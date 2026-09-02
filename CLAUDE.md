@@ -233,6 +233,33 @@ order, under their headings, with their required flags. Never hardcode the secti
 its order into a layout. Required state is shown by more than colour, and the Code section
 is bound to the workspace files rather than being a second editor.
 
+### Dialog architecture
+
+Every standard application dialog uses the shared `Modal` primitive. It provides Escape to
+close, a focus trap, focus restoration to whatever opened it, background scroll lock,
+`role="dialog"` + `aria-modal` + an accessible name, responsive sizing, and a scrollable body.
+Do not hand-roll a dialog: extend `Modal` instead.
+
+Two props carry real decisions rather than styling:
+
+- **`dismissOnBackdrop`** — defaults to true. Set it **false** for any dialog holding unsaved
+  input (forms, authoring workspaces, grading). A stray click beside a half-filled form must
+  not discard the work. Escape still closes, because a deliberate keypress is not a stray
+  click.
+- **`elevated`** — for a dialog opened from inside another dialog. Escape dismisses only the
+  topmost dialog; the primitive tracks an open-dialog stack so a nested preview never takes
+  its parent down with it.
+
+**Overlays that are deliberately NOT dialogs** and must stay custom:
+
+- `ExamGuard`'s fullscreen-required gate. It is a blocking integrity barrier, not a dialog:
+  it must have no Escape, no backdrop dismissal and no close button, because dismissing it
+  is precisely what the student must not be able to do.
+- The active examination's own overlays (`OnlineIDE`'s problem statement and new-file
+  dialogs). They live inside the permanently-dark exam surface; routing them through the
+  themed primitive would put a light panel in the middle of a dark, deliberately focused
+  examination.
+
 ### Accessibility expectations
 
 Semantic HTML (`nav`, `header`, `main`, `table`, real `button`s); every input has a label;

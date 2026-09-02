@@ -7,6 +7,7 @@ import { AppShell, LECTURER_NAV } from '@/components/AppShell';
 import {
   Button,
   Card,
+  Modal,
   EmptyState,
   TableWrap,
   TBody,
@@ -889,17 +890,16 @@ export default function LecturerDashboard() {
 
       {/* Modal: Create/Edit Programming Exam */}
       {showLabModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-xl w-full p-4 sm:p-6 shadow-overlay space-y-4 max-h-[92vh] overflow-y-auto">
-            <div className="space-y-1">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                {editingLabId ? 'Edit examination' : 'Create examination'}
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Configure the examination and its answer sheet here. Question sets, previews and student assignment are
-                managed from the examination&apos;s <span className="font-semibold">Question sets</span> action once it exists.
-              </p>
-            </div>
+        <Modal
+          open={showLabModal}
+          onClose={() => setShowLabModal(false)}
+          title={editingLabId ? 'Edit examination' : 'Create examination'}
+          description="Configure the examination and its answer sheet here. Question sets, previews and student assignment are managed from the examination's Question sets action once it exists."
+          size="lg"
+          // An exam being authored holds a lot of unsaved configuration; a stray click on the
+          // backdrop must not discard it.
+          dismissOnBackdrop={false}
+        >
             <form className="space-y-3">
               <input type="text" placeholder="Exam Name" value={labTitle} onChange={(e) => setLabTitle(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               <input type="text" placeholder="Short Description" value={labDesc} onChange={(e) => setLabDesc(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
@@ -994,8 +994,7 @@ export default function LecturerDashboard() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {questionSetsLab && (
@@ -1010,12 +1009,21 @@ export default function LecturerDashboard() {
 
       {/* Submission Inspector Modal */}
       {selectedSubmission && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex flex-col p-2 sm:p-6 overflow-hidden">
-          <div className="bg-slate-900 border border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay">
-            <div className="bg-slate-950 border-b border-slate-800 px-4 sm:px-6 py-3.5 flex items-start sm:items-center justify-between gap-3 flex-wrap">
+        <Modal
+          open
+          onClose={() => setSelectedSubmission(null)}
+          title={`${selectedSubmission.studentRollNumber} — ${selectedSubmission.studentName}`}
+          description="Review the submitted record, code and integrity signals, then award marks."
+          size="full"
+          fullHeight
+          // Grading holds typed marks and remarks; a stray backdrop click must not lose them.
+          dismissOnBackdrop={false}
+        >
+          <div className="flex flex-col h-full -m-4 sm:-m-5">
+            <div className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3.5 flex items-start sm:items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-                <span className="font-mono font-bold text-white text-base">{selectedSubmission.studentRollNumber}</span>
-                <span className="text-slate-300 font-semibold text-sm">{selectedSubmission.studentName}</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-white text-base">{selectedSubmission.studentRollNumber}</span>
+                <span className="text-slate-600 dark:text-slate-300 font-semibold text-sm">{selectedSubmission.studentName}</span>
                 {selectedSubmission.autoSubmitted && <StatusBadge tone="amber">Auto-submitted</StatusBadge>}
                 {/* Faculty-facing only — the student is never shown which set they sat. */}
                 {selectedSubmission.questionSetLabel && (
@@ -1025,7 +1033,7 @@ export default function LecturerDashboard() {
                   <StatusBadge tone="neutral">{selectedSubmission.startDeviceClass}</StatusBadge>
                 )}
               </div>
-              <button onClick={() => setSelectedSubmission(null)} className="px-3 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold">Close</button>
+              <button onClick={() => setSelectedSubmission(null)} className="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white rounded-control text-xs font-bold">Close</button>
             </div>
 
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-4 gap-4">
@@ -1052,17 +1060,17 @@ export default function LecturerDashboard() {
                 )}
 
                 {(selectedSubmission.answerSheet?.length || 0) > 0 && inspectorPane === 'sheet' ? (
-                  <div className="flex-1 min-h-0 overflow-y-auto bg-slate-950 border border-slate-800 rounded-card p-5 space-y-5">
+                  <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-5 space-y-5">
                     {selectedSubmission.problemStatement && (
                       <div className="space-y-1.5 border-b border-slate-800 pb-4">
-                        <h4 className="text-xs font-bold text-slate-300">Question</h4>
-                        <p className="text-[11px] text-slate-400 whitespace-pre-wrap leading-relaxed">{selectedSubmission.problemStatement}</p>
+                        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">Question</h4>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">{selectedSubmission.problemStatement}</p>
                       </div>
                     )}
 
                     {selectedSubmission.answerSheet.map((section: any, i: number) => (
                       <div key={section.id} className="space-y-1.5">
-                        <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
                           <span className="text-slate-500 font-mono">{i + 1}.</span>
                           <span>{section.label}</span>
                           {section.maxMarks !== null && (
@@ -1078,12 +1086,12 @@ export default function LecturerDashboard() {
                           </p>
                         ) : section.content.trim() ? (
                           <p
-                            className={`text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed bg-slate-900 border border-slate-800 rounded-control p-3 ${section.contentSource === 'EXECUTION_IO' ? 'font-mono' : ''}`}
+                            className={`text-[11px] text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-control p-3 ${section.contentSource === 'EXECUTION_IO' ? 'font-mono' : ''}`}
                           >
                             {section.content}
                           </p>
                         ) : (
-                          <p className="text-[11px] text-rose-400/80 italic">
+                          <p className="text-[11px] text-rose-600 dark:text-rose-400/80 italic">
                             Left blank{section.required ? ' (required section)' : ''}.
                           </p>
                         )}
@@ -1099,7 +1107,7 @@ export default function LecturerDashboard() {
 
               <div className="w-full md:w-80 flex flex-col space-y-4 overflow-y-auto">
                 {integrityStatus && (
-                  <div className="bg-slate-950 border border-slate-800 rounded-card p-4 space-y-3">
+                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-xs text-white flex items-center space-x-1.5">
                         <ShieldAlert className="w-3.5 h-3.5" />
@@ -1110,7 +1118,7 @@ export default function LecturerDashboard() {
                       </StatusBadge>
                     </div>
                     {timelineEvents.length === 0 ? (
-                      <p className="text-[11px] text-slate-500">No events recorded.</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">No events recorded.</p>
                     ) : (
                       <div className="space-y-1.5 max-h-64 overflow-y-auto">
                         {timelineEvents.map((ev) => (
@@ -1125,24 +1133,24 @@ export default function LecturerDashboard() {
                   </div>
                 )}
 
-                <div className="bg-slate-950 border border-slate-800 rounded-card p-5 flex flex-col justify-between space-y-4">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-5 flex flex-col justify-between space-y-4">
                   <form onSubmit={handleEvaluateSubmission} className="space-y-4">
                     <h4 className="font-bold text-sm text-white border-b border-slate-800 pb-2">Grading Panel</h4>
                     <div>
-                      <label className="text-xs font-semibold text-slate-400 block mb-1">Status</label>
-                      <select value={evalStatus} onChange={(e) => setEvalStatus(e.target.value)} className="w-full bg-slate-800 text-white border border-slate-700 rounded-control px-3 py-2 text-xs">
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Status</label>
+                      <select value={evalStatus} onChange={(e) => setEvalStatus(e.target.value)} className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs">
                         <option value="APPROVED">APPROVED</option>
                         <option value="REJECTED">REJECTED</option>
                         <option value="NEEDS_CORRECTION">NEEDS CORRECTION</option>
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-slate-400 block mb-1">Marks (out of 100)</label>
-                      <input type="number" placeholder="100" value={evalMarks} onChange={(e) => setEvalMarks(e.target.value)} className="w-full bg-slate-800 text-white border border-slate-700 rounded-control px-3 py-2 text-xs" />
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Marks (out of 100)</label>
+                      <input type="number" placeholder="100" value={evalMarks} onChange={(e) => setEvalMarks(e.target.value)} className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs" />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-slate-400 block mb-1">Remarks</label>
-                      <textarea placeholder="Feedback..." value={evalRemarks} onChange={(e) => setEvalRemarks(e.target.value)} rows={3} className="w-full bg-slate-800 text-white border border-slate-700 rounded-control p-3 text-xs" />
+                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Remarks</label>
+                      <textarea placeholder="Feedback..." value={evalRemarks} onChange={(e) => setEvalRemarks(e.target.value)} rows={3} className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-control p-3 text-xs" />
                     </div>
                     <button type="submit" className="w-full py-2.5 bg-brand-olive-700 text-white rounded-control font-bold text-xs">Submit Grade</button>
                   </form>
@@ -1150,7 +1158,7 @@ export default function LecturerDashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />

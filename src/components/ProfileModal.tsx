@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
+import { Modal } from '@/components/ui';
 import { X, Key, User as UserIcon, Building, Phone, Save, Sun, Moon } from 'lucide-react';
 
 interface ProfileModalProps {
@@ -68,20 +69,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 rounded-card border border-slate-200 dark:border-slate-800 max-w-lg w-full p-4 sm:p-6 shadow-overlay space-y-4 sm:space-y-5 my-auto max-h-[92vh] overflow-y-auto">
-        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
-          <div className="flex items-center space-x-2">
-            <UserIcon className="w-5 h-5 text-brand-blue-600 dark:text-brand-blue-400" />
-            <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">
-              Profile & Account Settings
-            </h3>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-white">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Profile & account settings"
+      size="md"
+      // Settings hold typed changes (name, password); a stray backdrop click must not
+      // discard them.
+      dismissOnBackdrop={false}
+    >
+      <div className="space-y-4 sm:space-y-5">
         {msg && (
           <div
             className={`p-3 rounded-lg text-sm font-medium ${
@@ -245,6 +242,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 };

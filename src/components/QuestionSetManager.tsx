@@ -18,6 +18,7 @@ import {
   History,
 } from 'lucide-react';
 import { QuestionPaper } from './QuestionPaper';
+import { Button, Modal } from '@/components/ui';
 
 // Faculty authoring for an exam's question sets, plus the student-to-set mapping.
 //
@@ -253,19 +254,21 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
   const assignable = sets.filter((s) => s.isActive && s.questions.length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex flex-col p-2 sm:p-6">
-      <div className="relative bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-5xl w-full mx-auto">
-        {/* Header */}
-        <div className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-5 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Layers className="w-4 h-4 text-brand-blue-400 flex-shrink-0" />
-            <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate">Question Sets — {labTitle}</h3>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-control text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
+    <Modal
+      open
+      onClose={onClose}
+      title={`Question sets — ${labTitle}`}
+      size="full"
+      fullHeight
+      // Authoring holds unsaved question edits; a stray backdrop click must not discard them.
+      dismissOnBackdrop={false}
+      footer={
+        <Button variant="outline" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      <div className="flex flex-col h-full -m-4 sm:-m-5">
         {/* Tabs */}
         <div className="bg-slate-50/60 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 px-5 py-2 flex items-center gap-2">
           <button
@@ -584,48 +587,36 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
         {/* Per-set preview: the paper exactly as a student will read it, rendered through
             the same component the student's exam uses. */}
         {previewSet && (
-          <div className="absolute inset-0 z-10 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex flex-col p-6" onClick={() => setPreviewSet(null)}>
-            <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-2xl w-full mx-auto" onClick={(e) => e.stopPropagation()}>
-              <div className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-5 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-brand-blue-400" />
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">Preview — {previewSet.label}</h4>
-                  <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 hidden sm:inline">as the student sees it</span>
-                </div>
-                <button onClick={() => setPreviewSet(null)} className="p-1.5 rounded-control text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close preview">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="flex-1 min-h-0 overflow-y-auto p-5">
-                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-4 text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
-                  <QuestionPaper
-                    questions={previewSet.questions.map((q, i) => ({
-                      order: i + 1,
-                      text: q.text || '(empty question — it will not be shown to students)',
-                      marks: q.marks.trim() === '' ? null : parseFloat(q.marks),
-                    }))}
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-3">
-                  The student sees these questions and nothing else — no set name, no set number, and no indication that
-                  other sets exist.
-                </p>
-              </div>
-              <div className="border-t border-slate-200 dark:border-slate-800 px-5 py-3 flex justify-end">
-                <button onClick={() => setPreviewSet(null)} className="px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-bold">
-                  Back to sets
-                </button>
-              </div>
+          <Modal
+            open
+            onClose={() => setPreviewSet(null)}
+            title={`Preview — ${previewSet.label}`}
+            description="Exactly as the student sees it"
+            size="lg"
+            // Read-only preview: nothing is lost by dismissing it, so the backdrop closes it.
+            elevated
+            footer={
+              <Button variant="primary" size="sm" onClick={() => setPreviewSet(null)}>
+                Back to sets
+              </Button>
+            }
+          >
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-4 text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
+              <QuestionPaper
+                questions={previewSet.questions.map((q, i) => ({
+                  order: i + 1,
+                  text: q.text || '(empty question — it will not be shown to students)',
+                  marks: q.marks.trim() === '' ? null : parseFloat(q.marks),
+                }))}
+              />
             </div>
-          </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-3">
+              The student sees these questions and nothing else — no set name, no set number, and no indication that
+              other sets exist.
+            </p>
+          </Modal>
         )}
-
-        <div className="border-t border-slate-200 dark:border-slate-800 px-5 py-3 flex justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded-control bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold">
-            Close
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 };

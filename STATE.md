@@ -3,8 +3,8 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after the visual-consistency sweep across every route on
-`claude/labsubmit-development-y605fv`.
+**Last updated:** 2026-09-01, after standardising every application dialog on the shared
+`Modal` primitive on `claude/labsubmit-development-y605fv`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
 exists in the repository. A database model with no code reading or writing it is *schema
@@ -345,15 +345,51 @@ so they read as the same product without losing their distinct character.
 permanently-dark exam modal and inside the theme-following lecturer preview; one set of
 colour classes could not serve both correctly.
 
+### Dialog standardisation (third pass)
+All 16 overlays in the application were inspected. **Ten migrated** to the shared `Modal`:
+six admin dialogs (create/edit branch, subject and faculty; edit student; reset password;
+view profile), the lecturer exam-creation dialog, the Submission Inspector, the Question Set
+Manager and its nested set preview, the answer-sheet preview, and the profile/settings
+dialog.
+
+**Four intentionally remain custom, and why:**
+- `ExamGuard`'s fullscreen-required gate — a blocking integrity barrier, not a dialog. It
+  deliberately has no Escape, no backdrop dismissal and no close button; dismissing it is
+  exactly what a student must not be able to do.
+- `OnlineIDE`'s problem-statement and new-file overlays (×2) — inside the permanently-dark
+  examination surface. Routing them through the themed primitive would drop a light panel
+  into the middle of a deliberately dark, focused exam.
+- (The tenth item, the AppShell mobile drawer, is navigation rather than a dialog.)
+
+The primitive gained the behaviours the migration required: focus trap, focus restoration,
+background scroll lock, an open-dialog stack so **Escape dismisses only the topmost dialog**,
+`elevated` for nested dialogs, `fullHeight` for review workspaces, and `dismissOnBackdrop`.
+
+**A real bug was found and fixed by this testing:** with a nested preview open, Escape closed
+*both* it and its parent workspace, because every mounted Modal heard the same window
+keydown. The dialog stack fixes it.
+
+**`dismissOnBackdrop` is false** for every dialog holding unsaved input — admin forms, exam
+creation, the question-set workspace, grading and settings — preserving their previous
+behaviour, which never dismissed on outside click. Making them backdrop-dismissible would
+have been a regression that silently discarded typed work.
+
+**Accessibility gained across ten dialogs:** `role="dialog"`, `aria-modal`, an accessible
+name, focus moved in on open and restored on close, Tab trapped inside, and the background
+made non-scrollable.
+
+**Responsive verification:** 111 assertions across 1440 / 834 / 390 px — every dialog fits
+its viewport in both dimensions, causes no page overflow, locks background scroll, receives
+focus, resists backdrop dismissal where it should, and closes on Escape.
+
 ### Known UI issues / limitations
 - Verified at three viewport widths (1440/834/390), not a full device matrix.
 - `QuestionSetManager` and `AnswerSheetConfigurator` are now theme-correct and on the tokens,
   but still compose their own layout rather than using the shared primitives.
 - Admin tables use the shared table *language* by class replacement rather than the
   `TableWrap`/`Th`/`Td` components, and have no mobile card fallback (they scroll).
-- Lecturer/admin/QuestionSetManager dialogs are still hand-rolled rather than using the
-  shared `Modal`, so Escape-to-close and the dialog ARIA roles are inconsistent between
-  them and the primitive.
+- The two exam-surface overlays remain hand-rolled by design (see above); they therefore
+  lack Escape-to-close and dialog ARIA. Documented rather than forced into the primitive.
 - The landing page is on the tokens but has had no layout pass.
 - Two navigation surfaces coexist below `lg` on lecturer/admin: the drawer and the original
   tab strip (the strip is now `lg:hidden`). Intentional for now, but slightly redundant.
@@ -361,11 +397,10 @@ colour classes could not serve both correctly.
   beyond role.
 
 ### Next UI/UX tasks
-1. Move the hand-rolled dialogs onto the shared `Modal` — this also gives them consistent
-   Escape-to-close and dialog ARIA, which currently differ per dialog.
-2. Rebuild `QuestionSetManager` and `AnswerSheetConfigurator` on the primitives.
-3. Rebuild admin tables on the table primitives with mobile card fallbacks.
-4. Give the landing page a layout pass.
+1. Rebuild `QuestionSetManager` and `AnswerSheetConfigurator` bodies on the primitives (their
+   dialog shells are now shared; their internals still compose their own layout).
+2. Rebuild admin tables on the table primitives with mobile card fallbacks.
+3. Give the landing page a layout pass.
 
 ---
 

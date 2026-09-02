@@ -445,6 +445,11 @@ export const Alert: React.FC<{ tone?: 'info' | 'success' | 'warning' | 'danger';
 
 /* ------------------------------------------------------------------- Modal */
 
+// Open dialogs, innermost last. Escape must dismiss only the topmost one — without this,
+// every mounted Modal hears the same window keydown and a nested preview would take its
+// parent down with it.
+const modalStack: symbol[] = [];
+
 export const Modal: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -452,18 +457,103 @@ export const Modal: React.FC<{
   description?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   footer?: React.ReactNode;
+  /**
+   * Whether clicking the backdrop dismisses the dialog. Defaults to true for read-only and
+   * informational dialogs. Set FALSE for anything holding unsaved input — a stray click
+   * beside a half-filled form must not throw the work away. Escape still closes, because a
+   * deliberate keypress is not a stray click.
+   */
+  dismissOnBackdrop?: boolean;
+  /** Raises a dialog opened from within another dialog above its parent. */
+  elevated?: boolean;
+  /** Fills the viewport height — for review workspaces rather than short forms. */
+  fullHeight?: boolean;
   children: React.ReactNode;
-}> = ({ open, onClose, title, description, size = 'md', footer, children }) => {
-  // Escape closes the dialog — expected of any modal, and the only keyboard affordance
-  // that is genuinely missing without it.
+}> = ({
+  open,
+  onClose,
+  title,
+  description,
+  size = 'md',
+  footer,
+  dismissOnBackdrop = true,
+  elevated = false,
+  fullHeight = false,
+  children,
+}) => {
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const restoreFocusRef = React.useRef<HTMLElement | null>(null);
+  const idRef = React.useRef<symbol>(Symbol('labsubmit-modal'));
+
+  // Register in the stack while open, so this dialog knows whether it is the topmost.
+  React.useEffect(() => {
+    if (!open) return;
+    const id = idRef.current;
+    modalStack.push(id);
+    return () => {
+      const i = modalStack.lastIndexOf(id);
+      if (i !== -1) modalStack.splice(i, 1);
+    };
+  }, [open]);
+
+  // Escape closes the dialog — expected of any modal, and the one keyboard affordance whose
+  // absence is immediately felt. Only the topmost dialog reacts, so closing a nested preview
+  // does not also close the workspace that opened it.
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      if (modalStack[modalStack.length - 1] !== idRef.current) return;
+      onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+
+  // Focus moves into the dialog on open and returns to whatever opened it on close, so
+  // keyboard users are not dropped back at the top of the document.
+  React.useEffect(() => {
+    if (!open) return;
+    restoreFocusRef.current = document.activeElement as HTMLElement | null;
+    const focusable = panelRef.current?.querySelector<HTMLElement>(
+      'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    );
+    (focusable || panelRef.current)?.focus();
+    return () => {
+      restoreFocusRef.current?.focus?.();
+    };
+  }, [open]);
+
+  // Tab is kept inside the dialog while it is open, so the page behind cannot be reached by
+  // keyboard while it is meant to be inert.
+  const onKeyDownTrap = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab' || !panelRef.current) return;
+    const nodes = Array.from(
+      panelRef.current.querySelectorAll<HTMLElement>(
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      )
+    ).filter((el) => el.offsetParent !== null);
+    if (nodes.length === 0) return;
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
+  // The page behind must not scroll under the dialog.
+  React.useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -477,16 +567,23 @@ export const Modal: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fade-in"
-      onClick={onClose}
+      className={cn(
+        'fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fade-in',
+        elevated ? 'z-[60]' : 'z-50'
+      )}
+      onClick={dismissOnBackdrop ? onClose : undefined}
     >
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        tabIndex={-1}
+        onKeyDown={onKeyDownTrap}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card shadow-overlay w-full my-auto max-h-[94vh] flex flex-col animate-slide-up',
+          'bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card shadow-overlay w-full my-auto flex flex-col animate-slide-up focus:outline-none',
+          fullHeight ? 'h-[94vh]' : 'max-h-[94vh]',
           SIZES[size]
         )}
       >

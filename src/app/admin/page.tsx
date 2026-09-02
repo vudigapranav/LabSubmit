@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { AppShell, ADMIN_NAV } from '@/components/AppShell';
-import { LoadingState, PageHeader, Toast as UiToast } from '@/components/ui';
+import { LoadingState, Modal, PageHeader, Toast as UiToast } from '@/components/ui';
 import { ProfileModal } from '@/components/ProfileModal';
 import {
   Shield,
@@ -942,12 +942,12 @@ export default function AdminDashboard() {
 
       {/* Modal: View User Details */}
       {showViewUserModal && viewingUser && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
-            <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
-              <Eye className="w-5 h-5 text-brand-blue-500" />
-              <span>{viewingUser.type === 'STUDENT' ? 'Student Profile' : 'Faculty Profile'}</span>
-            </h3>
+        <Modal
+          open={showViewUserModal}
+          onClose={() => setShowViewUserModal(false)}
+          title={viewingUser.type === 'STUDENT' ? 'Student Profile' : 'Faculty Profile'}
+          size="md"
+        >
 
             <div className="space-y-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 p-4 rounded-control border border-slate-200 dark:border-slate-700/60 font-mono">
               <div className="flex justify-between"><span className="text-slate-500 font-sans">Full Name:</span><strong className="text-slate-900 dark:text-white">{viewingUser.name}</strong></div>
@@ -972,15 +972,19 @@ export default function AdminDashboard() {
                 Close
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal: Edit Student */}
       {showEditStudentModal && editingStudent && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">Edit Student Details</h3>
+        <Modal
+          open={showEditStudentModal}
+          onClose={() => setShowEditStudentModal(false)}
+          title="Edit student details"
+          size="md"
+          // A half-filled form must not be discarded by a stray click beside it.
+          dismissOnBackdrop={false}
+        >
             <form onSubmit={handleSaveEditStudent} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Full Name</label>
@@ -1017,18 +1021,19 @@ export default function AdminDashboard() {
                 <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors">Save Changes</button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal: Reset Password (Student & Lecturer) */}
       {showResetPasswordModal && targetResetUser && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
-            <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
-              <Key className="w-5 h-5 text-amber-500" />
-              <span>Reset Password for {targetResetUser.name}</span>
-            </h3>
+        <Modal
+          open={showResetPasswordModal}
+          onClose={() => setShowResetPasswordModal(false)}
+          title="Reset password"
+          size="md"
+          // A half-filled form must not be discarded by a stray click beside it.
+          dismissOnBackdrop={false}
+        >
             <form onSubmit={handleResetPassword} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">New Password</label>
@@ -1040,15 +1045,19 @@ export default function AdminDashboard() {
                 <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-card transition-colors">Reset Password</button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal: Create/Edit Branch */}
       {showBranchModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingBranchId ? 'Edit Branch' : 'Create New Branch'}</h3>
+        <Modal
+          open={showBranchModal}
+          onClose={() => setShowBranchModal(false)}
+          title={editingBranchId ? 'Edit branch' : 'Create branch'}
+          size="md"
+          // A half-filled form must not be discarded by a stray click beside it.
+          dismissOnBackdrop={false}
+        >
             <form onSubmit={handleSaveBranch} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Branch Name (e.g. CSE-1, CSE-2)</label>
@@ -1078,15 +1087,19 @@ export default function AdminDashboard() {
                 <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors">Save Branch</button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal: Create/Edit Subject */}
       {showSubjectModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingSubjectId ? 'Edit Subject' : 'Create New Subject'}</h3>
+        <Modal
+          open={showSubjectModal}
+          onClose={() => setShowSubjectModal(false)}
+          title={editingSubjectId ? 'Edit subject' : 'Create subject'}
+          size="md"
+          // A half-filled form must not be discarded by a stray click beside it.
+          dismissOnBackdrop={false}
+        >
             <form onSubmit={handleSaveSubject} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Subject Name (e.g. Java Programming Lab)</label>
@@ -1131,15 +1144,19 @@ export default function AdminDashboard() {
                 <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-blue-600 hover:bg-brand-blue-500 text-white text-xs font-semibold shadow-card transition-colors">Save Subject</button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Modal: Add Lecturer */}
       {showAddLecturerModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingLecturerId ? 'Edit Faculty Lecturer' : 'Add Faculty Lecturer'}</h3>
+        <Modal
+          open={showAddLecturerModal}
+          onClose={() => setShowAddLecturerModal(false)}
+          title={editingLecturerId ? 'Edit faculty member' : 'Add faculty member'}
+          size="md"
+          // A half-filled form must not be discarded by a stray click beside it.
+          dismissOnBackdrop={false}
+        >
             <form onSubmit={handleSaveLecturer} className="space-y-3">
               <input type="text" placeholder="Full Name (e.g. Dr. Ravi)" value={lecName} onChange={(e) => setLecName(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               <input type="email" placeholder="Email (e.g. ravi@cbit.in)" value={lecEmail} onChange={(e) => setLecEmail(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
@@ -1152,8 +1169,7 @@ export default function AdminDashboard() {
                 <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-blue-600 hover:bg-brand-blue-500 text-white text-xs font-semibold shadow-card transition-colors">Save Faculty</button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />

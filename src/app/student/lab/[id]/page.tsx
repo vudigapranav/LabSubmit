@@ -195,7 +195,7 @@ export default function StudentLabWorkspacePage() {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white space-y-4">
         <AlertCircle className="w-12 h-12 text-red-500" />
         <h2 className="text-xl font-bold">Programming Exam Not Found</h2>
-        <Link href="/student" className="px-4 py-2 bg-brand-blue-600 rounded-xl text-xs font-bold text-white">
+        <Link href="/student" className="px-4 py-2 bg-brand-blue-600 rounded-control text-xs font-bold text-white">
           Return to Student Dashboard
         </Link>
       </div>
@@ -227,8 +227,8 @@ export default function StudentLabWorkspacePage() {
       {/* Gate: exam not started yet */}
       {!hasStarted && !isSubmitted && (
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-8 space-y-4 sm:space-y-5 shadow-2xl text-center">
-            <div className="w-14 h-14 rounded-2xl bg-brand-olive-950/60 border border-brand-olive-800/60 flex items-center justify-center mx-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-card max-w-lg w-full p-5 sm:p-8 space-y-4 sm:space-y-5 shadow-overlay text-center">
+            <div className="w-14 h-14 rounded-card bg-brand-olive-950/60 border border-brand-olive-800/60 flex items-center justify-center mx-auto">
               <BookOpen className="w-7 h-7 text-brand-olive-400" />
             </div>
             <div>
@@ -239,7 +239,7 @@ export default function StudentLabWorkspacePage() {
             {labData.status === 'RUNNING' ? (
               <>
                 {labData.examModeEnabled && (deviceEligibility?.eligible ?? true) && (
-                  <div className="bg-amber-950/40 border border-amber-800/60 rounded-xl p-4 text-left space-y-2">
+                  <div className="bg-amber-950/40 border border-amber-800/60 rounded-control p-4 text-left space-y-2">
                     <div className="flex items-center space-x-2 text-amber-300 font-bold text-xs">
                       <ShieldAlert className="w-4 h-4" />
                       <span>Secure Exam Mode</span>
@@ -260,8 +260,8 @@ export default function StudentLabWorkspacePage() {
                 {/* Exam-device restriction. This card is the courtesy notice; the binding
                     refusal is made server-side on start_exam and on every action after it. */}
                 {deviceEligibility && !deviceEligibility.eligible ? (
-                  <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-4 sm:p-5 space-y-3 text-center">
-                    <div className="w-11 h-11 rounded-2xl bg-rose-950/60 border border-rose-800/60 flex items-center justify-center mx-auto">
+                  <div className="bg-rose-950/40 border border-rose-800/60 rounded-control p-4 sm:p-5 space-y-3 text-center">
+                    <div className="w-11 h-11 rounded-card bg-rose-950/60 border border-rose-800/60 flex items-center justify-center mx-auto">
                       <Laptop className="w-5 h-5 text-rose-300" />
                     </div>
                     <h3 className="text-rose-200 font-bold text-sm">Unsupported device</h3>
@@ -270,7 +270,7 @@ export default function StudentLabWorkspacePage() {
                     <p className="text-xs text-rose-200/90 leading-relaxed">{deviceEligibility.reason}</p>
                     <Link
                       href="/student"
-                      className="block w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold transition-colors"
+                      className="block w-full py-2.5 rounded-control bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold transition-colors"
                     >
                       Return to your dashboard
                     </Link>
@@ -278,7 +278,7 @@ export default function StudentLabWorkspacePage() {
                 ) : (
                   <>
                     {viewportTooSmall && (
-                      <div className="bg-amber-950/40 border border-amber-800/60 rounded-xl p-3 text-left text-[11px] text-amber-200/90">
+                      <div className="bg-amber-950/40 border border-amber-800/60 rounded-control p-3 text-left text-[11px] text-amber-200/90">
                         Your window is quite narrow for an examination. Maximise your browser before starting so the
                         editor and answer sheet both fit.
                       </div>
@@ -293,7 +293,7 @@ export default function StudentLabWorkspacePage() {
                     <button
                       onClick={handleStartExam}
                       disabled={starting}
-                      className="w-full py-3 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-600 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center space-x-2 transition-colors shadow-md"
+                      className="w-full py-3 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 disabled:opacity-50 text-white font-bold text-sm flex items-center justify-center space-x-2 transition-colors shadow-cardHover"
                     >
                       <Maximize className="w-4 h-4" />
                       <span>{starting ? 'Starting...' : 'Start Exam'}</span>
@@ -302,14 +302,14 @@ export default function StudentLabWorkspacePage() {
                 )}
               </>
             ) : labData.status === 'UPCOMING' ? (
-              <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 flex items-center justify-center space-x-2 text-slate-300 text-xs font-semibold">
+              <div className="bg-slate-800/60 border border-slate-700 rounded-control p-4 flex items-center justify-center space-x-2 text-slate-300 text-xs font-semibold">
                 <Hourglass className="w-4 h-4" />
                 <span>
                   This exam opens {labData.startTime ? new Date(labData.startTime).toLocaleString() : 'soon'}.
                 </span>
               </div>
             ) : (
-              <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 flex items-center justify-center space-x-2 text-slate-300 text-xs font-semibold">
+              <div className="bg-slate-800/60 border border-slate-700 rounded-control p-4 flex items-center justify-center space-x-2 text-slate-300 text-xs font-semibold">
                 <Clock className="w-4 h-4" />
                 <span>This exam window has closed.</span>
               </div>
@@ -321,7 +321,7 @@ export default function StudentLabWorkspacePage() {
       {/* Locked: already submitted */}
       {isSubmitted && (
         <div className="flex-1 p-2 sm:p-4 overflow-hidden flex flex-col">
-          <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-xl p-3 mb-3 flex items-center space-x-2 text-emerald-300 text-xs font-semibold">
+          <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-control p-3 mb-3 flex items-center space-x-2 text-emerald-300 text-xs font-semibold">
             <CheckCircle2 className="w-4 h-4" />
             <span>
               Exam submitted{workspace.autoSubmitted ? ' automatically' : ''}

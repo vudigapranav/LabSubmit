@@ -68,8 +68,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 my-auto max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 rounded-card border border-slate-200 dark:border-slate-800 max-w-lg w-full p-4 sm:p-6 shadow-overlay space-y-4 sm:space-y-5 my-auto max-h-[92vh] overflow-y-auto">
         <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
           <div className="flex items-center space-x-2">
             <UserIcon className="w-5 h-5 text-brand-blue-600 dark:text-brand-blue-400" />
@@ -237,7 +237,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 rounded-lg bg-brand-blue-600 hover:bg-brand-blue-700 text-white text-sm font-semibold flex items-center space-x-2 shadow-md"
+              className="px-4 py-2 rounded-lg bg-brand-blue-600 hover:bg-brand-blue-700 text-white text-sm font-semibold flex items-center space-x-2 shadow-cardHover"
             >
               <Save className="w-4 h-4" />
               <span>{loading ? 'Saving...' : 'Save Changes'}</span>

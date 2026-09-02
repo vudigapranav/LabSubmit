@@ -475,7 +475,7 @@ export default function AdminDashboard() {
                 setRollEnd('');
                 setShowBranchModal(true);
               }}
-              className="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 transition-all shadow-sm flex items-center space-x-1.5"
+              className="px-3.5 py-2 rounded-control bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 transition-all shadow-card flex items-center space-x-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Branch</span>
@@ -487,7 +487,7 @@ export default function AdminDashboard() {
                 setSubCode('');
                 setShowSubjectModal(true);
               }}
-              className="px-3.5 py-2 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-800 text-white text-xs font-semibold transition-all shadow-sm flex items-center space-x-1.5"
+              className="px-3.5 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 text-white text-xs font-semibold transition-all shadow-card flex items-center space-x-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Subject</span>
@@ -500,7 +500,7 @@ export default function AdminDashboard() {
                 setLecPassword('');
                 setShowAddLecturerModal(true);
               }}
-              className="px-3.5 py-2 rounded-xl bg-brand-blue-600 hover:bg-brand-blue-700 text-white text-xs font-semibold transition-all shadow-sm flex items-center space-x-1.5"
+              className="px-3.5 py-2 rounded-control bg-brand-blue-600 hover:bg-brand-blue-700 text-white text-xs font-semibold transition-all shadow-card flex items-center space-x-1.5"
             >
               <UserPlus className="w-3.5 h-3.5" />
               <span>Add Faculty</span>
@@ -514,8 +514,8 @@ export default function AdminDashboard() {
         <div className="lg:hidden flex items-center gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-3 overflow-x-auto">
           <button
             onClick={() => setActiveTab('branches')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 ${
-              activeTab === 'branches' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 ${
+              activeTab === 'branches' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <School className="w-3.5 h-3.5" />
@@ -524,8 +524,8 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('subjects')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 ${
-              activeTab === 'subjects' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 ${
+              activeTab === 'subjects' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
@@ -534,8 +534,8 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('lecturers')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 ${
-              activeTab === 'lecturers' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 ${
+              activeTab === 'lecturers' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <GraduationCap className="w-3.5 h-3.5" />
@@ -544,8 +544,8 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('students')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 ${
-              activeTab === 'students' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 ${
+              activeTab === 'students' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <GraduationCap className="w-3.5 h-3.5" />
@@ -554,8 +554,8 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('labs')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 ${
-              activeTab === 'labs' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 ${
+              activeTab === 'labs' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
@@ -643,7 +643,7 @@ export default function AdminDashboard() {
                   <p className="text-xs text-slate-500 font-mono">Code: {sub.code} • Sem {sub.semester || 'N/A'}</p>
                 </div>
 
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-xs text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/50">
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-control text-xs text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/50">
                   <div className="font-semibold text-slate-500 text-[10px] uppercase">Assigned Lecturer:</div>
                   <div className="font-bold text-slate-900 dark:text-white text-xs mt-0.5">
                     {sub.lecturer ? `${sub.lecturer.name} (${sub.lecturer.email})` : '⚠️ Unassigned'}
@@ -745,7 +745,7 @@ export default function AdminDashboard() {
         {activeTab === 'students' && (
           <div className="space-y-4">
             {/* Hierarchical Filter Bar */}
-            <div className="bg-white dark:bg-surface-darkCard p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="bg-white dark:bg-surface-darkCard p-4 rounded-card border border-slate-200 dark:border-slate-800/80 shadow-card flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                 <Filter className="w-4 h-4 text-brand-blue-500" />
                 <span>Filter Students:</span>
@@ -792,7 +792,7 @@ export default function AdminDashboard() {
 
             {/* Display State: Guidance Prompt vs Empty State vs Students Table */}
             {!studentFilterYear || !studentFilterBranchId ? (
-              <div className="bg-white dark:bg-surface-darkCard p-12 rounded-2xl border border-slate-200 dark:border-slate-800/80 text-center space-y-2">
+              <div className="bg-white dark:bg-surface-darkCard p-12 rounded-card border border-slate-200 dark:border-slate-800/80 text-center space-y-2">
                 <GraduationCap className="w-10 h-10 text-slate-400 mx-auto" />
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white">Hierarchical Student Filtering</h3>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
@@ -800,11 +800,11 @@ export default function AdminDashboard() {
                 </p>
               </div>
             ) : loadingStudents ? (
-              <div className="bg-white dark:bg-surface-darkCard p-12 rounded-2xl border border-slate-200 dark:border-slate-800 text-center font-mono text-xs text-slate-400">
+              <div className="bg-white dark:bg-surface-darkCard p-12 rounded-card border border-slate-200 dark:border-slate-800 text-center font-mono text-xs text-slate-400">
                 Loading students for Year {studentFilterYear}...
               </div>
             ) : students.length === 0 ? (
-              <div className="bg-white dark:bg-surface-darkCard p-12 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-2">
+              <div className="bg-white dark:bg-surface-darkCard p-12 rounded-card border border-slate-200 dark:border-slate-800 text-center space-y-2">
                 <AlertCircle className="w-10 h-10 text-amber-500 mx-auto" />
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white">No Students Found</h3>
                 <p className="text-xs text-slate-500">
@@ -897,9 +897,9 @@ export default function AdminDashboard() {
         {/* Tab 5: All Labs Management */}
         {activeTab === 'labs' && (
           <div className="space-y-4">
-            <div className="flex items-center space-x-3 bg-white dark:bg-surface-darkCard p-4 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+            <div className="flex items-center space-x-3 bg-white dark:bg-surface-darkCard p-4 rounded-card border border-slate-200 dark:border-slate-800/80">
               <Filter className="w-4 h-4 text-slate-400" />
-              <select value={filterYear} onChange={(e) => { setFilterYear(e.target.value); fetchLabs(); }} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white">
+              <select value={filterYear} onChange={(e) => { setFilterYear(e.target.value); fetchLabs(); }} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-control px-3 py-1.5 text-xs text-slate-900 dark:text-white">
                 <option value="">All Years</option>
                 <option value="1">Year 1</option>
                 <option value="2">Year 2</option>
@@ -907,12 +907,12 @@ export default function AdminDashboard() {
                 <option value="4">Year 4</option>
               </select>
 
-              <select value={filterBranchId} onChange={(e) => { setFilterBranchId(e.target.value); fetchLabs(); }} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white">
+              <select value={filterBranchId} onChange={(e) => { setFilterBranchId(e.target.value); fetchLabs(); }} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-control px-3 py-1.5 text-xs text-slate-900 dark:text-white">
                 <option value="">All Branches</option>
                 {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
 
-              <select value={filterSubjectId} onChange={(e) => { setFilterSubjectId(e.target.value); fetchLabs(); }} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white">
+              <select value={filterSubjectId} onChange={(e) => { setFilterSubjectId(e.target.value); fetchLabs(); }} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-control px-3 py-1.5 text-xs text-slate-900 dark:text-white">
                 <option value="">All Subjects</option>
                 {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
@@ -942,14 +942,14 @@ export default function AdminDashboard() {
 
       {/* Modal: View User Details */}
       {showViewUserModal && viewingUser && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
               <Eye className="w-5 h-5 text-brand-blue-500" />
               <span>{viewingUser.type === 'STUDENT' ? 'Student Profile' : 'Faculty Profile'}</span>
             </h3>
 
-            <div className="space-y-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-200 dark:border-slate-700/60 font-mono">
+            <div className="space-y-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 p-4 rounded-control border border-slate-200 dark:border-slate-700/60 font-mono">
               <div className="flex justify-between"><span className="text-slate-500 font-sans">Full Name:</span><strong className="text-slate-900 dark:text-white">{viewingUser.name}</strong></div>
               <div className="flex justify-between"><span className="text-slate-500 font-sans">Email Address:</span><span className="text-slate-800 dark:text-slate-200">{viewingUser.email || 'N/A'}</span></div>
               {viewingUser.type === 'STUDENT' ? (
@@ -978,8 +978,8 @@ export default function AdminDashboard() {
 
       {/* Modal: Edit Student */}
       {showEditStudentModal && editingStudent && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white">Edit Student Details</h3>
             <form onSubmit={handleSaveEditStudent} className="space-y-3">
               <div>
@@ -1023,8 +1023,8 @@ export default function AdminDashboard() {
 
       {/* Modal: Reset Password (Student & Lecturer) */}
       {showResetPasswordModal && targetResetUser && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center space-x-2">
               <Key className="w-5 h-5 text-amber-500" />
               <span>Reset Password for {targetResetUser.name}</span>
@@ -1046,8 +1046,8 @@ export default function AdminDashboard() {
 
       {/* Modal: Create/Edit Branch */}
       {showBranchModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingBranchId ? 'Edit Branch' : 'Create New Branch'}</h3>
             <form onSubmit={handleSaveBranch} className="space-y-3">
               <div>
@@ -1084,8 +1084,8 @@ export default function AdminDashboard() {
 
       {/* Modal: Create/Edit Subject */}
       {showSubjectModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingSubjectId ? 'Edit Subject' : 'Create New Subject'}</h3>
             <form onSubmit={handleSaveSubject} className="space-y-3">
               <div>
@@ -1137,8 +1137,8 @@ export default function AdminDashboard() {
 
       {/* Modal: Add Lecturer */}
       {showAddLecturerModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card max-w-md w-full p-6 shadow-overlay space-y-4">
             <h3 className="font-bold text-base text-slate-900 dark:text-white">{editingLecturerId ? 'Edit Faculty Lecturer' : 'Add Faculty Lecturer'}</h3>
             <form onSubmit={handleSaveLecturer} className="space-y-3">
               <input type="text" placeholder="Full Name (e.g. Dr. Ravi)" value={lecName} onChange={(e) => setLecName(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />

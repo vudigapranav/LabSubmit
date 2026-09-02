@@ -81,7 +81,7 @@ export default function LoginPage() {
                   priority
                 />
               ) : (
-                <div className="w-16 h-16 rounded-xl bg-brand-olive-700 text-white flex items-center justify-center font-bold text-xl">
+                <div className="w-16 h-16 rounded-control bg-brand-olive-700 text-white flex items-center justify-center font-bold text-xl">
                   CBIT
                 </div>
               )}
@@ -98,7 +98,7 @@ export default function LoginPage() {
           </div>
 
           {/* 2 Role Tabs: Student Login vs Faculty Login */}
-          <div className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/50">
+          <div className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-control border border-slate-200/60 dark:border-slate-700/50">
             <button
               type="button"
               onClick={() => {
@@ -107,7 +107,7 @@ export default function LoginPage() {
               }}
               className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
                 activeTab === 'STUDENT'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-card'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -123,7 +123,7 @@ export default function LoginPage() {
               }}
               className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
                 activeTab === 'FACULTY'
-                  ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm'
+                  ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -134,7 +134,7 @@ export default function LoginPage() {
 
           {/* Error Notice */}
           {errorMsg && (
-            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-xl text-red-700 dark:text-red-300 text-xs font-medium flex items-center space-x-2">
+            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-control text-red-700 dark:text-red-300 text-xs font-medium flex items-center space-x-2">
               <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
               <span>{errorMsg}</span>
             </div>
@@ -158,7 +158,7 @@ export default function LoginPage() {
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   autoComplete="off"
-                  className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
+                  className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-control pl-9 pr-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
                   required
                 />
               </div>
@@ -178,7 +178,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
-                  className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
+                  className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-control pl-9 pr-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
                   required
                 />
               </div>
@@ -187,7 +187,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3 rounded-xl font-semibold text-sm transition-all shadow-md flex items-center justify-center space-x-2 ${
+              className={`w-full py-3 rounded-control font-semibold text-sm transition-all shadow-cardHover flex items-center justify-center space-x-2 ${
                 activeTab === 'STUDENT'
                   ? 'bg-brand-olive-700 hover:bg-brand-olive-800 text-white'
                   : 'bg-slate-900 dark:bg-slate-100 hover:opacity-90 text-white dark:text-slate-900'

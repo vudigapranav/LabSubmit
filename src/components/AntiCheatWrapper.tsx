@@ -212,7 +212,7 @@ export const AntiCheatWrapper: React.FC<AntiCheatWrapperProps> = ({
     <div className="relative w-full h-full select-none">
       {warningMsg && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-xl w-full px-4 animate-bounce">
-          <div className="bg-red-600 text-white px-4 py-3 rounded-lg shadow-2xl flex items-center justify-between border-2 border-red-400">
+          <div className="bg-red-600 text-white px-4 py-3 rounded-lg shadow-overlay flex items-center justify-between border-2 border-red-400">
             <div className="flex items-center space-x-3">
               <ShieldAlert className="w-6 h-6 flex-shrink-0 text-yellow-300" />
               <p className="text-sm font-semibold">{warningMsg}</p>

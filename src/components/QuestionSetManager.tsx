@@ -253,25 +253,25 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
   const assignable = sets.filter((s) => s.isActive && s.questions.length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex flex-col p-2 sm:p-6">
-      <div className="relative bg-slate-900 border border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-5xl w-full mx-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 dark:bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex flex-col p-2 sm:p-6">
+      <div className="relative bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-5xl w-full mx-auto">
         {/* Header */}
-        <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between gap-3">
+        <div className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-5 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Layers className="w-4 h-4 text-brand-blue-400 flex-shrink-0" />
-            <h3 className="font-bold text-white text-sm truncate">Question Sets — {labTitle}</h3>
+            <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate">Question Sets — {labTitle}</h3>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800" aria-label="Close">
+          <button onClick={onClose} className="p-1.5 rounded-control text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="bg-slate-950/60 border-b border-slate-800 px-5 py-2 flex items-center gap-2">
+        <div className="bg-slate-50/60 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 px-5 py-2 flex items-center gap-2">
           <button
             onClick={() => setTab('sets')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
-              tab === 'sets' ? 'bg-brand-blue-600 border-brand-blue-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+              tab === 'sets' ? 'bg-brand-blue-600 border-brand-blue-500 text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             Sets ({sets.length})
@@ -279,7 +279,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
           <button
             onClick={() => setTab('mapping')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors flex items-center gap-1.5 ${
-              tab === 'mapping' ? 'bg-brand-blue-600 border-brand-blue-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+              tab === 'mapping' ? 'bg-brand-blue-600 border-brand-blue-500 text-white' : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
@@ -288,32 +288,32 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
         </div>
 
         {error && (
-          <div className="mx-5 mt-3 flex items-start gap-2 rounded-xl border border-rose-800/60 bg-rose-950/40 px-3 py-2">
+          <div className="mx-5 mt-3 flex items-start gap-2 rounded-card border border-rose-200 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/40 px-3 py-2">
             <AlertTriangle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] text-rose-200 leading-relaxed">{error}</p>
+            <p className="text-[11px] text-rose-700 dark:text-rose-200 leading-relaxed">{error}</p>
           </div>
         )}
 
         {notice && (
-          <div className="mx-5 mt-3 rounded-xl border border-emerald-800/60 bg-emerald-950/40 px-3 py-2">
-            <p className="text-[11px] text-emerald-200 leading-relaxed">{notice}</p>
+          <div className="mx-5 mt-3 rounded-card border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2">
+            <p className="text-[11px] text-emerald-700 dark:text-emerald-200 leading-relaxed">{notice}</p>
           </div>
         )}
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {loading ? (
-            <div className="flex items-center justify-center py-16 text-slate-400 text-xs gap-2">
+            <div className="flex items-center justify-center py-16 text-slate-500 dark:text-slate-400 text-xs gap-2">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading question sets…
             </div>
           ) : tab === 'sets' ? (
             <>
               {/* How assignment currently behaves, stated plainly. */}
-              <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 space-y-1.5">
-                <div className="flex items-center gap-2 text-[11px] text-slate-300 font-semibold">
+              <div className="rounded-card border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-3 space-y-1.5">
+                <div className="flex items-center gap-2 text-[11px] text-slate-700 dark:text-slate-300 font-semibold">
                   <EyeOff className="w-3.5 h-3.5 text-slate-400" />
                   Students never see which set they were given, or how many sets exist.
                 </div>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                   {assignable.length === 0
                     ? 'No set is assignable yet, so every student receives the exam’s own problem statement. A set becomes assignable once it is active and has at least one question.'
                     : `${assignable.length} set${assignable.length === 1 ? '' : 's'} in rotation. Each student is given one at random when they start, spread evenly across sets, and it stays fixed for their whole attempt.`}
@@ -339,16 +339,16 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
               </div>
 
               {sets.map((set) => (
-                <div key={set.id} className="rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2 flex-wrap">
+                <div key={set.id} className="rounded-card border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 flex-wrap">
                     <input
                       type="text"
                       value={set.label}
                       onChange={(e) => patchSet(set.id, { label: e.target.value })}
                       aria-label="Set label"
-                      className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white w-40"
+                      className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-2.5 py-1.5 text-xs font-bold text-slate-900 dark:text-white w-40"
                     />
-                    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300">
+                    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
                       <input
                         type="checkbox"
                         checked={set.isActive}
@@ -357,7 +357,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                       Active
                     </label>
 
-                    <span className="text-[10px] font-mono text-slate-500">
+                    <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
                       {set.questions.length} question{set.questions.length === 1 ? '' : 's'} · assigned to{' '}
                       {set.assignedCount} student{set.assignedCount === 1 ? '' : 's'}
                     </span>
@@ -373,7 +373,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                         onClick={() => setPreviewSet(set)}
                         disabled={set.questions.length === 0}
                         aria-label={`Preview ${set.label}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 text-[11px] font-bold"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 text-[11px] font-bold"
                       >
                         <Eye className="w-3 h-3" />
                         Preview
@@ -388,7 +388,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                       </button>
                       <button
                         onClick={() => deleteSet(set)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-900"
+                        className="p-1.5 rounded-control text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-900"
                         aria-label={`Delete ${set.label}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -398,12 +398,12 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
 
                   <div className="p-4 space-y-2">
                     {set.questions.length === 0 && (
-                      <p className="text-[11px] text-slate-500 italic">No questions yet. Add as many as this set needs.</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">No questions yet. Add as many as this set needs.</p>
                     )}
 
                     {set.questions.map((q, qi) => (
                       <div key={qi} className="flex items-start gap-2">
-                        <span className="text-[11px] font-mono text-slate-500 pt-2 w-5 text-right flex-shrink-0">{qi + 1}.</span>
+                        <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 pt-2 w-5 text-right flex-shrink-0">{qi + 1}.</span>
                         <textarea
                           value={q.text}
                           onChange={(e) => {
@@ -414,7 +414,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                           rows={2}
                           placeholder="Write the question…"
                           aria-label={`${set.label} question ${qi + 1}`}
-                          className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-brand-blue-600 resize-y"
+                          className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 resize-y"
                         />
                         <input
                           type="number"
@@ -428,7 +428,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                             next[qi] = { ...q, marks: e.target.value };
                             patchQuestions(set.id, next);
                           }}
-                          className="w-16 bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white flex-shrink-0"
+                          className="w-16 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-2 py-1.5 text-xs text-slate-900 dark:text-white flex-shrink-0"
                         />
                         <div className="flex flex-col flex-shrink-0">
                           <button
@@ -440,7 +440,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                             }}
                             disabled={qi === 0}
                             aria-label={`Move question ${qi + 1} up`}
-                            className="p-0.5 text-slate-500 hover:text-white disabled:opacity-30"
+                            className="p-0.5 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30"
                           >
                             <ArrowUp className="w-3 h-3" />
                           </button>
@@ -453,7 +453,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                             }}
                             disabled={qi === set.questions.length - 1}
                             aria-label={`Move question ${qi + 1} down`}
-                            className="p-0.5 text-slate-500 hover:text-white disabled:opacity-30"
+                            className="p-0.5 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white disabled:opacity-30"
                           >
                             <ArrowDown className="w-3 h-3" />
                           </button>
@@ -461,7 +461,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                         <button
                           onClick={() => patchQuestions(set.id, set.questions.filter((_, i) => i !== qi))}
                           aria-label={`Delete question ${qi + 1}`}
-                          className="p-1 text-slate-500 hover:text-rose-400 flex-shrink-0"
+                          className="p-1 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 flex-shrink-0"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -481,26 +481,26 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
 
               <button
                 onClick={addSet}
-                className="w-full py-3 rounded-2xl border-2 border-dashed border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-3 rounded-card border-2 border-dashed border-slate-300 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Add a question set
               </button>
             </>
           ) : (
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-800">
-                <h4 className="text-xs font-bold text-white">Student → Set Mapping</h4>
-                <p className="text-[11px] text-slate-500 mt-0.5">
+            <div className="rounded-card border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white">Student → Set Mapping</h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                   Visible to faculty only, for evaluation and for investigating irregularities.
                 </p>
               </div>
               {assignments.length === 0 ? (
-                <p className="p-8 text-center text-slate-500 text-xs">No student has been assigned a set yet.</p>
+                <p className="p-8 text-center text-slate-500 dark:text-slate-400 text-xs">No student has been assigned a set yet.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[640px] text-left text-xs">
-                    <thead className="bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-800">
+                    <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                       <tr>
                         <th className="p-3">Roll Number</th>
                         <th className="p-3">Student</th>
@@ -509,9 +509,9 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                         <th className="p-3">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                       {assignments.map((a, i) => (
-                        <tr key={i} className="hover:bg-slate-900/40">
+                        <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-900/40">
                           <td className="p-3 font-mono font-bold text-white">{a.rollNumber || '—'}</td>
                           <td className="p-3 text-slate-300">{a.studentName}</td>
                           <td className="p-3">
@@ -527,7 +527,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                                   value=""
                                   aria-label={`Reassign ${a.rollNumber || a.studentName}`}
                                   onChange={(e) => { if (e.target.value) reassign(a, e.target.value); e.target.value = ''; }}
-                                  className="bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-[10px] text-slate-400 hover:text-white"
+                                  className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                                 >
                                   <option value="">Reassign…</option>
                                   {sets
@@ -557,20 +557,20 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
           )}
 
           {tab === 'mapping' && adminActions.length > 0 && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-2">
+            <div className="rounded-card border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2">
                 <History className="w-3.5 h-3.5 text-slate-400" />
-                <h4 className="text-xs font-bold text-white">Administrative Actions</h4>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white">Administrative Actions</h4>
               </div>
-              <ul className="divide-y divide-slate-800/60">
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {adminActions.map((a, i) => (
                   <li key={i} className="px-4 py-2.5 flex items-start gap-3">
                     <span className="text-[9px] font-mono font-bold text-indigo-300 bg-indigo-950/40 border border-indigo-800/50 rounded px-1.5 py-0.5 flex-shrink-0 mt-0.5">
                       {a.action.replace(/_/g, ' ')}
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[11px] text-slate-300">{a.details}</p>
-                      <p className="text-[10px] text-slate-500 font-mono">
+                      <p className="text-[11px] text-slate-700 dark:text-slate-300">{a.details}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                         {a.actorName} · {new Date(a.createdAt).toLocaleString()}
                       </p>
                     </div>
@@ -584,20 +584,20 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
         {/* Per-set preview: the paper exactly as a student will read it, rendered through
             the same component the student's exam uses. */}
         {previewSet && (
-          <div className="absolute inset-0 z-10 bg-black/80 backdrop-blur-sm flex flex-col p-6" onClick={() => setPreviewSet(null)}>
-            <div className="bg-slate-900 border border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-2xl w-full mx-auto" onClick={(e) => e.stopPropagation()}>
-              <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between">
+          <div className="absolute inset-0 z-10 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex flex-col p-6" onClick={() => setPreviewSet(null)}>
+            <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-2xl w-full mx-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-5 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Eye className="w-4 h-4 text-brand-blue-400" />
-                  <h4 className="font-bold text-white text-sm">Preview — {previewSet.label}</h4>
-                  <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">as the student sees it</span>
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">Preview — {previewSet.label}</h4>
+                  <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 hidden sm:inline">as the student sees it</span>
                 </div>
-                <button onClick={() => setPreviewSet(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800" aria-label="Close preview">
+                <button onClick={() => setPreviewSet(null)} className="p-1.5 rounded-control text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close preview">
                   <X className="w-4 h-4" />
                 </button>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto p-5">
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs text-slate-200 leading-relaxed">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-4 text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
                   <QuestionPaper
                     questions={previewSet.questions.map((q, i) => ({
                       order: i + 1,
@@ -606,13 +606,13 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                     }))}
                   />
                 </div>
-                <p className="text-[11px] text-slate-500 pt-3">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-3">
                   The student sees these questions and nothing else — no set name, no set number, and no indication that
                   other sets exist.
                 </p>
               </div>
-              <div className="border-t border-slate-800 px-5 py-3 flex justify-end">
-                <button onClick={() => setPreviewSet(null)} className="px-4 py-2 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-bold">
+              <div className="border-t border-slate-200 dark:border-slate-800 px-5 py-3 flex justify-end">
+                <button onClick={() => setPreviewSet(null)} className="px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-bold">
                   Back to sets
                 </button>
               </div>
@@ -620,8 +620,8 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
           </div>
         )}
 
-        <div className="border-t border-slate-800 px-5 py-3 flex justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold">
+        <div className="border-t border-slate-200 dark:border-slate-800 px-5 py-3 flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 rounded-control bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold">
             Close
           </button>
         </div>

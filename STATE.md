@@ -3,8 +3,8 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after applying the design system across the lecturer, admin,
-evaluation and answer-sheet surfaces on `claude/labsubmit-development-y605fv`.
+**Last updated:** 2026-09-01, after the visual-consistency sweep across every route on
+`claude/labsubmit-development-y605fv`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
 exists in the repository. A database model with no code reading or writing it is *schema
@@ -325,23 +325,47 @@ Escape and dismisses on selection. Dense faculty tables become card lists below 
 Verified with no horizontal page scroll at **1440px, 834px and 390px** for lecturer, and at
 1440px/834px for student and 1440px for admin.
 
+### Consistency sweep (second pass)
+Every route was inspected in the **light** theme, which is where an unconverted screen shows
+itself. Two real defects were found and fixed:
+
+1. **`QuestionSetManager` was hardcoded dark** — zero `dark:` classes — so it opened as a
+   dark modal over a light dashboard. It was the clearest remaining "old UI" screen. 57 class
+   strings were made theme-aware; it now follows the theme like every other management
+   surface.
+2. **Four different modal scrim opacities** (`bg-black/50`, `/60`, `/75`, `/80`) across
+   dialogs. All 14 now share the one scrim the `Modal` primitive uses.
+
+Also resolved: **every legacy radius and shadow token in the codebase is gone** (0 remaining
+occurrences of `rounded-xl`/`rounded-2xl`/`shadow-sm|md|xl|2xl`). The exam surfaces adopted
+the shared radius and shadow scale while keeping their deliberately dark, focused palette —
+so they read as the same product without losing their distinct character.
+
+`QuestionPaper` gained an explicit `surface` prop, because it renders both inside the
+permanently-dark exam modal and inside the theme-following lecturer preview; one set of
+colour classes could not serve both correctly.
+
 ### Known UI issues / limitations
 - Verified at three viewport widths (1440/834/390), not a full device matrix.
-- `QuestionSetManager` and `AnswerSheetConfigurator` use design tokens but still carry their
-  own internal layout rather than composing from the primitives.
-- Admin tables adopted the shared table *language* by class replacement rather than being
-  rebuilt on the `TableWrap`/`Th`/`Td` components, and have no mobile card fallback.
-- The lecturer/admin modals are still hand-rolled rather than using the shared `Modal`.
+- `QuestionSetManager` and `AnswerSheetConfigurator` are now theme-correct and on the tokens,
+  but still compose their own layout rather than using the shared primitives.
+- Admin tables use the shared table *language* by class replacement rather than the
+  `TableWrap`/`Th`/`Td` components, and have no mobile card fallback (they scroll).
+- Lecturer/admin/QuestionSetManager dialogs are still hand-rolled rather than using the
+  shared `Modal`, so Escape-to-close and the dialog ARIA roles are inconsistent between
+  them and the primitive.
+- The landing page is on the tokens but has had no layout pass.
 - Two navigation surfaces coexist below `lg` on lecturer/admin: the drawer and the original
   tab strip (the strip is now `lg:hidden`). Intentional for now, but slightly redundant.
 - The shell renders navigation from a static per-role list; it does not reflect permissions
   beyond role.
 
 ### Next UI/UX tasks
-1. Rebuild `QuestionSetManager` and `AnswerSheetConfigurator` on the primitives.
-2. Move lecturer/admin modals onto the shared `Modal`.
-3. Rebuild admin tables on the table primitives and give them mobile card fallbacks.
-4. Give the landing page a proper layout pass (tokens only so far).
+1. Move the hand-rolled dialogs onto the shared `Modal` — this also gives them consistent
+   Escape-to-close and dialog ARIA, which currently differ per dialog.
+2. Rebuild `QuestionSetManager` and `AnswerSheetConfigurator` on the primitives.
+3. Rebuild admin tables on the table primitives with mobile card fallbacks.
+4. Give the landing page a layout pass.
 
 ---
 

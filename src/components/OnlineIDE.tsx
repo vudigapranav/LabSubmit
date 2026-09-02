@@ -353,7 +353,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
       allowDragDrop={allowDragDrop}
       onViolation={onViolation}
     >
-      <div className={`flex flex-col ${fillParent ? 'h-full' : 'h-[calc(100vh-5rem)]'} w-full bg-slate-950 text-slate-100 rounded-2xl overflow-hidden shadow-md border border-slate-800`}>
+      <div className={`flex flex-col ${fillParent ? 'h-full' : 'h-[calc(100vh-5rem)]'} w-full bg-slate-950 text-slate-100 rounded-card overflow-hidden shadow-cardHover border border-slate-800`}>
         {notification && (
           <div
             className={`px-4 py-2 text-xs font-semibold flex items-center justify-between transition-colors ${
@@ -399,7 +399,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
             <button
               onClick={handleRunCode}
               disabled={isRunning}
-              className="flex items-center space-x-1.5 px-4 py-1.5 rounded-lg bg-brand-olive-700 hover:bg-brand-olive-600 disabled:opacity-50 text-white text-xs font-medium transition-colors shadow-sm"
+              className="flex items-center space-x-1.5 px-4 py-1.5 rounded-lg bg-brand-olive-700 hover:bg-brand-olive-600 disabled:opacity-50 text-white text-xs font-medium transition-colors shadow-card"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               <span>{isRunning ? 'Running...' : 'Run Code'}</span>
@@ -410,7 +410,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
               <button
                 onClick={handleSubmitLab}
                 disabled={workspaceSubmitted || isSubmitting}
-                className={`flex items-center space-x-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm ${
+                className={`flex items-center space-x-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-card ${
                   workspaceSubmitted
                     ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                     : 'bg-brand-blue-600 hover:bg-brand-blue-500 text-white'
@@ -562,7 +562,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         {/* Modal: Problem Statement Overlay */}
         {showProblemModal && (
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+            <div className="bg-slate-900 border border-slate-800 rounded-card max-w-2xl w-full p-6 space-y-4 shadow-overlay">
               <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                 <div className="flex items-center space-x-2">
                   <BookOpen className="w-4 h-4 text-brand-blue-400" />
@@ -576,14 +576,14 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
                 </button>
               </div>
 
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-slate-200 leading-relaxed max-h-96 overflow-y-auto">
-                <QuestionPaper questions={questions || []} fallbackStatement={problemStatement} />
+              <div className="bg-slate-950 p-4 rounded-control border border-slate-800 text-xs text-slate-200 leading-relaxed max-h-96 overflow-y-auto">
+                <QuestionPaper questions={questions || []} fallbackStatement={problemStatement} surface="dark" />
               </div>
 
               <div className="flex justify-end pt-2">
                 <button
                   onClick={() => setShowProblemModal(false)}
-                  className="px-4 py-2 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold"
+                  className="px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold"
                 >
                   Return to Workspace
                 </button>
@@ -595,7 +595,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         {/* Modal: Create File */}
         {showAddFileModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div className="bg-slate-900 border border-slate-800 rounded-card max-w-md w-full p-5 space-y-4 shadow-overlay">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
                 <h3 className="font-bold text-white text-sm">New Source File</h3>
                 <button onClick={() => setShowAddFileModal(false)} className="text-slate-400 hover:text-white">

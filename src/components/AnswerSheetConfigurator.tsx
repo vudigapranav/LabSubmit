@@ -144,7 +144,7 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange, sta
       </p>
 
       {startedAttempts > 0 && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-2">
+        <div className="flex items-start gap-2 rounded-control border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-2">
           <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <p className="text-[10px] text-amber-800 dark:text-amber-200/90 leading-relaxed">
             {startedAttempts} student{startedAttempts === 1 ? ' has' : 's have'} already started this exam. Answers
@@ -158,7 +158,7 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange, sta
         {drafts.map((draft, index) => (
           <div
             key={draft.key}
-            className={`rounded-xl border px-2.5 py-2 transition-colors ${
+            className={`rounded-control border px-2.5 py-2 transition-colors ${
               draft.enabled
                 ? 'bg-slate-50 dark:bg-slate-800/70 border-slate-200 dark:border-slate-700'
                 : 'bg-slate-50/40 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-800/60'
@@ -252,7 +252,7 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange, sta
           the lecturer sees here cannot drift from what students actually get. Reflects the
           unsaved working draft, which is the point: preview before publishing. */}
       {showPreview && (
-        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex flex-col p-4 sm:p-8">
+        <div className="fixed inset-0 z-[60] bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm flex flex-col p-4 sm:p-8">
           <div className="bg-slate-900 border border-slate-800 rounded-card flex-1 flex flex-col overflow-hidden shadow-overlay max-w-3xl w-full mx-auto">
             <div className="bg-slate-950 border-b border-slate-800 px-5 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -288,7 +288,7 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange, sta
               <button
                 type="button"
                 onClick={() => setShowPreview(false)}
-                className="px-4 py-2 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-bold"
+                className="px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-bold"
               >
                 Back to configuration
               </button>

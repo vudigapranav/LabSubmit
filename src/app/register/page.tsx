@@ -104,7 +104,7 @@ export default function RegisterPage() {
                   priority
                 />
               ) : (
-                <div className="w-14 h-14 rounded-xl bg-brand-olive-700 text-white flex items-center justify-center font-bold text-lg">
+                <div className="w-14 h-14 rounded-control bg-brand-olive-700 text-white flex items-center justify-center font-bold text-lg">
                   CBIT
                 </div>
               )}
@@ -122,7 +122,7 @@ export default function RegisterPage() {
 
           {/* Registration Success Modal Card */}
           {registrationSuccess ? (
-            <div className="p-6 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl space-y-4">
+            <div className="p-6 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-card space-y-4">
               <div className="flex items-center space-x-3 text-emerald-800 dark:text-emerald-200">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500 flex-shrink-0" />
                 <div>
@@ -133,7 +133,7 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/50 space-y-2 text-xs">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-control border border-emerald-100 dark:border-emerald-900/50 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 dark:text-slate-400 font-medium">Academic Year:</span>
                   <span className="font-bold text-slate-900 dark:text-white">Year {registrationSuccess.year}</span>
@@ -152,7 +152,7 @@ export default function RegisterPage() {
 
               <button
                 onClick={handleProceedToDashboard}
-                className="w-full py-3 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-800 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center space-x-2"
+                className="w-full py-3 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 text-white font-bold text-xs shadow-cardHover transition-all flex items-center justify-center space-x-2"
               >
                 <span>Proceed to Student Dashboard</span>
                 <ArrowRight className="w-4 h-4" />
@@ -162,7 +162,7 @@ export default function RegisterPage() {
             <>
               {/* Error Notice */}
               {errorMsg && (
-                <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-xl text-red-700 dark:text-red-300 text-xs font-medium flex items-center space-x-2">
+                <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-control text-red-700 dark:text-red-300 text-xs font-medium flex items-center space-x-2">
                   <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                   <span>{errorMsg}</span>
                 </div>
@@ -179,7 +179,7 @@ export default function RegisterPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     autoComplete="off"
-                    className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
+                    className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-control px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
                     required
                   />
                 </div>
@@ -194,7 +194,7 @@ export default function RegisterPage() {
                     value={rollNumber}
                     onChange={(e) => setRollNumber(e.target.value)}
                     autoComplete="off"
-                    className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600 font-mono"
+                    className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-control px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600 font-mono"
                     required
                   />
                   <p className="text-[10px] text-slate-400 mt-1">
@@ -209,7 +209,7 @@ export default function RegisterPage() {
                   <select
                     value={year}
                     onChange={(e) => setYear(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
+                    className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-control px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
                     required
                   >
                     <option value="1">1st Year</option>
@@ -230,7 +230,7 @@ export default function RegisterPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       autoComplete="new-password"
-                      className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
+                      className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-control px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
                       required
                     />
                   </div>
@@ -245,7 +245,7 @@ export default function RegisterPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       autoComplete="new-password"
-                      className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
+                      className="w-full bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-control px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-olive-600 focus:ring-1 focus:ring-brand-olive-600"
                       required
                     />
                   </div>
@@ -254,7 +254,7 @@ export default function RegisterPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-2 py-3 rounded-xl bg-brand-olive-700 hover:bg-brand-olive-800 disabled:opacity-50 text-white font-semibold text-sm transition-all shadow-md flex items-center justify-center space-x-2"
+                  className="w-full mt-2 py-3 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 disabled:opacity-50 text-white font-semibold text-sm transition-all shadow-cardHover flex items-center justify-center space-x-2"
                 >
                   <span>{loading ? 'Detecting Branch & Registering...' : 'Complete Student Registration'}</span>
                   <ArrowRight className="w-4 h-4" />

@@ -225,7 +225,7 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
       {/* Countdown timer */}
       {remainingMs !== null && !isSubmitted && (
         <div
-          className={`fixed top-3 right-3 z-[70] px-3 py-1.5 rounded-xl border font-mono text-xs font-bold flex items-center space-x-1.5 shadow-lg ${
+          className={`fixed top-3 right-3 z-[70] px-3 py-1.5 rounded-control border font-mono text-xs font-bold flex items-center space-x-1.5 shadow-lg ${
             isLowTime
               ? 'bg-red-950/90 border-red-700 text-red-200 animate-pulse'
               : 'bg-slate-900/95 border-slate-700 text-emerald-300'
@@ -239,7 +239,7 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
       {/* Transient toast for logged violations */}
       {toast && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[70] max-w-md w-full px-4">
-          <div className="bg-amber-900/95 border border-amber-700 text-amber-100 px-4 py-2.5 rounded-xl shadow-2xl flex items-center space-x-2 text-xs font-semibold">
+          <div className="bg-amber-900/95 border border-amber-700 text-amber-100 px-4 py-2.5 rounded-control shadow-overlay flex items-center space-x-2 text-xs font-semibold">
             <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-300" />
             <span>{toast}</span>
           </div>
@@ -249,7 +249,7 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
       {/* Blocking fullscreen-exit gate */}
       {examModeEnabled && !isFullscreen && !isSubmitted && (
         <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border-2 border-red-800 rounded-2xl max-w-md w-full p-8 text-center space-y-4 shadow-2xl">
+          <div className="bg-slate-900 border-2 border-red-800 rounded-card max-w-md w-full p-8 text-center space-y-4 shadow-overlay">
             <ShieldAlert className="w-12 h-12 text-red-400 mx-auto" />
             <h3 className="text-white font-bold text-lg">Fullscreen Required</h3>
             <p className="text-slate-300 text-sm">
@@ -261,7 +261,7 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
             </p>
             <button
               onClick={handleReenterFullscreen}
-              className="w-full py-3 rounded-xl bg-red-700 hover:bg-red-600 text-white font-bold text-sm flex items-center justify-center space-x-2 transition-colors"
+              className="w-full py-3 rounded-control bg-red-700 hover:bg-red-600 text-white font-bold text-sm flex items-center justify-center space-x-2 transition-colors"
             >
               <Maximize className="w-4 h-4" />
               <span>Re-enter Fullscreen &amp; Resume</span>

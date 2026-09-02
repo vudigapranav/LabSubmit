@@ -3,8 +3,8 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after standardising every application dialog on the shared
-`Modal` primitive on `claude/labsubmit-development-y605fv`.
+**Last updated:** 2026-09-01, after the landing-page layout pass on
+`claude/labsubmit-development-y605fv`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
 exists in the repository. A database model with no code reading or writing it is *schema
@@ -382,6 +382,28 @@ made non-scrollable.
 its viewport in both dimensions, causes no page overflow, locks background scroll, receives
 focus, resists backdrop dismissal where it should, and closes on Escape.
 
+### Landing page (fourth pass)
+`/` was a single centred hero with a logo, title, two buttons and a footer. It is now a
+sectioned entry point built from the shared design system: header with sign-in actions, hero,
+"what it is", the nine-step examination workflow as an ordered list, a nine-item capability
+grid, an integrity note, a closing call to action, and a footer.
+
+**Every capability named is verified as implemented** before being written — the answer-sheet
+configurator, question sets and their random assignment, hidden set identity, the execution
+engine, run capture into the record, the integrity log, the device restriction and manual
+evaluation. The page carries **no invented statistics, institutions, partnerships or
+testimonials**, and explicitly states that there is no auto-grading rather than implying
+otherwise. The integrity section repeats the honest limitation: the device check is a
+deterrent, not attestation.
+
+One correction of substance: the old tagline called LabSubmit a "Programming Laboratory
+Management & Code Execution Portal", which reduces it to online coding. The hero now states
+it is a digital laboratory examination and evaluation platform, matching the product
+direction in CLAUDE.md.
+
+`Navbar` gained an optional `actions` slot so the public pages can carry sign-in actions
+without a second navigation component.
+
 ### Known UI issues / limitations
 - Verified at three viewport widths (1440/834/390), not a full device matrix.
 - `QuestionSetManager` and `AnswerSheetConfigurator` are now theme-correct and on the tokens,
@@ -390,7 +412,8 @@ focus, resists backdrop dismissal where it should, and closes on Escape.
   `TableWrap`/`Th`/`Td` components, and have no mobile card fallback (they scroll).
 - The two exam-surface overlays remain hand-rolled by design (see above); they therefore
   lack Escape-to-close and dialog ARIA. Documented rather than forced into the primitive.
-- The landing page is on the tokens but has had no layout pass.
+- The landing page copy is maintained by hand; if a capability is ever removed, the page
+  must be updated with it.
 - Two navigation surfaces coexist below `lg` on lecturer/admin: the drawer and the original
   tab strip (the strip is now `lg:hidden`). Intentional for now, but slightly redundant.
 - The shell renders navigation from a static per-role list; it does not reflect permissions
@@ -400,7 +423,7 @@ focus, resists backdrop dismissal where it should, and closes on Escape.
 1. Rebuild `QuestionSetManager` and `AnswerSheetConfigurator` bodies on the primitives (their
    dialog shells are now shared; their internals still compose their own layout).
 2. Rebuild admin tables on the table primitives with mobile card fallbacks.
-3. Give the landing page a layout pass.
+3. Faculty tables → mobile card fallbacks on the admin side.
 
 ---
 

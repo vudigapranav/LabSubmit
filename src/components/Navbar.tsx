@@ -8,9 +8,11 @@ import { Sun, Moon, LogOut, User as UserIcon, Shield, GraduationCap, School } fr
 
 interface NavbarProps {
   onOpenProfile?: () => void;
+  /** Optional right-hand slot, used by the public pages to carry their sign-in actions. */
+  actions?: React.ReactNode;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenProfile }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenProfile, actions }) => {
   const { user, theme, toggleTheme, logout } = useApp();
   const [logoError, setLogoError] = useState(false);
 
@@ -49,6 +51,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenProfile }) => {
 
         {/* Right Controls */}
         <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+          {actions}
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}

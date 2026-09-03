@@ -33,7 +33,12 @@ export async function GET(req: Request) {
         lecturer: { select: { name: true, email: true } },
         branch: true,
         labs: {
-          where: { isPublished: true }, // drafts stay hidden from students
+          // Drafts stay hidden from students, and so do archived examinations: an archived
+          // exam must never be offered as active or upcoming work. Already-published
+          // results are unaffected — those are served from /api/student/grades, which keys
+          // off the submission rather than the lab, so a student keeps their marks and
+          // remarks for an exam that has since been archived.
+          where: { isPublished: true, archivedAt: null },
           orderBy: { createdAt: 'desc' },
         },
       },

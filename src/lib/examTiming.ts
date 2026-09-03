@@ -2,7 +2,7 @@
 // layer and client components (dashboards, ExamGuard) without pulling @prisma/client into
 // client bundles.
 
-export type ExamStatus = 'DRAFT' | 'UPCOMING' | 'RUNNING' | 'COMPLETED';
+export type ExamStatus = 'DRAFT' | 'UPCOMING' | 'RUNNING' | 'COMPLETED' | 'ARCHIVED';
 
 export interface ExamTimingLab {
   isPublished: boolean;
@@ -11,6 +11,12 @@ export interface ExamTimingLab {
   durationMinutes: number | null;
   examModeEnabled: boolean;
   allowedLanguages: string;
+  /**
+   * Set when the exam has been retired (see Lab.archivedAt). Optional so that every
+   * existing caller — and any lab object assembled without it — keeps type-checking and
+   * behaves exactly as before.
+   */
+  archivedAt?: Date | string | null;
 }
 
 export interface ExamTimingWorkspace {
@@ -24,6 +30,12 @@ function toDate(value: Date | string | null): Date | null {
 }
 
 export function getExamStatus(lab: ExamTimingLab, now: Date = new Date()): ExamStatus {
+  // Archived wins over every schedule-derived state. This is what stops an archived exam
+  // being startable or runnable: both the workspace route and the execution engine's
+  // authorizeRun already refuse anything that is not RUNNING, so retiring an exam closes
+  // every attempt entry point at once rather than needing a new check at each of them.
+  if (lab.archivedAt) return 'ARCHIVED';
+
   if (!lab.isPublished) return 'DRAFT';
 
   const start = toDate(lab.startTime);

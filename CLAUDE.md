@@ -163,6 +163,25 @@ Supporting conventions:
   the *manual* submit only.
 - **Idempotent state transitions.** Submission and assignment paths are reachable from
   several places; they must converge on one shared helper rather than diverging.
+- **Student work is never destroyed to tidy something up.** An examination that any student
+  has started, submitted, written a file into, answered a section of, or triggered an
+  integrity event on must never be permanently deletable — every relation on `Lab` cascades,
+  so a delete takes the submissions, awarded marks and integrity log with it. Such an exam is
+  **archived** (`Lab.archivedAt`), which writes one column and destroys nothing. The check is
+  re-derived from the database on the server for every request; a client confirmation is a
+  courtesy, never the guard. Any future destructive operation on student-owned records
+  follows the same shape: refuse with 409, offer the non-destructive alternative, and state
+  in the refusal exactly what exists.
+- **Destructive administrative actions are audited.** Deleting, archiving or restoring an
+  exam, and overriding a live question set or an assignment, write an `ExamAdminAction` row
+  recording the actor, the exam and what happened. That model is the one audit trail — do not
+  add a parallel one. Its `labId` is nullable with `onDelete: SetNull` and it snapshots
+  `labTitle`, because the record of a deletion has to outlive the thing it records.
+- **One lifecycle, extended — never a second status system.** `getExamStatus()` in
+  `examTiming.ts` is the single source of an exam's state (`DRAFT`, `UPCOMING`, `RUNNING`,
+  `COMPLETED`, `ARCHIVED`). New lifecycle states are added there, so every entry point that
+  already gates on `RUNNING` — the workspace route and `ExecutionController.authorizeRun()` —
+  picks them up without a new check of its own.
 - **Pure modules for shared logic.** Rules needed by both server routes and client
   components live in dependency-free modules (no Prisma import) so they can be shared
   without pulling the database client into a browser bundle.
@@ -286,6 +305,7 @@ and hosts Postgres. Both read the same database. See `DEPLOYMENT.md`.
 | Integrity / violations | `src/lib/examIntegrity.ts`, `src/lib/useViolationLogger.ts` |
 | Submission finalization | `src/lib/examSubmission.ts` |
 | Answer-sheet catalogue & rules | `src/lib/answerSheet.ts` |
+| Exam deletion / archive policy | `src/lib/examLifecycle.ts` (pure), `src/components/ExamRetirementDialog.tsx` |
 | Device policy | `src/lib/deviceEligibility.ts` (server), `src/lib/useDeviceClass.ts` (hint) |
 | Execution engine | `src/lib/execution/*`, driven by `server.js` |
 | Student exam UI | `src/app/student/lab/[id]/page.tsx`, `src/components/OnlineIDE.tsx`, `ExamGuard.tsx`, `AnswerSheet.tsx` |

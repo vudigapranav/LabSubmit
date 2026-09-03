@@ -37,8 +37,9 @@ only* and belongs under In Progress, not Completed.
   lecturer password reset; system statistics.
 
 ### Examination configuration (lecturer)
-- Create / edit / delete / publish examinations, scoped to the lecturer's assigned
-  subjects; drafts stay hidden from students.
+- Create / edit / publish examinations, scoped to the lecturer's assigned subjects; drafts
+  stay hidden from students. **Permanent deletion is restricted** — see
+  "Exam deletion protection & archive" below.
 - Scheduling: exam date, start time, end time, per-student duration.
 - Allowed programming languages per exam (C, C++, Java, Python).
 - Secure exam mode toggle, fullscreen-exit threshold, and copy / paste / cut / right-click
@@ -248,6 +249,83 @@ only* and belongs under In Progress, not Completed.
   serving its own statement. 11 browser assertions over the authoring UI and mapping table.
 - **A real leak was found and fixed by this testing:** the student's workspace object still
   carried `questionSetId`. It is now stripped alongside the joined set.
+
+### Exam deletion protection & archive — *completed this session*
+
+Closes the P0 finding from the lecturer UX audit: `DELETE /api/lecturer/labs` previously had
+**no guard of any kind**, and `Lab` carries six `onDelete: Cascade` relations, so one click on
+an unlabelled trash icon behind a generic `confirm()` destroyed every workspace, submission,
+awarded mark, integrity event, question set and answer-sheet section under that exam.
+
+**Permanent deletion policy.** An examination is permanently deletable **only** when no
+student has touched it. "Touched" is deliberately broad — any one of these refuses the
+delete: a started attempt (`LabWorkspace.startedAt` not null), any `Submission`, any
+`ExamViolation`, any `LabFile`, or any `AnswerSheetResponse`. A bare workspace row does *not*
+count, because one is created merely by opening the exam page. Counts are re-derived from the
+database on every DELETE request, never read from the client, so calling the endpoint
+directly — with or without a forged override body — cannot get past it. A refused delete
+returns **HTTP 409** carrying `code: "EXAM_HAS_STUDENT_ACTIVITY"`, `canArchive: true`, the
+activity counts, and the preservation/effect lists the dialog renders. The payload contains
+**counts only** — no student names, roll numbers or ids.
+
+**Archive behaviour.** Archiving writes exactly one column, `Lab.archivedAt`, and touches no
+other row — which is why the preservation claims are safe to make. `getExamStatus()` returns
+`ARCHIVED` for such a lab, ahead of every schedule-derived state. Because the student
+workspace route and `ExecutionController.authorizeRun()` both already refuse anything that is
+not `RUNNING`, retiring an exam closes **all three attempt entry points at once** without a
+new check in any of them. `/api/student/labs` additionally filters `archivedAt: null`, so an
+archived exam never appears as active or upcoming work. Published results are unaffected:
+`/api/student/grades` keys off the submission, not the lab, so a student keeps the marks and
+remarks for an exam that has since been archived. Faculty keep full access — archived exams
+stay in the lecturer list (badged `ARCHIVED`), their submissions stay gradeable and their
+question sets stay readable. Archiving is reversible via the same endpoint.
+
+**Server-side protection.** The rule lives in `PATCH`/`DELETE` on
+`src/app/api/lecturer/labs/route.ts` behind the same `assertLabAccess()` ownership check the
+question-set routes use: a LECTURER may act only on their own exams, an ADMIN on any;
+students and unauthenticated callers are rejected. `src/lib/examLifecycle.ts` is a pure module
+(no Prisma import) holding the activity rule, the refusal wording and the
+`ARCHIVE_PRESERVES` / `ARCHIVE_EFFECTS` lists, so the API and the confirmation dialog cannot
+drift — the UI can never promise something the implementation does not do.
+
+**Audit logging.** Uses the existing `ExamAdminAction` model, with two safe widening changes:
+`labId` became nullable with `onDelete: SetNull` (under the previous `Cascade` the one row
+that mattered most — "this exam was permanently deleted" — was destroyed by the very delete
+it documented), and a `labTitle` snapshot was added so an orphaned row still names what went.
+Actions written: `DELETE_EXAM`, `ARCHIVE_EXAM`, `UNARCHIVE_EXAM`, each with the acting user
+and a details string. A no-op archive/unarchive is idempotent and writes no row.
+
+**Frontend.** The native `confirm()` is gone. `src/components/ExamRetirementDialog.tsx` shows
+one of three faces, chosen from what the server reported: *delete* (names the exam, states it
+cannot be undone), *archive* (leads with "Exam cannot be deleted because student attempts
+exist", then lists precisely what is preserved and what changes), or *restore*. Backdrop
+dismissal is disabled. Exam-card actions are now labelled (`aria-label` + `title`) in 36 px
+targets, with delete/archive separated from edit by a divider and a destructive hover state;
+the icon shown is the action the server will actually permit.
+
+**Tests performed** — `scratchpad/archive.test.sh`, **52 assertions, all passing** against the
+running server and the real database, plus 21 browser assertions (`ui-archive.js`) and a
+WebSocket test (`ws-archive.js`). Covers: zero-attempt draft deletes and is audited; the audit
+row survives the cascade; exam with one and with several attempts refuses deletion; direct API
+DELETE with a forged override body still refused; no student identity in the refusal; archived
+exam remains listed, gradeable and set-readable for its lecturer; archived exam disappears
+from the student lab list; `start_exam` on an archived exam refused with `status: ARCHIVED`;
+the execution WebSocket compiled and ran code before archiving and returned
+`EXAM_NOT_ACTIVE (status: ARCHIVED)` after; submissions, workspaces, files, marks + status,
+question sets, questions, student-to-set assignment, answer-sheet sections and answer-sheet
+responses all byte-identical across an archive; foreign lecturer, student and unauthenticated
+callers refused 403 on both delete and archive; existing assigned-question-set deletion
+protection still returns its original 409. Typecheck and `npm run build` both clean.
+
+**Limitations.**
+- Archive is a lecturer/admin action; there is no bulk archive and no automatic archiving of
+  long-finished exams.
+- Deleting a zero-attempt exam still deletes its question sets and answer-sheet configuration.
+  That is intended — no student work exists — but it is not recoverable.
+- The audit trail is written but has **no UI**: `ExamAdminAction` rows are only readable from
+  the database or through `/api/lecturer/assignments`, which surfaces assignment actions only.
+- `archivedAt` records *when* an exam was archived; the actor is recorded on the
+  `ExamAdminAction` row rather than denormalised onto `Lab`.
 
 ## 2. In progress
 

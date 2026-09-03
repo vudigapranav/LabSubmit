@@ -3,6 +3,48 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getExamStatus, serializeAllowedLanguages } from '@/lib/examTiming';
 import { defaultSectionConfig, normalizeSectionConfig, NormalizedSection } from '@/lib/answerSheet';
+import {
+  ARCHIVE_EFFECTS,
+  ARCHIVE_PRESERVES,
+  EXAM_ADMIN_ACTIONS,
+  ExamActivity,
+  deletionRefusalMessage,
+  describeActivity,
+  hasStudentActivity,
+} from '@/lib/examLifecycle';
+
+/**
+ * Everything a student could have created under this exam, counted in one place so the
+ * DELETE guard and the lecturer's dialog agree. Counts only — never a name or a roll
+ * number: the lecturer needs to know work exists, not whose it is, to choose between
+ * deleting and archiving.
+ */
+async function loadExamActivity(labId: string): Promise<ExamActivity> {
+  const [startedAttempts, submissions, gradedSubmissions, violations, files, answerSheetResponses] =
+    await Promise.all([
+      prisma.labWorkspace.count({ where: { labId, startedAt: { not: null } } }),
+      prisma.submission.count({ where: { labId } }),
+      prisma.submission.count({ where: { labId, marks: { not: null } } }),
+      prisma.examViolation.count({ where: { labId } }),
+      prisma.labFile.count({ where: { workspace: { labId } } }),
+      prisma.answerSheetResponse.count({ where: { workspace: { labId } } }),
+    ]);
+
+  return { startedAttempts, submissions, gradedSubmissions, violations, files, answerSheetResponses };
+}
+
+/**
+ * Ownership guard, matching the convention already used by the question-set routes: a
+ * LECTURER may only act on their own exams; an ADMIN may act on any.
+ */
+async function assertLabAccess(labId: string, session: { role: string; userId: string }) {
+  const lab = await prisma.lab.findUnique({ where: { id: labId } });
+  if (!lab) return { error: NextResponse.json({ error: 'Exam not found' }, { status: 404 }), lab: null };
+  if (session.role === 'LECTURER' && lab.lecturerId !== session.userId) {
+    return { error: NextResponse.json({ error: 'You do not have access to this exam.' }, { status: 403 }), lab: null };
+  }
+  return { error: null, lab };
+}
 
 // The lecturer's answer-sheet format, resolved for a brand-new exam. An empty or absent
 // payload falls back to the standard unified format rather than to no sheet at all, so an
@@ -114,19 +156,23 @@ export async function GET(req: Request) {
     // Attach computed exam status + appeared/submitted/pending counts for the faculty dashboard.
     const labsWithStats = await Promise.all(
       labs.map(async (lab) => {
-        const [startedCount, submittedCount, violationCount] = await Promise.all([
-          prisma.labWorkspace.count({ where: { labId: lab.id, startedAt: { not: null } } }),
+        const [submittedCount, activity] = await Promise.all([
           prisma.labWorkspace.count({ where: { labId: lab.id, isSubmitted: true } }),
-          prisma.examViolation.count({ where: { labId: lab.id } }),
+          loadExamActivity(lab.id),
         ]);
 
         return {
           ...lab,
           status: getExamStatus(lab),
-          appearedCount: startedCount,
+          appearedCount: activity.startedAttempts,
           submittedCount,
-          pendingCount: Math.max(startedCount - submittedCount, 0),
-          violationCount,
+          pendingCount: Math.max(activity.startedAttempts - submittedCount, 0),
+          violationCount: activity.violations,
+          // Lets the lecturer's UI open the correct dialog — permanent delete, or archive —
+          // without first attempting a delete. The server re-derives this on every DELETE
+          // regardless, so a stale or forged value here changes nothing.
+          activity,
+          canDelete: !hasStudentActivity(activity),
         };
       })
     );
@@ -319,19 +365,109 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Exam ID is required' }, { status: 400 });
     }
 
-    const existing = await prisma.lab.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
-    }
-    if (session!.role === 'LECTURER' && existing.lecturerId !== session!.userId) {
-      return NextResponse.json({ error: 'You do not have access to this exam.' }, { status: 403 });
+    const { error, lab: existing } = await assertLabAccess(id, session!);
+    if (error) return error;
+
+    // THE GUARD. Every relation on Lab cascades, so this delete would take the workspaces,
+    // submissions, awarded marks, integrity log, question sets and answer-sheet format with
+    // it. Re-derived here on every request from the database, never from anything the
+    // client sent, so calling this endpoint directly cannot get past it.
+    const activity = await loadExamActivity(id);
+    if (hasStudentActivity(activity)) {
+      return NextResponse.json(
+        {
+          error: deletionRefusalMessage(activity),
+          code: 'EXAM_HAS_STUDENT_ACTIVITY',
+          canArchive: true,
+          alreadyArchived: existing!.archivedAt !== null,
+          // Counts only. Enough for the lecturer to understand the cost; nothing that
+          // identifies a student.
+          activity,
+          archivePreserves: ARCHIVE_PRESERVES,
+          archiveEffects: ARCHIVE_EFFECTS,
+        },
+        { status: 409 }
+      );
     }
 
-    await prisma.lab.delete({
-      where: { id },
+    // No student has touched it, so nothing of theirs is lost. Record the deletion before
+    // performing it: ExamAdminAction.labId is SetNull, so the row survives the exam and the
+    // title snapshot keeps it meaningful.
+    await prisma.examAdminAction.create({
+      data: {
+        labId: id,
+        labTitle: existing!.title,
+        actorId: session!.userId,
+        action: EXAM_ADMIN_ACTIONS.DELETE,
+        details: `Permanently deleted "${existing!.title}" — no student attempts, submissions, files or integrity events existed`,
+      },
     });
 
+    await prisma.lab.delete({ where: { id } });
+
     return NextResponse.json({ message: 'Exam deleted successfully' });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+  }
+}
+
+// PATCH — archive or restore an examination.
+//
+// Archiving is the answer to "this exam must go away but its student work must not". It
+// writes one timestamp and touches nothing else, which is exactly why the preservation
+// claims in ARCHIVE_PRESERVES are safe to make. getExamStatus then reports ARCHIVED, and
+// because both the workspace route and the execution engine already refuse anything that
+// is not RUNNING, every attempt entry point closes without a new check in either of them.
+export async function PATCH(req: Request) {
+  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  if (errorResponse) return errorResponse;
+
+  try {
+    const { id, archived } = await req.json();
+
+    if (!id) {
+      return NextResponse.json({ error: 'Exam ID is required' }, { status: 400 });
+    }
+    if (typeof archived !== 'boolean') {
+      return NextResponse.json({ error: 'archived must be true or false' }, { status: 400 });
+    }
+
+    const { error, lab: existing } = await assertLabAccess(id, session!);
+    if (error) return error;
+
+    const alreadyInState = archived === (existing!.archivedAt !== null);
+    if (alreadyInState) {
+      // Idempotent: the exam is already where the caller wants it. Report success without
+      // writing a second audit row for an action that changed nothing.
+      return NextResponse.json({
+        message: archived ? 'Exam is already archived' : 'Exam is already active',
+        lab: { id: existing!.id, archivedAt: existing!.archivedAt, status: getExamStatus(existing!) },
+      });
+    }
+
+    const activity = await loadExamActivity(id);
+
+    const updated = await prisma.lab.update({
+      where: { id },
+      data: { archivedAt: archived ? new Date() : null },
+    });
+
+    await prisma.examAdminAction.create({
+      data: {
+        labId: id,
+        labTitle: existing!.title,
+        actorId: session!.userId,
+        action: archived ? EXAM_ADMIN_ACTIONS.ARCHIVE : EXAM_ADMIN_ACTIONS.UNARCHIVE,
+        details: archived
+          ? `Archived "${existing!.title}" — preserved ${describeActivity(activity)}`
+          : `Restored "${existing!.title}" to active examinations`,
+      },
+    });
+
+    return NextResponse.json({
+      message: archived ? 'Exam archived' : 'Exam restored',
+      lab: { id: updated.id, archivedAt: updated.archivedAt, status: getExamStatus(updated) },
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
   }

@@ -122,6 +122,16 @@ model Lab {
   // from CSS or client-only checks.
   requireDesktopDevice Boolean @default(true)
 
+  // Archive. An examination that students have actually sat can never be permanently
+  // deleted — every relation below cascades, so a delete would take the workspaces,
+  // submissions, awarded marks, integrity log, question sets and answer-sheet format with
+  // it. Retiring such an exam sets this timestamp instead: nothing is destroyed, the exam
+  // leaves every student-facing and active workflow (getExamStatus returns ARCHIVED, which
+  // is not RUNNING, so no attempt can start or continue), and faculty keep full access for
+  // historical review and evaluation. Null means "live", which is what every existing row
+  // is, so the column is additive and changes no current behaviour.
+  archivedAt DateTime?
+
   lecturer            User                 @relation("LecturerLabs", fields: [lecturerId], references: [id], onDelete: Cascade)
   branch              Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
   subject             Subject?             @relation(fields: [subjectId], references: [id], onDelete: SetNull)
@@ -349,14 +359,24 @@ model SectionEvaluation {
 // override that refusal, the override is recorded here rather than happening silently, so
 // an examiner can later answer "who changed this paper, and when?".
 model ExamAdminAction {
-  id        String   @id @default(uuid())
-  labId     String
+  id String @id @default(uuid())
+
+  // Nullable, and SetNull rather than Cascade: the record of a deletion must outlive the
+  // thing it records. Under the previous Cascade the one audit row that mattered most —
+  // "this exam was permanently deleted" — was destroyed by the very delete it documented.
+  // Widening the column (dropping NOT NULL) leaves every existing row valid.
+  labId String?
+
+  // Snapshot of the exam's title at the time of the action, so a row whose labId has been
+  // nulled by a deletion still names what went.
+  labTitle String?
+
   actorId   String
-  action    String // GENERATE_ASSIGNMENTS, REASSIGN_SET, EDIT_LIVE_QUESTION_SET
+  action    String // GENERATE_ASSIGNMENTS, REASSIGN_SET, EDIT_LIVE_QUESTION_SET, ARCHIVE_EXAM, UNARCHIVE_EXAM, DELETE_EXAM
   details   String
   createdAt DateTime @default(now())
 
-  lab   Lab  @relation(fields: [labId], references: [id], onDelete: Cascade)
+  lab   Lab? @relation(fields: [labId], references: [id], onDelete: SetNull)
   actor User @relation("ExamAdminActions", fields: [actorId], references: [id], onDelete: Cascade)
 
   @@index([labId])

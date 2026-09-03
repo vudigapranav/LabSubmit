@@ -31,12 +31,15 @@ import {
   draftsFromSections,
 } from '@/components/AnswerSheetConfigurator';
 import { QuestionSetManager } from '@/components/QuestionSetManager';
+import { ExamRetirementDialog } from '@/components/ExamRetirementDialog';
 import { deriveIntegrityStatus, type IntegrityStatus, type Severity } from '@/lib/examIntegrity';
 import {
   GraduationCap,
   Plus,
   Edit2,
   Trash2,
+  Archive,
+  ArchiveRestore,
   BookOpen,
   CheckCircle,
   AlertCircle,
@@ -127,6 +130,11 @@ export default function LecturerDashboard() {
   // Drives the configurator's warning when a format is edited under a live exam.
   const [editingLabAttempts, setEditingLabAttempts] = useState(0);
   const [questionSetsLab, setQuestionSetsLab] = useState<any | null>(null);
+
+  // Exam retirement (delete / archive / restore). One dialog, server-decided outcome.
+  const [retiringLab, setRetiringLab] = useState<any | null>(null);
+  const [retiring, setRetiring] = useState(false);
+  const [retireRefusal, setRetireRefusal] = useState<string | null>(null);
 
   // Anti-Cheat Permissions
   const [allowCopy, setAllowCopy] = useState(false);
@@ -343,19 +351,71 @@ export default function LecturerDashboard() {
     } catch (e) { showToast('error', 'Server error'); } finally { setSaving(false); }
   };
 
-  const handleDeleteLab = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this exam?')) return;
+  // Retiring an exam goes through one dialog, and the server decides the outcome. A DELETE
+  // that the server refuses (409) does not fail silently: the refusal is fed back into the
+  // dialog, which switches to offering Archive with the server's own wording.
+  const handleRetireExam = async (intent: 'DELETE' | 'ARCHIVE' | 'RESTORE') => {
+    const lab = retiringLab;
+    if (!lab) return;
+
+    setRetiring(true);
     try {
-      const res = await fetch(`/api/lecturer/labs?id=${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        showToast('success', 'Exam deleted');
-        fetchWorkspaceData();
-        fetchAssignedSubjects();
+      if (intent === 'DELETE') {
+        const res = await fetch(`/api/lecturer/labs?id=${lab.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 409) {
+          // The guard fired. Keep the dialog open and show why, rather than reporting a
+          // failure the lecturer cannot act on.
+          setRetireRefusal(data.error || 'This exam holds student work and cannot be deleted.');
+          setRetiringLab({ ...lab, activity: data.activity ?? lab.activity, canDelete: false });
+          return;
+        }
+        if (!res.ok) {
+          showToast('error', data.error || 'Failed to delete exam');
+          return;
+        }
+        showToast('success', `"${lab.title}" deleted`);
+      } else {
+        const res = await fetch('/api/lecturer/labs', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ id: lab.id, archived: intent === 'ARCHIVE' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast('error', data.error || 'Failed to update exam');
+          return;
+        }
+        showToast(
+          'success',
+          intent === 'ARCHIVE'
+            ? `"${lab.title}" archived — submissions, marks and question sets kept`
+            : `"${lab.title}" restored`
+        );
       }
-    } catch (e) { showToast('error', 'Server error'); }
+
+      closeRetireDialog();
+      fetchWorkspaceData();
+      fetchAssignedSubjects();
+    } catch (e) {
+      showToast('error', 'Server error');
+    } finally {
+      setRetiring(false);
+    }
+  };
+
+  const openRetireDialog = (lab: any) => {
+    setRetireRefusal(null);
+    setRetiringLab(lab);
+  };
+
+  const closeRetireDialog = () => {
+    setRetiringLab(null);
+    setRetireRefusal(null);
   };
 
   const handleEvaluateSubmission = async (e: React.FormEvent) => {
@@ -658,21 +718,56 @@ export default function LecturerDashboard() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <StatusBadge tone={EXAM_STATUS_TONE[lab.status] || 'neutral'}>{lab.status}</StatusBadge>
-                          <div className="flex items-center space-x-1">
+                          {/* Every action is labelled and sits in a 36px target. Delete is
+                              pulled away from edit by a divider and carries a destructive
+                              hover state, so the irreversible action is never the one you
+                              hit by accident. */}
+                          <div className="flex items-center gap-0.5">
                             <button
                               onClick={() => setQuestionSetsLab(lab)}
                               title="Question sets"
                               aria-label={`Question sets for ${lab.title}`}
-                              className="p-1 rounded text-slate-400 hover:text-indigo-400"
+                              className="p-2 rounded-control text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             >
-                              <Layers className="w-4 h-4" />
+                              <Layers className="w-4 h-4" aria-hidden="true" />
                             </button>
-                            <button onClick={() => openEditModal(lab)} className="p-1 rounded text-slate-400 hover:text-brand-blue-500">
-                              <Edit2 className="w-4 h-4" />
+                            <button
+                              onClick={() => openEditModal(lab)}
+                              title="Edit exam"
+                              aria-label={`Edit ${lab.title}`}
+                              className="p-2 rounded-control text-slate-400 hover:text-brand-blue-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" aria-hidden="true" />
                             </button>
-                            <button onClick={() => handleDeleteLab(lab.id)} className="p-1 rounded text-slate-400 hover:text-red-600">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <span aria-hidden="true" className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" />
+                            {lab.archivedAt ? (
+                              <button
+                                onClick={() => openRetireDialog(lab)}
+                                title="Restore exam"
+                                aria-label={`Restore ${lab.title} to active examinations`}
+                                className="p-2 rounded-control text-slate-400 hover:text-brand-olive-600 hover:bg-brand-olive-50 dark:hover:bg-brand-olive-900/30 transition-colors"
+                              >
+                                <ArchiveRestore className="w-4 h-4" aria-hidden="true" />
+                              </button>
+                            ) : lab.canDelete === false ? (
+                              <button
+                                onClick={() => openRetireDialog(lab)}
+                                title="Archive exam"
+                                aria-label={`Archive ${lab.title} — it holds student work and cannot be deleted`}
+                                className="p-2 rounded-control text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                              >
+                                <Archive className="w-4 h-4" aria-hidden="true" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => openRetireDialog(lab)}
+                                title="Delete exam"
+                                aria-label={`Delete ${lab.title} permanently`}
+                                className="p-2 rounded-control text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" aria-hidden="true" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -1159,6 +1254,19 @@ export default function LecturerDashboard() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {retiringLab && (
+        <ExamRetirementDialog
+          open={!!retiringLab}
+          onClose={closeRetireDialog}
+          examTitle={retiringLab.title}
+          activity={retiringLab.activity}
+          archived={!!retiringLab.archivedAt}
+          busy={retiring}
+          serverRefusal={retireRefusal}
+          onConfirm={handleRetireExam}
+        />
       )}
 
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />

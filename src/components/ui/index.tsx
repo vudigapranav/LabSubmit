@@ -210,6 +210,7 @@ export const EXAM_STATUS_TONE: Record<string, BadgeTone> = {
   UPCOMING: 'blue',
   RUNNING: 'olive',
   COMPLETED: 'neutral',
+  ARCHIVED: 'neutral',
   PENDING: 'amber',
   APPROVED: 'emerald',
   REJECTED: 'rose',

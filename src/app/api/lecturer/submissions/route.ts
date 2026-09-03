@@ -90,6 +90,9 @@ export async function GET(req: Request) {
       maxMarks: sub.maxMarks,
       remarks: sub.remarks,
       isPublished: sub.isPublished,
+      // Release state of the parent exam, so the grading panel can tell the lecturer
+      // whether saving this mark will reach the student now or stay private until release.
+      resultsReleasedAt: sub.lab.resultsReleasedAt,
       submittedAt: sub.submittedAt,
       evaluatedAt: sub.evaluatedAt,
       autoSubmitted: sub.workspace.autoSubmitted,

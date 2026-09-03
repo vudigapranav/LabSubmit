@@ -8,6 +8,7 @@ import { checkExamDevice } from '@/lib/deviceEligibility';
 import { findIncompleteRequiredSections } from '@/lib/answerSheet';
 import { assignableSets, chooseSetId, toStudentPaper, paperToPlainText } from '@/lib/questionSets';
 import { initialFileForLab } from '@/lib/workspaceBootstrap';
+import { RESULTS_WITHHELD_MESSAGE } from '@/lib/resultRelease';
 
 
 /**
@@ -147,7 +148,7 @@ export async function GET(req: Request) {
       questions: withholdExamContent ? [] : paper,
       answerSheetSections: withholdExamContent ? [] : answerSheetSections,
       examContentWithheld: withholdExamContent,
-      submission,
+      submission: toStudentSubmission(submission, lab.resultsReleasedAt),
       effectiveDeadline: getEffectiveDeadline(lab, workspace),
       // The gate the UI renders. The binding decision is re-made server-side on start_exam
       // and on every action inside the attempt; this response has already acted on it.
@@ -156,6 +157,40 @@ export async function GET(req: Request) {
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
   }
+}
+
+/**
+ * The student's view of their own submission. Built from what a student may know rather
+ * than by deleting fields off the Prisma row, so a column added to Submission later cannot
+ * silently start leaking.
+ *
+ * Until the exam's results are released, a student may know THAT they submitted and when —
+ * never the mark, the lecturer's remarks, the evaluation outcome, or who evaluated it. The
+ * raw row was previously returned whole from both of this route's exits, which handed a
+ * student their unpublished marks and their lecturer's private remarks for the asking.
+ */
+function toStudentSubmission(
+  submission: { id: string; submittedAt: Date; status: string; marks: number | null; maxMarks: number; remarks: string | null; isPublished: boolean } | null,
+  resultsReleasedAt: Date | null
+) {
+  if (!submission) return null;
+
+  // Both gates must agree: the cohort has been released AND this row was published by that
+  // release. Either alone is not enough.
+  const released = resultsReleasedAt !== null && submission.isPublished;
+
+  return {
+    id: submission.id,
+    submittedAt: submission.submittedAt,
+    resultsReleased: released,
+    // Withheld until release. `status` is included in the withholding because APPROVED or
+    // REJECTED reveals the evaluation outcome just as surely as the number does.
+    status: released ? submission.status : 'SUBMITTED',
+    marks: released ? submission.marks : null,
+    maxMarks: submission.maxMarks,
+    remarks: released ? submission.remarks : null,
+    resultsMessage: released ? null : RESULTS_WITHHELD_MESSAGE,
+  };
 }
 
 // POST actions: start_exam, create_file, save_file, rename_file, delete_file, submit_lab
@@ -399,7 +434,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         message: 'Exam submitted successfully! Your workspace is now locked.',
-        submission: sub,
+        submission: toStudentSubmission(sub, lab.resultsReleasedAt),
       });
     }
 

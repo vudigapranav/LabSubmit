@@ -3,7 +3,7 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after the landing-page layout pass on
+**Last updated:** 2026-09-03, after result release / publication control on
 `claude/labsubmit-development-y605fv`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
@@ -80,9 +80,10 @@ only* and belongs under In Progress, not Completed.
 ### Evaluation & results
 - Submission inspector: student's files rendered read-only, with the integrity timeline.
 - Manual evaluation: marks, remarks, status (APPROVED / REJECTED / NEEDS_CORRECTION /
-  PENDING), and a publish toggle controlling student visibility.
+  PENDING). Saving an evaluation never publishes it — visibility is controlled by an
+  explicit exam-level release (see "Result release / publication control" below).
 - `NEEDS_CORRECTION` reopens the student's workspace for resubmission.
-- Student results view showing only published marks and remarks.
+- Student results view showing only released marks and remarks.
 
 ### Unified customizable answer sheet — *added this session*
 - Nine-section catalogue (Aim, Description, Algorithm, Procedure, Code, Input, Output,
@@ -326,6 +327,90 @@ protection still returns its original 409. Typecheck and `npm run build` both cl
   the database or through `/api/lecturer/assignments`, which surfaces assignment actions only.
 - `archivedAt` records *when* an exam was archived; the actor is recorded on the
   `ExamAdminAction` row rather than denormalised onto `Lab`.
+
+### Result release / publication control — *completed this session*
+
+Closes the second P0 finding. **What the audit got right and wrong:** `evalPublish` was indeed
+a client `useState(true)` that was never changed and was sent as `isPublished` on every grade
+save, so saving a mark published it instantly. But `Submission.isPublished` already defaulted
+to `false` in the schema, and `/api/student/grades` already filtered on it — a partial
+workflow existed and has been completed rather than duplicated.
+
+**Three leaks the audit did not find,** all now closed:
+- `GET /api/student/workspace` returned the raw Prisma `Submission` row — marks, remarks,
+  status, `evaluatorId` — to the student with no publication check at all.
+- `POST /api/student/workspace` (`submit_lab`) returned the same row; after a
+  `NEEDS_CORRECTION` reopen it still carried the previous marks and remarks.
+- `GET /api/student/labs` returned `submission.status` unguarded, so `APPROVED`/`REJECTED`
+  revealed the evaluation outcome before release.
+
+**Publication model.** `Submission.isPublished` stays the authoritative per-record gate that
+student APIs filter on. `Lab.resultsReleasedAt` (new, nullable, additive) is the exam-level
+switch the lecturer operates. These are not competing models: the timestamp is the switch,
+`isPublished` is how it is materialised onto rows, and release sets both in one
+`prisma.$transaction` so they cannot disagree. Scope is per-exam/cohort, which is what the
+existing schema supports cleanly — `Submission` already had the per-row flag, so no grading
+model redesign was needed.
+
+**Default unpublished.** `resultsReleasedAt` is nullable with no default, so every existing
+and new exam reads "not released". `prisma/backfill/2026-09-result-release.sql` is an
+UPDATE-only, re-runnable script for environments that predate this change and carry rows
+published by the old behaviour; it marks those exams as already-released so the switch and
+the rows agree. It was a no-op on this database (no such rows existed).
+
+**Server-side enforcement.** `POST /api/lecturer/evaluate` no longer reads `isPublished` from
+the request body at all — publication is derived from `lab.resultsReleasedAt`. Sending
+`isPublished: true` is ignored (tested). `/api/student/grades` requires **both** gates
+(`isPublished: true` AND `lab.resultsReleasedAt` not null), so a stale flag from a legacy row
+or a direct database edit still cannot surface. The workspace route builds the student's view
+of their own submission with `toStudentSubmission()` — constructed from what a student may
+know rather than by deleting fields, so a column added to `Submission` later cannot silently
+start leaking. Before release a student sees that they submitted and when, and nothing else;
+`status` reads `SUBMITTED`. Checked and clean: the execution WebSocket carries no submission
+data, and `SectionEvaluation` has no code references anywhere, so there is no section-marks
+path to leak through.
+
+**Lecturer release.** `PATCH /api/lecturer/labs` with `{ id, releaseResults: true }` — the
+same lifecycle endpoint archive uses, behind the same `assertLabAccess()` ownership check.
+Exam cards show a `Results released` / `Results not released` badge with graded/pending
+counts and a labelled **Release results** button; `ResultReleaseDialog` (built on the shared
+`Modal`, `dismissOnBackdrop={false}`) shows the counts, states that students will see their
+marks and that release cannot be undone, and lists the effects from `RELEASE_EFFECTS`.
+
+**Incomplete grading.** Release is refused with **409** and
+`code: "RELEASE_BLOCKED_INCOMPLETE_GRADING"` unless every submitted attempt is evaluated,
+enforced server-side and re-derived per request. Chosen over partial release so a lecturer
+can never believe the cohort has results when only some do. The dialog shows the blocking
+reason and does not offer the action.
+
+**After release.** Grades saved afterwards publish immediately, because withholding one
+student's mark once their classmates have theirs is the confusing case. Editing a released
+mark updates only that row. There is deliberately **no un-release action** — it is not needed
+for the workflow and would let a student see a mark and then lose it.
+
+**Audit logging.** `RELEASE_RESULTS` on the existing `ExamAdminAction`, with actor, exam,
+title snapshot and the number of results made visible. A repeat release is idempotent and
+writes no second row.
+
+**Tests** — `scratchpad/release.test.sh`, **52 assertions, all passing**, plus 18 browser
+assertions (`ui-release.js`). Covers cases A–K: default unpublished; saving a grade does not
+publish; a forged `isPublished: true` is ignored; the student cannot obtain marks, remarks or
+the evaluation outcome from the grades, labs or workspace APIs before release; release
+blocked at 409 with incomplete grading; foreign lecturer, student and unauthenticated callers
+refused; release succeeds, publishes and audits; the student then sees marks and remarks
+through every route; idempotent re-release writes no duplicate audit row; state survives a
+fresh login; post-release grading publishes immediately. Regression: the 1bbd83b archive and
+delete-protection suites (52 API + 20 browser + 3 WebSocket) all still pass.
+
+**Limitations.**
+- No un-release. Deliberate, as above.
+- Release is per exam; there is no cross-subject bulk release.
+- `Submission.isPublished` is still writable by a direct database edit, but the double gate
+  on the grades API means such a row cannot surface while its exam is unreleased.
+- The `RELEASE_RESULTS` audit rows, like the others, have no UI.
+- Out of scope and still open: `GET /api/lecturer/labs` accepts the STUDENT role. It returns
+  only cohort-level aggregate counts, no per-student marks, so it is not a publication leak —
+  but it remains the separate audit finding it was.
 
 ## 2. In progress
 

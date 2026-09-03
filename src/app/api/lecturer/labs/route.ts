@@ -12,6 +12,7 @@ import {
   describeActivity,
   hasStudentActivity,
 } from '@/lib/examLifecycle';
+import { ReleaseReadiness, canRelease, releaseBlockedReason } from '@/lib/resultRelease';
 
 /**
  * Everything a student could have created under this exam, counted in one place so the
@@ -31,6 +32,24 @@ async function loadExamActivity(labId: string): Promise<ExamActivity> {
     ]);
 
   return { startedAttempts, submissions, gradedSubmissions, violations, files, answerSheetResponses };
+}
+
+/**
+ * How far along grading is for one exam, in the terms the release rule cares about.
+ * Counts only — the lecturer needs to know how many remain, not who they are.
+ */
+async function loadReleaseReadiness(labId: string): Promise<ReleaseReadiness> {
+  // "Graded" means a completed evaluation: it has been evaluated and is no longer sitting
+  // in the PENDING bucket the submission is created in.
+  const gradedWhere = { labId, evaluatedAt: { not: null }, status: { not: 'PENDING' } } as const;
+
+  const [totalSubmissions, graded, published] = await Promise.all([
+    prisma.submission.count({ where: { labId } }),
+    prisma.submission.count({ where: gradedWhere }),
+    prisma.submission.count({ where: { labId, isPublished: true } }),
+  ]);
+
+  return { totalSubmissions, graded, ungraded: Math.max(totalSubmissions - graded, 0), published };
 }
 
 /**
@@ -156,9 +175,10 @@ export async function GET(req: Request) {
     // Attach computed exam status + appeared/submitted/pending counts for the faculty dashboard.
     const labsWithStats = await Promise.all(
       labs.map(async (lab) => {
-        const [submittedCount, activity] = await Promise.all([
+        const [submittedCount, activity, releaseReadiness] = await Promise.all([
           prisma.labWorkspace.count({ where: { labId: lab.id, isSubmitted: true } }),
           loadExamActivity(lab.id),
+          loadReleaseReadiness(lab.id),
         ]);
 
         return {
@@ -173,6 +193,11 @@ export async function GET(req: Request) {
           // regardless, so a stale or forged value here changes nothing.
           activity,
           canDelete: !hasStudentActivity(activity),
+          // Result release state for the lecturer's badge and dialog. The server re-derives
+          // both on every release request, so a stale value here cannot release anything.
+          releaseReadiness,
+          canReleaseResults: !lab.resultsReleasedAt && canRelease(releaseReadiness),
+          releaseBlockedReason: lab.resultsReleasedAt ? null : releaseBlockedReason(releaseReadiness),
         };
       })
     );
@@ -423,17 +448,76 @@ export async function PATCH(req: Request) {
   if (errorResponse) return errorResponse;
 
   try {
-    const { id, archived } = await req.json();
+    const { id, archived, releaseResults } = await req.json();
 
     if (!id) {
       return NextResponse.json({ error: 'Exam ID is required' }, { status: 400 });
     }
-    if (typeof archived !== 'boolean') {
-      return NextResponse.json({ error: 'archived must be true or false' }, { status: 400 });
+    if (typeof archived !== 'boolean' && releaseResults !== true) {
+      return NextResponse.json(
+        { error: 'Provide archived (true/false) or releaseResults: true' },
+        { status: 400 }
+      );
     }
 
     const { error, lab: existing } = await assertLabAccess(id, session!);
     if (error) return error;
+
+    // ---- Result release -----------------------------------------------------------
+    // Releasing is a cohort-level operation: it sets Lab.resultsReleasedAt and publishes
+    // the exam's graded submissions in one transaction, so the exam-level switch and the
+    // per-row isPublished the student APIs read can never disagree.
+    if (releaseResults === true) {
+      if (existing!.resultsReleasedAt) {
+        // Idempotent: already released. Report success without a duplicate audit row.
+        const already = await loadReleaseReadiness(id);
+        return NextResponse.json({
+          message: 'Results for this exam are already released',
+          resultsReleasedAt: existing!.resultsReleasedAt,
+          readiness: already,
+        });
+      }
+
+      const readiness = await loadReleaseReadiness(id);
+      if (!canRelease(readiness)) {
+        // Refused: releasing now would tell the lecturer the cohort has its results while
+        // some students would receive nothing. Counts only — no student is identified.
+        return NextResponse.json(
+          {
+            error: releaseBlockedReason(readiness),
+            code: 'RELEASE_BLOCKED_INCOMPLETE_GRADING',
+            readiness,
+          },
+          { status: 409 }
+        );
+      }
+
+      const releasedAt = new Date();
+      const [, published] = await prisma.$transaction([
+        prisma.lab.update({ where: { id }, data: { resultsReleasedAt: releasedAt } }),
+        prisma.submission.updateMany({
+          where: { labId: id, evaluatedAt: { not: null }, status: { not: 'PENDING' } },
+          data: { isPublished: true },
+        }),
+      ]);
+
+      await prisma.examAdminAction.create({
+        data: {
+          labId: id,
+          labTitle: existing!.title,
+          actorId: session!.userId,
+          action: EXAM_ADMIN_ACTIONS.RELEASE_RESULTS,
+          details: `Released results for "${existing!.title}" — ${published.count} result(s) made visible to students`,
+        },
+      });
+
+      return NextResponse.json({
+        message: `Results released — ${published.count} student${published.count === 1 ? '' : 's'} can now see their marks`,
+        resultsReleasedAt: releasedAt,
+        releasedCount: published.count,
+        readiness: { ...readiness, published: published.count },
+      });
+    }
 
     const alreadyInState = archived === (existing!.archivedAt !== null);
     if (alreadyInState) {

@@ -132,6 +132,13 @@ model Lab {
   // is, so the column is additive and changes no current behaviour.
   archivedAt DateTime?
 
+  // Result release. Null means results for this examination have not been released, which
+  // is what every existing row is and what every new exam starts as. Releasing sets this
+  // timestamp and publishes the exam's graded submissions in the same transaction, so this
+  // switch and Submission.isPublished can never disagree. Whether a newly saved evaluation
+  // is published is derived from this field on the server — the client never decides it.
+  resultsReleasedAt DateTime?
+
   lecturer            User                 @relation("LecturerLabs", fields: [lecturerId], references: [id], onDelete: Cascade)
   branch              Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
   subject             Subject?             @relation(fields: [subjectId], references: [id], onDelete: SetNull)
@@ -372,7 +379,7 @@ model ExamAdminAction {
   labTitle String?
 
   actorId   String
-  action    String // GENERATE_ASSIGNMENTS, REASSIGN_SET, EDIT_LIVE_QUESTION_SET, ARCHIVE_EXAM, UNARCHIVE_EXAM, DELETE_EXAM
+  action    String // GENERATE_ASSIGNMENTS, REASSIGN_SET, EDIT_LIVE_QUESTION_SET, ARCHIVE_EXAM, UNARCHIVE_EXAM, DELETE_EXAM, RELEASE_RESULTS
   details   String
   createdAt DateTime @default(now())
 

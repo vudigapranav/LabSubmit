@@ -32,6 +32,8 @@ import {
 } from '@/components/AnswerSheetConfigurator';
 import { QuestionSetManager } from '@/components/QuestionSetManager';
 import { ExamRetirementDialog } from '@/components/ExamRetirementDialog';
+import { ResultReleaseDialog } from '@/components/ResultReleaseDialog';
+import { NO_SUBMISSIONS, RELEASE_STATE_LABEL, releaseState } from '@/lib/resultRelease';
 import { deriveIntegrityStatus, type IntegrityStatus, type Severity } from '@/lib/examIntegrity';
 import {
   GraduationCap,
@@ -53,6 +55,7 @@ import {
   Code,
   Layers,
   ClipboardCheck,
+  Send,
 } from 'lucide-react';
 
 const LANGUAGE_OPTIONS = [
@@ -131,6 +134,11 @@ export default function LecturerDashboard() {
   const [editingLabAttempts, setEditingLabAttempts] = useState(0);
   const [questionSetsLab, setQuestionSetsLab] = useState<any | null>(null);
 
+  // Result release. One dialog, server-decided outcome.
+  const [releasingLab, setReleasingLab] = useState<any | null>(null);
+  const [releasing, setReleasing] = useState(false);
+  const [releaseRefusal, setReleaseRefusal] = useState<string | null>(null);
+
   // Exam retirement (delete / archive / restore). One dialog, server-decided outcome.
   const [retiringLab, setRetiringLab] = useState<any | null>(null);
   const [retiring, setRetiring] = useState(false);
@@ -145,7 +153,6 @@ export default function LecturerDashboard() {
   const [evalMarks, setEvalMarks] = useState('');
   const [evalRemarks, setEvalRemarks] = useState('');
   const [evalStatus, setEvalStatus] = useState('APPROVED');
-  const [evalPublish, setEvalPublish] = useState(true);
   const [inspectorPane, setInspectorPane] = useState<'sheet' | 'code'>('sheet');
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -408,6 +415,51 @@ export default function LecturerDashboard() {
     }
   };
 
+  // Releasing goes through the same lifecycle endpoint as archive. A 409 (grading
+  // incomplete) is fed back into the dialog rather than reported as a bare failure.
+  const handleReleaseResults = async () => {
+    const lab = releasingLab;
+    if (!lab) return;
+
+    setReleasing(true);
+    try {
+      const res = await fetch('/api/lecturer/labs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: lab.id, releaseResults: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 409) {
+        setReleaseRefusal(data.error || 'Results cannot be released yet.');
+        setReleasingLab({ ...lab, releaseReadiness: data.readiness ?? lab.releaseReadiness });
+        return;
+      }
+      if (!res.ok) {
+        showToast('error', data.error || 'Failed to release results');
+        return;
+      }
+
+      showToast('success', data.message || 'Results released');
+      closeReleaseDialog();
+      fetchWorkspaceData();
+    } catch (e) {
+      showToast('error', 'Server error');
+    } finally {
+      setReleasing(false);
+    }
+  };
+
+  const openReleaseDialog = (lab: any) => {
+    setReleaseRefusal(null);
+    setReleasingLab(lab);
+  };
+
+  const closeReleaseDialog = () => {
+    setReleasingLab(null);
+    setReleaseRefusal(null);
+  };
+
   const openRetireDialog = (lab: any) => {
     setRetireRefusal(null);
     setRetiringLab(lab);
@@ -431,7 +483,6 @@ export default function LecturerDashboard() {
           status: evalStatus,
           marks: evalMarks ? parseFloat(evalMarks) : null,
           remarks: evalRemarks,
-          isPublished: evalPublish,
         }),
       });
       const data = await res.json();
@@ -791,6 +842,32 @@ export default function LecturerDashboard() {
                           View submissions &rarr;
                         </button>
                       </div>
+
+                      {/* Result release. Shown only once an exam has submissions to release,
+                          so a draft or an untaken exam is not cluttered with an action that
+                          cannot apply. State is named in text, never by colour alone. */}
+                      {(lab.releaseReadiness?.totalSubmissions ?? 0) > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+                          <div className="flex items-center gap-2">
+                            <StatusBadge tone={lab.resultsReleasedAt ? 'emerald' : 'neutral'}>
+                              {RELEASE_STATE_LABEL[releaseState(lab.resultsReleasedAt)]}
+                            </StatusBadge>
+                            <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                              {lab.releaseReadiness.graded} graded · {lab.releaseReadiness.ungraded} pending
+                            </span>
+                          </div>
+                          {!lab.resultsReleasedAt && (
+                            <Button
+                              variant="outline"
+                              onClick={() => openReleaseDialog(lab)}
+                              aria-label={`Release results for ${lab.title}`}
+                            >
+                              <Send className="w-3.5 h-3.5" aria-hidden="true" />
+                              Release results
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </Card>
                   ))
                 )}
@@ -1248,12 +1325,29 @@ export default function LecturerDashboard() {
                       <textarea placeholder="Feedback..." value={evalRemarks} onChange={(e) => setEvalRemarks(e.target.value)} rows={3} className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-control p-3 text-xs" />
                     </div>
                     <button type="submit" className="w-full py-2.5 bg-brand-olive-700 text-white rounded-control font-bold text-xs">Submit Grade</button>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      {selectedSubmission?.resultsReleasedAt
+                        ? 'Results for this exam are released — saving makes this mark visible to the student immediately.'
+                        : 'This mark stays private until you release results for this exam.'}
+                    </p>
                   </form>
                 </div>
               </div>
             </div>
           </div>
         </Modal>
+      )}
+
+      {releasingLab && (
+        <ResultReleaseDialog
+          open={!!releasingLab}
+          onClose={closeReleaseDialog}
+          examTitle={releasingLab.title}
+          readiness={releasingLab.releaseReadiness ?? NO_SUBMISSIONS}
+          busy={releasing}
+          serverRefusal={releaseRefusal}
+          onConfirm={handleReleaseResults}
+        />
       )}
 
       {retiringLab && (

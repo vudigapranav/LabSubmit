@@ -172,6 +172,14 @@ Supporting conventions:
   courtesy, never the guard. Any future destructive operation on student-owned records
   follows the same shape: refuse with 409, offer the non-destructive alternative, and state
   in the refusal exactly what exists.
+- **Publication is derived on the server, never supplied by the client.** Whether a saved
+  evaluation is visible to a student is a property of the exam's release state
+  (`Lab.resultsReleasedAt`), not a flag in the request body. Saving a grade never publishes
+  it; an explicit cohort-level release does. Student-facing payloads are built from what a
+  student may know — `toStudentSubmission()`, like `toStudentPaper()` — rather than by
+  deleting fields from an internal row, so a column added later cannot silently start
+  leaking. Marks, remarks and the evaluation outcome are all withheld together: `APPROVED`
+  reveals the result as surely as the number does.
 - **Destructive administrative actions are audited.** Deleting, archiving or restoring an
   exam, and overriding a live question set or an assignment, write an `ExamAdminAction` row
   recording the actor, the exam and what happened. That model is the one audit trail — do not
@@ -306,6 +314,7 @@ and hosts Postgres. Both read the same database. See `DEPLOYMENT.md`.
 | Submission finalization | `src/lib/examSubmission.ts` |
 | Answer-sheet catalogue & rules | `src/lib/answerSheet.ts` |
 | Exam deletion / archive policy | `src/lib/examLifecycle.ts` (pure), `src/components/ExamRetirementDialog.tsx` |
+| Result release / publication | `src/lib/resultRelease.ts` (pure), `src/components/ResultReleaseDialog.tsx` |
 | Device policy | `src/lib/deviceEligibility.ts` (server), `src/lib/useDeviceClass.ts` (hint) |
 | Execution engine | `src/lib/execution/*`, driven by `server.js` |
 | Student exam UI | `src/app/student/lab/[id]/page.tsx`, `src/components/OnlineIDE.tsx`, `ExamGuard.tsx`, `AnswerSheet.tsx` |

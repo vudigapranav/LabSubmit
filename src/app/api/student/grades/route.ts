@@ -10,7 +10,12 @@ export async function GET(req: Request) {
     const submissions = await prisma.submission.findMany({
       where: {
         studentId: session!.userId,
-        isPublished: true, // Only show published grades
+        // Both gates, deliberately. isPublished is the per-row flag the release action
+        // sets; lab.resultsReleasedAt is the exam-level switch that set it. Requiring both
+        // means a row that somehow carries a stale isPublished — a legacy record, a direct
+        // database edit — still cannot surface until its exam has actually been released.
+        isPublished: true,
+        lab: { resultsReleasedAt: { not: null } },
       },
       include: {
         lab: {

@@ -8,7 +8,11 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { submissionId, marks, remarks, status, isPublished } = body;
+    // isPublished is deliberately NOT read from the body. Whether a saved evaluation is
+    // visible to the student is a property of the exam's release state, decided below from
+    // the database. The old behaviour trusted a client flag that the lecturer UI hardcoded
+    // to true, which published every mark the instant it was typed.
+    const { submissionId, marks, remarks, status } = body;
 
     if (!submissionId || !status) {
       return NextResponse.json({ error: 'Submission ID and status are required' }, { status: 400 });
@@ -31,14 +35,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'You do not have access to this submission.' }, { status: 403 });
     }
 
-    // Update submission evaluation
+    // Publication is derived, never supplied. Before the exam's results are released a
+    // saved grade stays private, so the lecturer can mark, review and change marks freely.
+    // Once the cohort has been released, a grade saved for a late or re-marked submission
+    // is published immediately — withholding one student's mark after their classmates
+    // already have theirs is the confusing case, not the safe one.
+    const resultsReleased = submission.lab.resultsReleasedAt !== null;
+
     const updatedSubmission = await prisma.submission.update({
       where: { id: submissionId },
       data: {
         status,
         marks: marks !== undefined && marks !== null ? parseFloat(marks) : submission.marks,
         remarks: remarks !== undefined ? remarks : submission.remarks,
-        isPublished: isPublished !== undefined ? Boolean(isPublished) : submission.isPublished,
+        isPublished: resultsReleased,
         evaluatedAt: new Date(),
         evaluatorId: session!.userId,
       },
@@ -53,7 +63,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({
-      message: 'Evaluation saved successfully',
+      message: resultsReleased
+        ? 'Evaluation saved and visible to the student — results for this exam are released'
+        : 'Evaluation saved. It stays private until you release results for this exam.',
+      resultsReleased,
       submission: updatedSubmission,
     });
   } catch (error: any) {

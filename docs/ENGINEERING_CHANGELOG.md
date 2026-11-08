@@ -75,3 +75,27 @@ read exam papers outside their own live attempt; students must not modify others
 
 **Operational note.** Any host where `JWT_SECRET` is unset will now refuse logins. Confirm it
 is set (identically) on Vercel and Railway before deploying this commit.
+
+---
+
+## Iteration 3 — Login hardening (S7) · 2026-11-08
+
+**Objective.** Login must not reveal which accounts exist and must bound password guessing,
+without affecting legitimate sign-in for any role.
+
+**Changes.**
+- `src/lib/rateLimit.ts` (new): in-memory failure limiter (per account 10 / per address 100,
+  15-minute window); successes clear the account counter.
+- `api/auth/login`: one message for unknown account and wrong password; dummy bcrypt compare
+  for unknown accounts (timing); role-tab messages only after a correct password; 429 with
+  `Retry-After` while locked; 500 no longer echoes `error.message`.
+- `tests/auth.test.mjs` (7 tests).
+
+**Tests executed.**
+- Baseline: 3 S7 tests **failed** (distinct messages; no throttling); 4 regression tests passed.
+- After fix: `npm test` → **30 pass, 0 fail** against the dev server; `npm run build` succeeds;
+  `npm test` → **30 pass, 0 fail** against the production server (`NODE_ENV=production`), where
+  the S4 privilege-drop warning was observed in the log as designed.
+
+**Remaining.** Limiter is per instance (not global on Vercel). Account lockout can be
+triggered by a third party for one window — documented trade-off.

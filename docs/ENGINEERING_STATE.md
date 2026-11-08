@@ -3,7 +3,7 @@
 Persistent engineering state across sessions. Updated at the end of every iteration.
 History of each iteration: `ENGINEERING_CHANGELOG.md`. Feature inventory: `/STATE.md`.
 
-**Last updated:** 2026-11-08, after iteration 2.
+**Last updated:** 2026-11-08, after iteration 3.
 **Branch:** `claude/labsubmit-development-y605fv` (not pushed since `85240d1`; owner pushes after review).
 
 ## Current phase
@@ -16,11 +16,14 @@ Stage 5 — IMPLEMENT, working through the P0 security items in `MVP_ROADMAP.md`
 - Iteration 1: execution engine containment — S1, S2, S3 fixed and verified; S4 partially
   mitigated. First committed test suite (`npm test`).
 - Iteration 2: S5 (no JWT fallback secret), S6 (students can no longer list exam papers),
-  S12 (file actions scoped to own workspace). Suite at 23 tests, all passing.
+  S12 (file actions scoped to own workspace).
+- Iteration 3: S7 login hardening (generic errors, timing equalisation, failure limiter).
+  Suite at 30 tests, all passing in dev and production mode; `npm run build` succeeds.
 
 ## In progress / next
 
-- Iteration 3 (next): S7 login rate limit + enumeration.
+- All P0 items in `MVP_ROADMAP.md` are done except the Railway uid drop (awaiting approval).
+- Next: P1 — lint config, Next.js 14.2.x patch upgrade (S8).
 
 
 ## Pending (see `MVP_ROADMAP.md`)
@@ -63,8 +66,10 @@ npm test
 
 `src/lib/execution/{CompilerService,PtyService,ExecutionController}.ts`,
 `src/lib/execution/sandbox.ts` (new), `src/lib/sourceFilename.ts` (new),
-`src/app/api/student/workspace/route.ts`, `package.json`, `tests/*`, `docs/*`.
+`src/app/api/student/workspace/route.ts`, `src/app/api/lecturer/labs/route.ts`,
+`src/app/api/auth/login/route.ts`, `src/lib/jwt.ts`, `src/lib/rateLimit.ts` (new), `package.json`,
+`tests/*`, `docs/*`.
 
 ## Next recommended action
 
-Iteration 3 (S7).
+P1 task 5 (lint config), then task 6 (Next.js patch upgrade, S8), re-running `npm test` and `npm run build` after each.

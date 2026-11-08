@@ -20,7 +20,7 @@ Severity scale: CRITICAL · HIGH · MEDIUM · LOW · INFORMATIONAL.
 | S4 | CRITICAL | No OS-level isolation of student code (same uid as server, network, no memory/process limits) | **Partially mitigated — iteration 1.** Release blocker for unsupervised hosting until uid drop is enabled on Railway |
 | S5 | HIGH | Hardcoded fallback JWT signing secret in `src/lib/jwt.ts` | **Fixed — iteration 2** (verified) |
 | S6 | HIGH | Students can read every exam paper (incl. drafts, upcoming) via `GET /api/lecturer/labs` | **Fixed — iteration 2** (verified) |
-| S7 | MEDIUM | Login: no rate limiting; distinct error messages enable account enumeration | Open — scheduled iteration 3 |
+| S7 | MEDIUM | Login: no rate limiting; distinct error messages enable account enumeration | **Fixed — iteration 3** (verified) |
 | S8 | MEDIUM | `next@14.2.10` has published critical/high advisories | Open |
 | S9 | LOW | 7-day tokens with no server-side revocation; deactivating/deleting a user does not end an existing session | Open — needs verification |
 | S10 | LOW | `GET /api/auth/lecturers-available` is unauthenticated and returns lecturer names and emails | Open |
@@ -141,9 +141,12 @@ which are built from what a student may know.
 **Impact.** Unlimited password guessing; "user not found" vs "Invalid password" (and the
 role-tab messages before the password check) confirm which roll numbers/emails exist.
 
-**Planned remediation.** One generic credential error for unknown user and wrong password;
+**Remediation (iteration 3).** One generic credential error for unknown user and wrong password;
+unknown accounts are compared against a dummy bcrypt hash so timing matches a wrong password;
 role-tab mismatch only reported *after* a correct password; in-memory per-identifier and
-per-IP attempt limiter (`src/lib/rateLimit.ts`) returning 429 with `Retry-After`.
+per-IP failure limiter (`src/lib/rateLimit.ts`: 10 failures/account and 100/address per 15 min) returning
+429 with `Retry-After`; a locked account is refused even with the correct password.
+Accepted trade-off: someone knowing a roll number can lock that account for up to 15 minutes.
 Limitation: in-memory, so per-instance on Vercel — raises cost of guessing, not a global
 guarantee.
 

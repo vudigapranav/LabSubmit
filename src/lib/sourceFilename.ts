@@ -26,3 +26,9 @@ export function isSafeSourceFilename(name: unknown): name is string {
     !name.includes('..')
   );
 }
+
+// Size limits for an attempt's source files, shared by the workspace REST route and the
+// execution engine (SECURITY_AUDIT.md S14). Generous for any lab program; they exist so an
+// authenticated student cannot fill the database or the execution host's disk.
+export const MAX_SOURCE_FILE_BYTES = 256 * 1024;
+export const MAX_FILES_PER_WORKSPACE = 20;

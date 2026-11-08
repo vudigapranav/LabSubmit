@@ -69,7 +69,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ branches });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/branches]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -102,7 +103,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Branch created successfully', branch });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/branches]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -145,7 +147,8 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ message: 'Branch updated successfully', branch });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/branches]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -165,6 +168,7 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ message: 'Branch deleted successfully' });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/branches]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

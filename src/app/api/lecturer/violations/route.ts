@@ -57,6 +57,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ violations: formatted });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/violations]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

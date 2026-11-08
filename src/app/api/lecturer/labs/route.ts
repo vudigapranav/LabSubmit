@@ -207,7 +207,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ labs: labsWithStats });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/labs]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -283,7 +284,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Exam created successfully', lab });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/labs]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -377,7 +379,8 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ message: 'Exam updated successfully', lab: labWithSections ?? lab });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/labs]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -435,7 +438,8 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ message: 'Exam deleted successfully' });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/labs]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { checkPasswordPolicy } from '@/lib/passwordPolicy';
 import { signToken } from '@/lib/jwt';
 
 export async function POST(req: Request) {
@@ -73,6 +74,10 @@ export async function POST(req: Request) {
     }
 
     // 4. Create Student User & Profile
+    const passwordProblem = checkPasswordPolicy(password);
+    if (passwordProblem) {
+      return NextResponse.json({ error: passwordProblem }, { status: 400 });
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await prisma.user.create({
@@ -118,6 +123,7 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error('Registration error:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    console.error('[/api/auth/register-student]', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

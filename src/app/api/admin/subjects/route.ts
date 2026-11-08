@@ -27,7 +27,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ subjects });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/subjects]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -60,7 +61,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Subject created successfully', subject });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/subjects]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -94,7 +96,8 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ message: 'Subject updated successfully', subject });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/subjects]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -114,6 +117,7 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ message: 'Subject deleted successfully' });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/subjects]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

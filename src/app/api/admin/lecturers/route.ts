@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { checkPasswordPolicy } from '@/lib/passwordPolicy';
 import bcrypt from 'bcryptjs';
 
 // GET all lecturers
@@ -36,7 +37,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ lecturers: lecturersWithStats });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/lecturers]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -66,6 +68,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 });
     }
 
+    const passwordProblem = checkPasswordPolicy(password);
+    if (passwordProblem) {
+      return NextResponse.json({ error: passwordProblem }, { status: 400 });
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const lecturer = await prisma.user.create({
@@ -87,7 +93,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Lecturer created successfully', lecturer });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/lecturers]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -145,7 +152,8 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ message: 'Lecturer updated successfully', user: updatedUser });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/lecturers]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -168,6 +176,7 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ message: 'Lecturer deleted successfully' });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/lecturers]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

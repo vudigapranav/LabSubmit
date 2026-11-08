@@ -5,11 +5,12 @@ import { detectLanguage } from '@/lib/compiler';
 import { getExamStatus, getEffectiveDeadline, parseAllowedLanguages, isLanguageAllowed } from '@/lib/examTiming';
 import { finalizeSubmission } from '@/lib/examSubmission';
 import { checkExamDevice } from '@/lib/deviceEligibility';
-import { findIncompleteRequiredSections } from '@/lib/answerSheet';
+import { findIncompleteRequiredSections, MAX_SECTION_CONTENT_BYTES } from '@/lib/answerSheet';
 import { assignableSets, chooseSetId, toStudentPaper, paperToPlainText } from '@/lib/questionSets';
 import { initialFileForLab } from '@/lib/workspaceBootstrap';
 import { RESULTS_WITHHELD_MESSAGE } from '@/lib/resultRelease';
-import { isSafeSourceFilename, SOURCE_FILENAME_RULE } from '@/lib/sourceFilename';
+import { isSafeSourceFilename, SOURCE_FILENAME_RULE, MAX_SOURCE_FILE_BYTES, MAX_FILES_PER_WORKSPACE } from '@/lib/sourceFilename';
+import { studentInExamCohort, examPaperReleased } from '@/lib/examAccess';
 
 
 /**
@@ -70,6 +71,15 @@ export async function GET(req: Request) {
     });
 
     if (!workspace) {
+      // Only a student in the exam's cohort may open it. Same 404 as a missing or draft exam,
+      // so the response does not confirm that an exam exists for another cohort (S13).
+      // An EXISTING workspace is not re-checked here: continuation fails open (CLAUDE.md §6);
+      // start_exam still checks the cohort, so such a workspace can never reach the paper.
+      const profile = await prisma.studentProfile.findUnique({ where: { userId: session!.userId } });
+      if (!studentInExamCohort(lab, profile)) {
+        return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
+      }
+
       // Create initial workspace with a default file matching the exam's first allowed language.
       // Note: this does NOT start the exam clock — that only happens via the start_exam action.
       const boilerplate = initialFileForLab(lab.allowedLanguages);
@@ -113,12 +123,17 @@ export async function GET(req: Request) {
     const assignableCount = await prisma.questionSet.count({
       where: { labId, isActive: true, questions: { some: {} } },
     });
-    const paper = toStudentPaper(workspace.questionSet);
-    const problemStatement = workspace.questionSet
-      ? paperToPlainText(paper)
-      : assignableCount > 0
-        ? '' // sets exist but none assigned yet — withheld until the attempt starts
-        : lab.problemStatement;
+    // The paper is released only once this student's attempt has started (or was submitted)
+    // — never for an UPCOMING exam, never before Start. start_exam delivers it (S13).
+    const paperReleased = examPaperReleased(workspace);
+    const paper = paperReleased ? toStudentPaper(workspace.questionSet) : [];
+    const problemStatement = !paperReleased
+      ? ''
+      : workspace.questionSet
+        ? paperToPlainText(paper)
+        : assignableCount > 0
+          ? '' // sets exist but none assigned yet — withheld until the attempt starts
+          : lab.problemStatement;
 
     // BOTH the joined set and the raw foreign key are stripped. questionSetId is not a
     // label, but it is a stable identifier two students could compare to discover they hold
@@ -149,6 +164,9 @@ export async function GET(req: Request) {
       questions: withholdExamContent ? [] : paper,
       answerSheetSections: withholdExamContent ? [] : answerSheetSections,
       examContentWithheld: withholdExamContent,
+      // True until the student presses Start; the UI shows the start gate, not an empty paper.
+      paperWithheldUntilStart: !paperReleased,
+      // Built from what a student may know: no marks or remarks before release.
       submission: toStudentSubmission(submission, lab.resultsReleasedAt),
       effectiveDeadline: getEffectiveDeadline(lab, workspace),
       // The gate the UI renders. The binding decision is re-made server-side on start_exam
@@ -156,7 +174,8 @@ export async function GET(req: Request) {
       deviceEligibility: device,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/student/workspace]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -224,6 +243,12 @@ export async function POST(req: Request) {
     if (action === 'start_exam') {
       if (!lab.isPublished) {
         return NextResponse.json({ error: 'Exam is not currently available.' }, { status: 403 });
+      }
+      // Fail closed on START: a workspace alone (e.g. one predating the cohort check) is not
+      // permission to sit an exam for another cohort (S13).
+      const startProfile = await prisma.studentProfile.findUnique({ where: { userId: session!.userId } });
+      if (!studentInExamCohort(lab, startProfile)) {
+        return NextResponse.json({ error: 'This exam is not available to you.' }, { status: 403 });
       }
       if (workspace.isSubmitted) {
         return NextResponse.json({ error: 'This exam has already been submitted.' }, { status: 403 });
@@ -309,6 +334,19 @@ export async function POST(req: Request) {
         reason: 'TIMEOUT',
       });
       return NextResponse.json({ error: 'Exam time has expired. Your work has been auto-submitted.' }, { status: 403 });
+    }
+
+    // Size limits (S14): without them a student could store arbitrarily large files or
+    // answers. 413 so the client can tell "too big" from "invalid".
+    const tooLarge = (text: unknown, limit: number) => typeof text === 'string' && Buffer.byteLength(text) > limit;
+    if ((action === 'save_file' || action === 'create_file') && tooLarge(content, MAX_SOURCE_FILE_BYTES)) {
+      return NextResponse.json({ error: `File is too large (limit ${MAX_SOURCE_FILE_BYTES / 1024} KB).` }, { status: 413 });
+    }
+    if (action === 'save_section' && tooLarge(content, MAX_SECTION_CONTENT_BYTES)) {
+      return NextResponse.json({ error: `Answer is too long (limit ${MAX_SECTION_CONTENT_BYTES / 1024} KB).` }, { status: 413 });
+    }
+    if (action === 'create_file' && workspace.files.length >= MAX_FILES_PER_WORKSPACE) {
+      return NextResponse.json({ error: `An attempt can hold at most ${MAX_FILES_PER_WORKSPACE} files.` }, { status: 400 });
     }
 
     // File actions must target a file in the caller's OWN workspace. Prisma updates below
@@ -456,6 +494,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ error: 'Invalid action specified' }, { status: 400 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/student/workspace]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

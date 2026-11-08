@@ -128,6 +128,7 @@ export async function GET(req: Request) {
       subjects: subjectsWithLabs,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/student/labs]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

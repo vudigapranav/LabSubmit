@@ -57,6 +57,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, duplicateSession });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/student/heartbeat]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

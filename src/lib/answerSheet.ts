@@ -337,3 +337,6 @@ export function validateFlatMarks(value: unknown, maxMarks: number): { marks: nu
   if (marks !== null && (marks < 0 || marks > maxMarks)) return { marks: null, error: `Marks must be between 0 and ${maxMarks}.` };
   return { marks: marks === null ? null : round2(marks), error: null };
 }
+
+/** Largest answer-sheet section a student may save (SECURITY_AUDIT.md S14). */
+export const MAX_SECTION_CONTENT_BYTES = 64 * 1024;

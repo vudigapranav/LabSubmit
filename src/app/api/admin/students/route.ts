@@ -52,7 +52,8 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ students: formattedStudents });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/students]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -105,7 +106,8 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ message: 'Student updated successfully', user: updatedUser });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/students]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -135,6 +137,7 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ message: 'Student deleted successfully' });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/students]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

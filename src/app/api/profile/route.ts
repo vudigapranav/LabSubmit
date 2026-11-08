@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { checkPasswordPolicy } from '@/lib/passwordPolicy';
 import bcrypt from 'bcryptjs';
 
 export async function PUT(req: Request) {
@@ -26,6 +27,10 @@ export async function PUT(req: Request) {
 
     // Password change check
     if (newPassword) {
+      const passwordProblem = checkPasswordPolicy(newPassword);
+      if (passwordProblem) {
+        return NextResponse.json({ error: passwordProblem }, { status: 400 });
+      }
       if (!currentPassword) {
         return NextResponse.json({ error: 'Current password is required to update password' }, { status: 400 });
       }
@@ -69,6 +74,7 @@ export async function PUT(req: Request) {
       },
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/profile]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

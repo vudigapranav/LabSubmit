@@ -75,7 +75,8 @@ export async function GET(req: Request) {
       })),
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/question-sets]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -107,7 +108,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Question set created', set });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/question-sets]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -193,7 +195,8 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ message: 'Question set updated', set });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/question-sets]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -230,6 +233,7 @@ export async function DELETE(req: Request) {
     await prisma.questionSet.delete({ where: { id } });
     return NextResponse.json({ message: 'Question set deleted' });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/question-sets]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

@@ -55,6 +55,7 @@ export async function GET(req: Request) {
       assignedBranches,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/sections]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

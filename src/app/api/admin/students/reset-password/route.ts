@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { checkPasswordPolicy } from '@/lib/passwordPolicy';
 import bcrypt from 'bcryptjs';
 
 export async function POST(req: Request) {
@@ -23,6 +24,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
+    const passwordProblem = checkPasswordPolicy(newPassword);
+    if (passwordProblem) {
+      return NextResponse.json({ error: passwordProblem }, { status: 400 });
+    }
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await prisma.user.update({
@@ -32,6 +37,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: `Password for ${student.name} reset successfully` });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/students/reset-password]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

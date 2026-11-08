@@ -21,6 +21,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, theme });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/profile/theme]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

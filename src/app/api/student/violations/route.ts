@@ -102,6 +102,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ logged: !result.deduped, fullscreenExitCount: result.fullscreenExitCount, autoSubmit: result.autoSubmit });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/student/violations]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

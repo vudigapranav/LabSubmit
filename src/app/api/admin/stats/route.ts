@@ -61,6 +61,7 @@ export async function GET(req: Request) {
       lecturerBreakdown,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/stats]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

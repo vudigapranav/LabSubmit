@@ -13,6 +13,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ranges: branches });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/admin/roll-ranges]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

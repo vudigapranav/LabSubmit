@@ -77,7 +77,8 @@ export async function GET(req: Request) {
       })),
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/assignments]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
@@ -245,6 +246,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ error: 'Invalid action specified' }, { status: 400 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/assignments]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

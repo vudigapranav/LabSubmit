@@ -3,7 +3,7 @@
 Persistent engineering state across sessions. Updated at the end of every iteration.
 History of each iteration: `ENGINEERING_CHANGELOG.md`. Feature inventory: `/STATE.md`.
 
-**Last updated:** 2026-11-08, after iteration 1.
+**Last updated:** 2026-11-08, after iteration 2.
 **Branch:** `claude/labsubmit-development-y605fv` (not pushed since `85240d1`; owner pushes after review).
 
 ## Current phase
@@ -14,12 +14,14 @@ Stage 5 — IMPLEMENT, working through the P0 security items in `MVP_ROADMAP.md`
 
 - Iteration 0: audit documents in `docs/`.
 - Iteration 1: execution engine containment — S1, S2, S3 fixed and verified; S4 partially
-  mitigated. First committed test suite (`npm test`, 12 tests).
+  mitigated. First committed test suite (`npm test`).
+- Iteration 2: S5 (no JWT fallback secret), S6 (students can no longer list exam papers),
+  S12 (file actions scoped to own workspace). Suite at 23 tests, all passing.
 
 ## In progress / next
 
-- Iteration 2: S5 (JWT fallback secret), S6 (students reading all exam papers), S12 (file IDOR).
-- Iteration 3: S7 (login rate limit + enumeration).
+- Iteration 3 (next): S7 login rate limit + enumeration.
+
 
 ## Pending (see `MVP_ROADMAP.md`)
 
@@ -33,6 +35,7 @@ None at last run.
 
 ## Known bugs / blockers
 
+- **Deploy prerequisite:** `JWT_SECRET` must be set on both hosts; without it logins now fail (by design).
 - **S4 Linux verification outstanding.** `ulimit -v`, `/proc` environ protection and the uid
   drop have not been executed on Linux.
 - **Production change awaiting approval:** add an unprivileged user to the `Dockerfile` and
@@ -64,4 +67,4 @@ npm test
 
 ## Next recommended action
 
-Iteration 2 (S5, S6, S12).
+Iteration 3 (S7).

@@ -18,13 +18,13 @@ Severity scale: CRITICAL · HIGH · MEDIUM · LOW · INFORMATIONAL.
 | S2 | CRITICAL | Path traversal: client-supplied filenames written outside the execution temp dir | **Fixed — iteration 1** (verified) |
 | S3 | HIGH | Shell command injection through filenames in the compile command | **Fixed — iteration 1** (verified) |
 | S4 | CRITICAL | No OS-level isolation of student code (same uid as server, network, no memory/process limits) | **Partially mitigated — iteration 1.** Release blocker for unsupervised hosting until uid drop is enabled on Railway |
-| S5 | HIGH | Hardcoded fallback JWT signing secret in `src/lib/jwt.ts` | Open — scheduled iteration 2 |
-| S6 | HIGH | Students can read every exam paper (incl. drafts, upcoming) via `GET /api/lecturer/labs` | Open — scheduled iteration 2 |
+| S5 | HIGH | Hardcoded fallback JWT signing secret in `src/lib/jwt.ts` | **Fixed — iteration 2** (verified) |
+| S6 | HIGH | Students can read every exam paper (incl. drafts, upcoming) via `GET /api/lecturer/labs` | **Fixed — iteration 2** (verified) |
 | S7 | MEDIUM | Login: no rate limiting; distinct error messages enable account enumeration | Open — scheduled iteration 3 |
 | S8 | MEDIUM | `next@14.2.10` has published critical/high advisories | Open |
 | S9 | LOW | 7-day tokens with no server-side revocation; deactivating/deleting a user does not end an existing session | Open — needs verification |
 | S10 | LOW | `GET /api/auth/lecturers-available` is unauthenticated and returns lecturer names and emails | Open |
-| S12 | MEDIUM | `save_file` / `rename_file` / `delete_file` act on `fileId` without checking it belongs to the caller's workspace (IDOR; ids are unguessable, hence MEDIUM) | Open — scheduled iteration 2 |
+| S12 | MEDIUM | `save_file` / `rename_file` / `delete_file` act on `fileId` without checking it belongs to the caller's workspace (IDOR; ids are unguessable, hence MEDIUM) | **Fixed — iteration 2** (verified) |
 | S11 | INFO | Many 500 handlers echo `error.message` to the client (may leak Prisma internals) | Open |
 
 ---
@@ -117,7 +117,7 @@ Railway image before relying on them.
 **Impact.** If `JWT_SECRET` is ever unset on either host, tokens are signed with a string
 that is in the public repository; anyone can forge an ADMIN token.
 
-**Planned remediation.** No fallback. A missing secret, or one equal to the historical
+**Remediation (iteration 2).** No fallback. A missing secret, or one equal to the historical
 fallback, throws on first use (fail closed). Verification pins `algorithms: ['HS256']`.
 **Operational note:** any deployment that was silently relying on the fallback will stop
 issuing/accepting tokens until `JWT_SECRET` is set — that is intended.
@@ -130,7 +130,7 @@ issuing/accepting tokens until `JWT_SECRET` is set — that is intended.
 branches — with full `problemStatement`, bypassing exam timing, device withholding and
 question-set confidentiality.
 
-**Planned remediation.** `STUDENT` removed from the allowed roles. No student UI used the
+**Remediation (iteration 2).** `STUDENT` removed from the allowed roles. No student UI used the
 endpoint (verified by grep); students use `/api/student/labs` and `/api/student/workspace`,
 which are built from what a student may know.
 
@@ -154,6 +154,21 @@ transitive `postcss`, `nanoid`, `source-map-js`, `dompurify` (via Monaco). The b
 critical (middleware authorisation bypass) does not apply — the project has no
 `middleware.ts` — but others (cache poisoning, DoS) may. Upgrade to the latest `14.2.x`
 patch, then build and regression-test. Not done blindly.
+
+## S12 — File actions not scoped to the caller's workspace · MEDIUM
+
+**File:** `src/app/api/student/workspace/route.ts` (`save_file`, `rename_file`, `delete_file`).
+
+**Evidence.** Each did `prisma.labFile.update/delete({ where: { id: fileId } })` after
+loading the caller's workspace but without checking the file was in it. Reproduced against
+the live server: student A's `save_file` with student B's file id returned 200 and
+overwrote B's code.
+
+**Impact.** Any student holding another's file id could alter or delete their exam code.
+File ids are UUIDs and are not exposed to other students, which is why this is MEDIUM.
+
+**Remediation (iteration 2).** The three actions are refused with 404 unless `fileId` is
+one of the caller's own workspace files.
 
 ## S9 — No session revocation · LOW (needs verification)
 

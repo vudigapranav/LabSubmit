@@ -311,6 +311,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Exam time has expired. Your work has been auto-submitted.' }, { status: 403 });
     }
 
+    // File actions must target a file in the caller's OWN workspace. Prisma updates below
+    // are keyed by file id alone, so without this a student could edit, rename or delete
+    // another student's files by id (SECURITY_AUDIT.md S12).
+    if (['save_file', 'rename_file', 'delete_file'].includes(action) && fileId && !workspace.files.some((f) => f.id === fileId)) {
+      return NextResponse.json({ error: 'File not found in your workspace.' }, { status: 404 });
+    }
+
     if (action === 'create_file') {
       if (!filename) {
         return NextResponse.json({ error: 'Filename is required' }, { status: 400 });

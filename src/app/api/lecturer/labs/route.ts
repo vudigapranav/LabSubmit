@@ -135,7 +135,10 @@ async function syncAnswerSheetSections(labId: string, input: unknown) {
 }
 
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN', 'STUDENT']);
+  // Faculty only. This returns full problem statements for every exam including drafts;
+  // students read papers solely through /api/student/workspace, which withholds them until
+  // the attempt is live (SECURITY_AUDIT.md S6).
+  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

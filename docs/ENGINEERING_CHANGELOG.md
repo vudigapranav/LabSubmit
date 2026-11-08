@@ -50,3 +50,28 @@ source and is unaffected. Documented for local developers.
 **Remaining.** Linux-only behaviour (memory `ulimit -v`, `/proc` environ test, uid drop) not
 executed — Docker daemon was not running. Enabling the uid drop in the `Dockerfile` changes
 production deployment and needs owner approval. No network isolation.
+
+---
+
+## Iteration 2 — Token secret, exam-paper exposure, file IDOR (S5, S6, S12) · 2026-11-08
+
+**Objective.** No token may be signed or verified with a public secret; students must not
+read exam papers outside their own live attempt; students must not modify others' files.
+
+**Changes.**
+- `src/lib/jwt.ts`: removed the hardcoded fallback; throws if `JWT_SECRET` is unset or equals
+  the legacy published value; HS256 pinned on sign and verify.
+- `api/lecturer/labs` `GET`: `STUDENT` removed from allowed roles (no student UI used it).
+- `api/student/workspace`: `save_file` / `rename_file` / `delete_file` refused (404) unless the
+  file belongs to the caller's workspace.
+- `tests/access-control.test.mjs` (12 tests, self-cleaning fixtures). `npm test` script fixed to
+  use a glob — Node 24's runner rejects a bare directory.
+
+**Tests executed.**
+- Baseline: S6, S12 (×2), S5 (×2) **failed** — including a live reproduction of student A
+  overwriting student B's code (HTTP 200).
+- After fix: `npm test` → **23 pass, 0 fail**; `tsc --noEmit` clean; admin dashboard endpoints
+  (`/api/lecturer/labs`, `/api/admin/stats`) return 200 for an admin token; 0 fixture rows left.
+
+**Operational note.** Any host where `JWT_SECRET` is unset will now refuse logins. Confirm it
+is set (identically) on Vercel and Railway before deploying this commit.

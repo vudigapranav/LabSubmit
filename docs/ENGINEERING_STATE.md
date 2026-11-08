@@ -3,7 +3,7 @@
 Persistent engineering state across sessions. Updated at the end of every iteration.
 History of each iteration: `ENGINEERING_CHANGELOG.md`. Feature inventory: `/STATE.md`.
 
-**Last updated:** 2026-11-08, after iteration 7.
+**Last updated:** 2026-11-08, after the security assessment (iterations 8–10).
 **Branch:** `claude/labsubmit-development-y605fv` (not pushed since `85240d1`; owner pushes after review).
 
 ## Current phase
@@ -30,11 +30,15 @@ Stage 5 — IMPLEMENT, working through the P0 security items in `MVP_ROADMAP.md`
 - Iteration 7: section-wise evaluation rolling up into the total; flat marks validated; grading
   panel prefills and gains a publish control; student breakdown. Suite 75 (all pass in
   production); browser 23/23 (+ Runs tab 13/13 re-run).
+- Iterations 8–10 — security assessment: threat model, API matrix, Linux engine probes; fixed S10, S11,
+  S13–S18, S23, S26, S27; per-run uid pool (`EXEC_RUN_UID_RANGE`) for S4. Suite 91/91 (production);
+  browser 47/47. Deliverables: `SECURITY_AUDIT.md`, `THREAT_MODEL.md`, `API_SECURITY_MATRIX.md`,
+  `COMPILER_SECURITY_REVIEW.md`, `SECURITY_REMEDIATION_LOG.md`, `SECURITY_TEST_RESULTS.md`.
 
 ## In progress / next
 
 - All P0 items in `MVP_ROADMAP.md` are done except the Railway uid drop (awaiting approval).
-- Owner-directed sequence (security → execution records → section evaluation) is complete.
+- Security status: **NOT READY FOR PRODUCTION / SECURE FOR TESTING** (see `SECURITY_AUDIT.md`).
 - Next by roadmap: lint config (P1 #5); low/info security items S9–S11; README rewrite and
   DATABASE/API/JURY docs (P3 #12); pre-existing UI defects listed in STATE.md §3b.
 
@@ -52,13 +56,13 @@ None at last run.
 ## Known bugs / blockers
 
 - **Deploy prerequisite:** `JWT_SECRET` must be set on both hosts; without it logins now fail (by design).
-- **S4 Linux verification outstanding.** `ulimit -v`, `/proc` environ protection and the uid
-  drop have not been executed on Linux.
+- S4 Linux verification: **done** (iteration 10, `COMPILER_SECURITY_REVIEW.md`).
 - **Owner decision needed:** Next 15.5+ major upgrade (React 19) to clear residual S8 advisories.
 - **Local install note:** this machine's npm skips install scripts unless approved
   (`npm install-scripts approve <pkg>`); a fresh clone needs node-pty/prisma scripts approved.
-- **Production change awaiting approval:** add an unprivileged user to the `Dockerfile` and
-  set `EXEC_RUN_UID`/`EXEC_RUN_GID` on Railway.
+- **Production change awaiting approval:** set `EXEC_RUN_UID_RANGE=20000-20099` on Railway (no image
+  user needed; the server already runs as root) and run with `--init`/tini. Verified in a Linux container.
+- **Deploy prerequisite:** production seeding now needs `SEED_ADMIN_PASSWORD` (see `DEPLOYMENT.md`).
 - **Local dev gotcha:** on macOS run
   `chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper` after `npm install`, or
   every execution fails with `posix_spawnp failed`.
@@ -97,4 +101,6 @@ npm test        # loads tsx so tests can import src/**/*.ts directly
 
 ## Next recommended action
 
-Owner decisions first (uid drop on Railway, Next 15.5 major upgrade), then lint config and S9 (session revocation / user deactivation).
+Owner decisions (in order of impact): (1) set `EXEC_RUN_UID_RANGE` on Railway and add an init
+process (S4, S20); (2) choose a network-less sandbox (S19); (3) account issuance for S28; (4) Next 15.5
+upgrade (S8). Then lint config and S9.

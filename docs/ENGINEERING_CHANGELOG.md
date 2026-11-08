@@ -272,3 +272,34 @@ submission total (CLAUDE.md §3), without changing exams that have no weighted s
    phone drawer navigation; reading the prefilled value before the effect ran).
 
 **Remaining.** `cn()` class conflicts are a latent issue for every primitive (logged in STATE.md).
+
+---
+
+## Iterations 8–10 — Security assessment and remediation · 2026-11-08
+
+**Objective.** Full-application security assessment (brief: authorised local testing only) with
+fix-and-retest for every confirmed issue, plus six security deliverables.
+
+**Recon.** Static sweep (sinks, raw SQL, cookies, secrets, git history), GET leak scan of 20 endpoints × 4
+identities, enumeration of all 48 handlers, threat model, Linux container probes of the engine.
+
+**Baseline (unfixed code).** `tests/security-module.test.mjs` first run: **13 of 15 failed** (S10, S11,
+S13 ×4, S14 ×3, S15 ×2, S17, S18), S16 passed only because its child did not ignore SIGHUP — rewritten,
+then failed. S23 reproduced (lab created under a foreign subject). S26 reproduced (`.env` in build context).
+Linux probes (same-uid): `/proc` environ read **including `JWT_SECRET`**, server signalable, `/etc`
+writable, other runs readable, 300 processes, `setsid` escape, network reachable.
+
+**Fixes.** Iteration 8 (REST, `078d90a`): S10, S11, S13, S14, S17, S18. Iteration 9 (WebSocket/engine,
+`ad61c08`): S15, S16. Iteration 10: per-run uid pool (`f266839`), S23 (`ebcfff5`), S26 (`12e2918`),
+S27 + audit rewrite (`0d66320`).
+
+**Tests executed (final, production build).** `npm test` **91/91**; browser **47/47** (exam start 11,
+section grading 23, Runs tab 13); Linux probes 11 × 3 modes + 4-language regression in pool mode + uid
+reuse; leak scan clean; `tsc` clean; `next build` compiles.
+
+**Corrections.** Listed in `SECURITY_REMEDIATION_LOG.md` (gentle S16 test; zsh word-splitting; zombie
+misread; pool leak under ESM loader → `globalThis`; S23 baseline body; hang against unfixed engine; seed
+guard check run on the dev DB).
+
+**Remaining (decisions).** S4 deployment (`EXEC_RUN_UID_RANGE`), S19 network sandbox, S20 init process,
+S8 major upgrade, S9 revocation, S28 account issuance.

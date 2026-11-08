@@ -457,9 +457,22 @@ Each item was reproduced as a live attack before the fix and is covered by `npm 
 - Students see the per-section breakdown with remarks on published results (cards on phones,
   under the row on desktop).
 
+### Security assessment — *2026-11-08, iterations 8–10*
+- Full assessment documented in `docs/` (audit S1–S28, threat model, API matrix, compiler review,
+  remediation log, test results). Final status: **NOT READY FOR PRODUCTION**, **SECURE FOR TESTING**.
+- Exam papers are released only after the student's own Start, and only within the exam's cohort
+  (`src/lib/examAccess.ts`); size limits on files and answers; one password policy
+  (`src/lib/passwordPolicy.ts`); lecturers can only place exams under subjects they teach; security headers;
+  generic 500 messages; WebSocket ≤2 runs per user and 2 MB frames; run process groups are killed.
+- Execution engine: optional per-run uid pool (`EXEC_RUN_UID_RANGE`) — verified on Linux to block secret
+  theft via `/proc`, signalling the server, cross-run reads, fork bombs and `setsid` escapes. **Not
+  enabled on Railway yet.** Student programs can still reach the network in every mode.
+- Seed refuses to run in production without `SEED_ADMIN_PASSWORD`, or against a non-empty database
+  without `SEED_RESET=yes`. `.dockerignore` keeps `.env` out of images.
+
 ### Automated tests
 `npm test` — Node's built-in runner against a running server, local PostgreSQL and real
-compilers (`tests/`). 47 tests at last run, all passing in dev and production mode.
+compilers (`tests/`). 91 tests at last run: 91/91 in production mode (87 + 4 production-only skips in dev).
 
 ## 2. In progress
 

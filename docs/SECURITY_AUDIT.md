@@ -57,6 +57,7 @@ every configuration until a real sandbox is introduced. See "Release gate" at th
 | S22 | LOW | 3.5 | Any lecturer can list students of any cohort | Code-verified | **Accepted** (staff directory) |
 | S26 | LOW | 5.5 | No `.dockerignore`: local `.env` baked into image layers | Verified | **Fixed** (it.10) |
 | S27 | MEDIUM | 6.8 | Deployment guide runs the seed on production: public admin password, and a second run wipes all data | Verified (guard) | **Fixed** (it.10) |
+| S28 | MEDIUM | 5.4 | Self-registration lets anyone claim an unregistered roll number in an authorised range | Code-verified | **Open — design decision** |
 | S11 | INFO | — | 500 responses echoed exception text | Verified (static test) | **Fixed** (it.8) |
 | S21 | INFO | — | WebSocket `Origin` not checked | Code-verified | **Accepted** — no ambient credentials |
 | S24 | INFO | — | Rate limiter, run slots, uid pool are in-memory, per instance | Design | **Accepted** for one execution host |
@@ -182,6 +183,14 @@ Format per finding: component / files · evidence · attack scenario · impact �
   users unless `SEED_RESET=yes`; both checks run before any write. Guide corrected. Development unchanged.
 - **Status:** Fixed. **Retest:** guard refused without password (unreachable DB); refused with password on a DB
   with users — user count unchanged (6 → 6). Seeded demo users still have the public `password123`.
+
+### S28 — Roll-number squatting at self-registration · MEDIUM (5.4)
+- **Files:** `api/auth/register-student`. Registration needs only a roll number inside an admin range and a
+  password of the registrant's choosing; there is no proof the registrant is that student.
+- **Scenario:** before a student registers, someone else registers their roll number, then sits exams and
+  receives results as them; the real student is told the roll number is taken.
+- **Recommendation (design decision for the owner):** admin-issued initial passwords (bulk import), or
+  verification through the institution's email. **Status:** Open.
 
 ### S9 — No session revocation · LOW (4.2)
 - Tokens are verified by signature only for 7 days; logout is client-side; deleting a user does not

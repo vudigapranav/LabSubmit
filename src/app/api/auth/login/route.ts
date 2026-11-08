@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { signToken } from '@/lib/jwt';
+import { recordAudit, requestIp } from '@/lib/audit';
 import { clientAddress, loginAccountLimiter, loginAddressLimiter } from '@/lib/rateLimit';
 
 // One message for "no such account" and "wrong password" — distinct messages told an
@@ -38,7 +39,10 @@ export async function POST(req: Request) {
       loginAccountLimiter.retryAfterSeconds(accountKey),
       loginAddressLimiter.retryAfterSeconds(addressKey)
     );
-    if (retryAfter > 0) return tooManyAttempts(retryAfter);
+    if (retryAfter > 0) {
+      await recordAudit({ action: 'AUTH_LOGIN_THROTTLED', category: 'AUTH', metadata: { identifier: accountKey }, ip: addressKey });
+      return tooManyAttempts(retryAfter);
+    }
 
     let user = await prisma.user.findFirst({
       where: {
@@ -61,6 +65,8 @@ export async function POST(req: Request) {
     if (!user || !isMatch) {
       loginAccountLimiter.recordFailure(accountKey);
       loginAddressLimiter.recordFailure(addressKey);
+      // The identifier is recorded (needed to investigate guessing); the password never is.
+      await recordAudit({ action: 'AUTH_LOGIN_FAILED', category: 'AUTH', targetType: 'User', targetId: user?.id ?? null, metadata: { identifier: accountKey, knownAccount: Boolean(user) }, ip: addressKey });
       return NextResponse.json({ error: INVALID_CREDENTIALS }, { status: 401 });
     }
     loginAccountLimiter.reset(accountKey);
@@ -81,6 +87,8 @@ export async function POST(req: Request) {
       rollNumber: user.rollNumber,
       name: user.name,
     });
+
+    await recordAudit({ action: 'AUTH_LOGIN_SUCCESS', category: 'AUTH', actorId: user.id, actorRole: user.role, targetType: 'User', targetId: user.id, ip: addressKey });
 
     return NextResponse.json({
       message: 'Login successful',

@@ -10,6 +10,7 @@ import { assignableSets, chooseSetId, toStudentPaper, paperToPlainText } from '@
 import { initialFileForLab } from '@/lib/workspaceBootstrap';
 import { RESULTS_WITHHELD_MESSAGE } from '@/lib/resultRelease';
 import { isSafeSourceFilename, SOURCE_FILENAME_RULE, MAX_SOURCE_FILE_BYTES, MAX_FILES_PER_WORKSPACE } from '@/lib/sourceFilename';
+import { recordAudit, requestIp } from '@/lib/audit';
 import { studentInExamCohort, examPaperReleased } from '@/lib/examAccess';
 
 
@@ -299,6 +300,16 @@ export async function POST(req: Request) {
           questionSet: { include: { questions: { orderBy: { order: 'asc' } } } },
         },
       });
+
+      if (!workspace.startedAt) {
+        // First start only — resuming an attempt is not a new start.
+        await recordAudit({
+          action: 'EXAM_ATTEMPT_STARTED', category: 'EXAM', actorId: session!.userId, actorRole: 'STUDENT',
+          targetType: 'LabWorkspace', targetId: workspace.id,
+          metadata: { labId, deviceClass: startDevice.deviceClass, deadline: getEffectiveDeadline(lab, updated) },
+          ip: requestIp(req),
+        });
+      }
 
       const { questionSet, questionSetId: _assignedSetId, ...startedWorkspace } = updated;
       const startedPaper = toStudentPaper(questionSet);

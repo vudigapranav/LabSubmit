@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { checkPasswordPolicy } from '@/lib/passwordPolicy';
+import { recordAudit, requestIp } from '@/lib/audit';
 import bcrypt from 'bcryptjs';
 
 // GET all lecturers
 export async function GET(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
 
 // POST create lecturer
 export async function POST(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -91,6 +92,7 @@ export async function POST(req: Request) {
       include: { lecturerProfile: true },
     });
 
+    await recordAudit({ action: 'ADMIN_LECTURER_CREATED', category: 'ADMIN', actorId: session!.userId, actorRole: session!.role, targetType: 'User', targetId: lecturer.id, metadata: { email: lecturer.email, name: lecturer.name } });
     return NextResponse.json({ message: 'Lecturer created successfully', lecturer });
   } catch (error: any) {
     console.error('[/api/admin/lecturers]', error);
@@ -100,7 +102,7 @@ export async function POST(req: Request) {
 
 // PUT edit lecturer
 export async function PUT(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -150,6 +152,7 @@ export async function PUT(req: Request) {
       },
     });
 
+    await recordAudit({ action: 'ADMIN_LECTURER_UPDATED', category: 'ADMIN', actorId: session!.userId, actorRole: session!.role, targetType: 'User', targetId: id, metadata: { fields: Object.keys(body).filter((k) => k !== 'id') } });
     return NextResponse.json({ message: 'Lecturer updated successfully', user: updatedUser });
   } catch (error: any) {
     console.error('[/api/admin/lecturers]', error);
@@ -159,7 +162,7 @@ export async function PUT(req: Request) {
 
 // DELETE lecturer
 export async function DELETE(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -174,6 +177,7 @@ export async function DELETE(req: Request) {
       where: { id },
     });
 
+    await recordAudit({ action: 'ADMIN_LECTURER_DELETED', category: 'ADMIN', actorId: session!.userId, actorRole: session!.role, targetType: 'User', targetId: id });
     return NextResponse.json({ message: 'Lecturer deleted successfully' });
   } catch (error: any) {
     console.error('[/api/admin/lecturers]', error);

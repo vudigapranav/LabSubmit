@@ -415,3 +415,27 @@ model ExamAdminAction {
 
   @@index([labId])
 }
+
+// Centralised, tamper-evident audit trail of security-sensitive actions. Insert-only. Each row
+// hashes its own content together with the previous row's hash, so editing or deleting any row
+// breaks every hash after it — detectable by verifyAuditChain() (src/lib/audit.ts).
+// Never holds passwords, tokens or secrets (metadata is redacted before hashing).
+model AuditEvent {
+  seq        Int      @id @default(autoincrement())
+  at         DateTime // set by the server in code, so the hashed value is exactly the stored one
+  actorId    String?
+  actorRole  String?
+  action     String // e.g. AUTH_LOGIN_FAILED, GRADE_SAVED, RESULT_PUBLISHED
+  category   String // AUTH | ADMIN | EXAM | SUBMISSION | GRADING
+  targetType String?
+  targetId   String?
+  metadata   Json     @default("{}")
+  ip         String?
+  prevHash   String
+  hash       String   @unique
+
+  @@index([action])
+  @@index([actorId])
+  @@index([targetId])
+  @@index([at])
+}

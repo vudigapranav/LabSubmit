@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getExamStatus, serializeAllowedLanguages } from '@/lib/examTiming';
+import { recordAudit, requestIp } from '@/lib/audit';
 import { defaultSectionConfig, normalizeSectionConfig, NormalizedSection } from '@/lib/answerSheet';
 import {
   ARCHIVE_EFFECTS,
@@ -308,6 +309,7 @@ export async function POST(req: Request) {
       include: { branch: true, subject: true, answerSheetSections: { orderBy: { order: 'asc' } } },
     });
 
+    await recordAudit({ action: 'EXAM_CREATED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role, targetType: 'Lab', targetId: lab.id, metadata: { title: lab.title, isPublished: lab.isPublished, subjectId: lab.subjectId } });
     return NextResponse.json({ message: 'Exam created successfully', lab });
   } catch (error: any) {
     console.error('[/api/lecturer/labs]', error);
@@ -413,6 +415,18 @@ export async function PUT(req: Request) {
       include: { branch: true, subject: true, answerSheetSections: { orderBy: { order: 'asc' } } },
     });
 
+    // Before/after for the fields that change what students experience.
+    const watched = ['title', 'isPublished', 'examDate', 'startTime', 'endTime', 'durationMinutes', 'allowedLanguages', 'subjectId', 'year', 'branchId', 'examModeEnabled', 'requireDesktopDevice'] as const;
+    const changes: Record<string, { before: unknown; after: unknown }> = {};
+    for (const k of watched) {
+      const before = (existing as Record<string, unknown>)[k];
+      const after = (lab as Record<string, unknown>)[k];
+      if (JSON.stringify(before) !== JSON.stringify(after)) changes[k] = { before, after };
+    }
+    await recordAudit({ action: 'EXAM_UPDATED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role, targetType: 'Lab', targetId: id, metadata: { changes } });
+    if (changes.isPublished) {
+      await recordAudit({ action: lab.isPublished ? 'EXAM_PUBLISHED' : 'EXAM_UNPUBLISHED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role, targetType: 'Lab', targetId: id });
+    }
     return NextResponse.json({ message: 'Exam updated successfully', lab: labWithSections ?? lab });
   } catch (error: any) {
     console.error('[/api/lecturer/labs]', error);
@@ -471,6 +485,7 @@ export async function DELETE(req: Request) {
     });
 
     await prisma.lab.delete({ where: { id } });
+    await recordAudit({ action: 'EXAM_DELETED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role, targetType: 'Lab', targetId: id, metadata: { title: existing!.title } });
 
     return NextResponse.json({ message: 'Exam deleted successfully' });
   } catch (error: any) {

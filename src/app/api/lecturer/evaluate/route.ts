@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { recordAudit } from '@/lib/audit';
 import { evaluateSectionMarks, gradableSections, validateFlatMarks, MAX_REMARK_LENGTH } from '@/lib/answerSheet';
 
 export async function POST(req: Request) {
@@ -117,6 +118,23 @@ export async function POST(req: Request) {
       } else {
         updatedSubmission = await prisma.submission.update({ where: { id: submissionId }, data: common });
       }
+    }
+
+    // Auditable grading history: what changed, by whom, before → after.
+    const before = { status: submission.status, marks: submission.marks, maxMarks: submission.maxMarks, isPublished: submission.isPublished };
+    // Re-read what was actually committed rather than trusting the in-memory result.
+    const saved = await prisma.submission.findUnique({ where: { id: submissionId } });
+    const after = saved ? { status: saved.status, marks: saved.marks, maxMarks: saved.maxMarks, isPublished: saved.isPublished } : null;
+    await recordAudit({
+      action: 'GRADE_SAVED', category: 'GRADING', actorId: session!.userId, actorRole: session!.role,
+      targetType: 'Submission', targetId: submissionId,
+      metadata: { labId: submission.labId, studentId: submission.studentId, before, after, sectionMarks: sectionMarks ?? null },
+    });
+    if (after && before.isPublished !== after.isPublished) {
+      await recordAudit({
+        action: after.isPublished ? 'RESULT_PUBLISHED' : 'RESULT_WITHDRAWN', category: 'GRADING', actorId: session!.userId, actorRole: session!.role,
+        targetType: 'Submission', targetId: submissionId, metadata: { labId: submission.labId, studentId: submission.studentId, marks: after.marks, maxMarks: after.maxMarks },
+      });
     }
 
     // If returned for corrections, reopen student workspace

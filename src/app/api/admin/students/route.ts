@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { recordAudit, requestIp } from '@/lib/audit';
 import { prisma } from '@/lib/db';
 
 export async function GET(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -58,7 +59,7 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -104,6 +105,7 @@ export async function PUT(req: Request) {
       });
     }
 
+    await recordAudit({ action: 'ADMIN_STUDENT_UPDATED', category: 'ADMIN', actorId: session!.userId, actorRole: session!.role, targetType: 'User', targetId: userId, metadata: { fields: Object.keys(body).filter((k) => k !== 'userId') } });
     return NextResponse.json({ message: 'Student updated successfully', user: updatedUser });
   } catch (error: any) {
     console.error('[/api/admin/students]', error);
@@ -112,7 +114,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -135,6 +137,7 @@ export async function DELETE(req: Request) {
       where: { id: userId },
     });
 
+    await recordAudit({ action: 'ADMIN_STUDENT_DELETED', category: 'ADMIN', actorId: session!.userId, actorRole: session!.role, targetType: 'User', targetId: userId });
     return NextResponse.json({ message: 'Student deleted successfully' });
   } catch (error: any) {
     console.error('[/api/admin/students]', error);

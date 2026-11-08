@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { severityForType } from './examIntegrity';
 import { getEffectiveDeadline } from './examTiming';
+import { recordAudit } from './audit';
 import { canonicalAnswers, canonicalFiles, snapshotHash, type SnapshotAnswer, type SnapshotFile } from './submissionSnapshot';
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -72,19 +73,26 @@ export async function finalizeSubmission(
   const deadline = lab && workspace ? getEffectiveDeadline(lab, workspace) : null;
   const onTime = reason === 'TIMEOUT' || !deadline || now.getTime() <= deadline.getTime();
 
+  const snapshotHashValue = snapshotHash({ submissionId: submission.id, labId, studentId, version, submittedAt: now }, files, answers);
   await db.submissionSnapshot.create({
     data: {
       submissionId: submission.id,
       version,
       files: canonicalFiles(files) as unknown as Prisma.InputJsonValue,
       answers: canonicalAnswers(answers) as unknown as Prisma.InputJsonValue,
-      contentHash: snapshotHash({ submissionId: submission.id, labId, studentId, version, submittedAt: now }, files, answers),
+      contentHash: snapshotHashValue,
       submittedAt: now,
       auto,
       reason: reason ?? null,
       onTime,
       sessionId: workspace?.sessionId ?? null,
     },
+  });
+
+  await recordAudit({
+    action: 'SUBMISSION_FINALIZED', category: 'SUBMISSION', actorId: auto ? null : studentId, actorRole: auto ? 'SYSTEM' : 'STUDENT',
+    targetType: 'Submission', targetId: submission.id,
+    metadata: { labId, studentId, version, contentHash: snapshotHashValue, auto, reason: reason ?? null, onTime, submittedAt: now },
   });
 
   return submission;

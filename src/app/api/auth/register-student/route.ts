@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { checkPasswordPolicy } from '@/lib/passwordPolicy';
+import { recordAudit, requestIp } from '@/lib/audit';
 import { signToken } from '@/lib/jwt';
 
 export async function POST(req: Request) {
@@ -100,6 +101,8 @@ export async function POST(req: Request) {
         },
       },
     });
+
+    await recordAudit({ action: 'AUTH_STUDENT_REGISTERED', category: 'AUTH', actorId: newUser.id, actorRole: 'STUDENT', targetType: 'User', targetId: newUser.id, metadata: { rollNumber: newUser.rollNumber }, ip: requestIp(req) });
 
     const token = signToken({
       userId: newUser.id,

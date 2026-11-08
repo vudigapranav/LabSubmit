@@ -44,6 +44,12 @@ const dev = process.env.NODE_ENV !== 'production';
     process.exit(1);
   }
   console.log('[STARTUP] Required configuration validated.');
+  try {
+    const { describeIsolation } = require('./src/lib/execution/sandbox');
+    console.log(`[STARTUP] Execution isolation: ${describeIsolation()}`);
+  } catch (err) {
+    console.error('[STARTUP] Could not determine execution isolation:', err && err.message);
+  }
 }
 const hostname = process.env.HOSTNAME || 'localhost';
 const port = parseInt(process.env.PORT || '3000', 10);

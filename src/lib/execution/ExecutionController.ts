@@ -16,7 +16,7 @@ import { ExecutionLogger } from './ExecutionLogger';
 import { isSafeSourceFilename, SOURCE_FILENAME_RULE, MAX_FILES_PER_WORKSPACE } from '../sourceFilename';
 import { appendBounded, applyTerminalInput, RECORD_FIELD_LIMIT, stripAnsi } from '../runTranscript';
 import { persistExecutionRecord } from '../executionRecords';
-import { acquireRunIdentity } from './sandbox';
+import { acquireRunIdentity, sandboxRefusal } from './sandbox';
 // Relative imports (not the @/* alias) — this file is loaded by server.js via tsx's
 // CJS require hook, a different resolution path than Next's own webpack/SWC bundling
 // used everywhere else in the app, so path-alias resolution here is unverified.
@@ -174,6 +174,14 @@ export class ExecutionController {
         code: 'TOO_MANY_RUNS',
         message: `You already have ${MAX_CONCURRENT_RUNS_PER_USER} programs running. Stop one before starting another.`,
       });
+      this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
+      return;
+    }
+
+    // Fail closed when isolation is mandatory but not available on this host.
+    const isolationProblem = sandboxRefusal();
+    if (isolationProblem) {
+      this.sendWs({ type: 'error', code: 'SANDBOX_UNAVAILABLE', message: isolationProblem });
       this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
       return;
     }

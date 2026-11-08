@@ -5,6 +5,7 @@
 // not achieve; a real isolation boundary (namespaces / per-run container) is still owed.
 import path from 'path';
 import fs from 'fs/promises';
+import { accessSync, constants as fsConstants } from 'fs';
 import type { SupportedLanguage } from './types';
 
 // ── Environment ─────────────────────────────────────────────────────────────────────────
@@ -67,13 +68,17 @@ export function withResourceLimits(
   if (language !== 'compile' && LIMITED_MEMORY_LANGUAGES.includes(language)) {
     lines.push(`ulimit -v ${RESOURCE_LIMITS.virtualMemoryKb} 2>/dev/null`);
   }
+  // The seccomp launcher (sandbox-launcher.c) sits between the shell and the program: no
+  // network, no ptrace/mount/unshare/io_uring, and it fails closed if the filter cannot be
+  // installed. Passed as a positional argument like everything else — never interpolated.
+  const launcher = sandboxLauncher();
   // Only safe with a per-run uid: RLIMIT_NPROC counts every process of the uid, so under a
   // shared uid it would be a limit shared by all students (and, without a uid drop, by the
   // server itself).
   if (identity?.pooled) lines.push(`ulimit -u ${PER_RUN_PROCESS_LIMIT} 2>/dev/null`);
   lines.push('exec "$@"');
   // `labsubmit-run` becomes $0; the real command and its args become "$@".
-  return { cmd: '/bin/sh', args: ['-c', lines.join('; '), 'labsubmit-run', cmd, ...args] };
+  return { cmd: '/bin/sh', args: ['-c', lines.join('; '), 'labsubmit-run', ...(launcher ? [launcher] : []), cmd, ...args] };
 }
 
 // ── Privilege drop ─────────────────────────────────────────────────────────────────────
@@ -235,4 +240,46 @@ export async function reapRunIdentity(identity: RunIdentity): Promise<void> {
     if ((await processesOwnedBy(identity.uid)).length === 0) uidsInUse.delete(identity.uid);
     else console.error(`[SECURITY] uid ${identity.uid} still owns processes after reaping; leaving it out of the pool.`);
   }
+}
+
+// ── Seccomp launcher (EXEC_SANDBOX_LAUNCHER) ───────────────────────────────────────────
+// Path to the compiled sandbox-launcher.c (the Dockerfile builds it). Checked once; an entry
+// that is not an executable file is treated as absent.
+let launcherCache: string | null | undefined;
+export function sandboxLauncher(): string | null {
+  if (launcherCache !== undefined) return launcherCache;
+  const p = process.env.EXEC_SANDBOX_LAUNCHER;
+  launcherCache = null;
+  if (p) {
+    try {
+      accessSync(p, fsConstants.X_OK);
+      launcherCache = p;
+    } catch {
+      console.error(`[SECURITY] EXEC_SANDBOX_LAUNCHER=${p} is not an executable file; student code is NOT network-isolated.`);
+    }
+  }
+  return launcherCache;
+}
+
+/**
+ * EXEC_REQUIRE_SANDBOX=true makes isolation mandatory: with no usable launcher, or no per-run
+ * uid pool, runs are refused rather than executed unisolated. Off by default so a deployment
+ * without the launcher keeps working; production should turn it on (see
+ * docs/SECURITY_BLOCKER_CLOSURE_REPORT.md).
+ */
+export function sandboxRefusal(): string | null {
+  if (process.env.EXEC_REQUIRE_SANDBOX !== 'true') return null;
+  if (!sandboxLauncher()) return 'Code execution is unavailable: the execution sandbox is not installed on this server.';
+  const range = parseRange(process.env.EXEC_RUN_UID_RANGE);
+  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+  if (!range || !isRoot) return 'Code execution is unavailable: per-run isolation is not configured on this server.';
+  return null;
+}
+
+/** One line for the startup log describing the isolation actually in force. */
+export function describeIsolation(): string {
+  const range = parseRange(process.env.EXEC_RUN_UID_RANGE);
+  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+  const identity = range && isRoot ? `per-run uid ${range[0]}-${range[1]}` : runIdentity() ? 'single runner uid' : 'server uid (NOT isolated)';
+  return `identity=${identity}; network/syscall filter=${sandboxLauncher() ? 'seccomp launcher' : 'NONE'}; required=${process.env.EXEC_REQUIRE_SANDBOX === 'true'}`;
 }

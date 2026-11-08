@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { verifySnapshot, type SnapshotAnswer, type SnapshotFile } from '@/lib/submissionSnapshot';
 
 export async function GET(req: Request) {
   const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
@@ -53,6 +54,7 @@ export async function GET(req: Request) {
           },
         },
         sectionEvaluations: true,
+        snapshots: { orderBy: { version: 'desc' } },
         workspace: {
           include: {
             files: true,
@@ -76,7 +78,18 @@ export async function GET(req: Request) {
       violationCounts.map((v) => [`${v.labId}:${v.studentId}`, v._count.id])
     );
 
-    const formattedSubmissions = submissions.map((sub) => ({
+    const formattedSubmissions = submissions.map((sub) => {
+      // Grade what was HANDED IN: the latest immutable snapshot, not the live workspace —
+      // which "needs correction" reopens for editing. Submissions finalized before snapshots
+      // existed have none and fall back to the workspace, as before.
+      const latest = sub.snapshots[0];
+      const snapFiles = latest ? (latest.files as unknown as SnapshotFile[]) : null;
+      const snapAnswers = latest ? (latest.answers as unknown as SnapshotAnswer[]) : null;
+      const answerFor = (section: { id: string; key: string }) =>
+        snapAnswers
+          ? snapAnswers.find((a) => a.sectionKey === section.key)?.content || ''
+          : sub.workspace.answerSheetResponses.find((r: any) => r.sectionId === section.id)?.content || '';
+      return {
       id: sub.id,
       labId: sub.labId,
       studentId: sub.studentId,
@@ -122,8 +135,7 @@ export async function GET(req: Request) {
           required: section.required,
           maxMarks: section.maxMarks,
           contentSource: section.contentSource,
-          content:
-            sub.workspace.answerSheetResponses.find((r: any) => r.sectionId === section.id)?.content || '',
+          content: answerFor(section),
           // Saved section-wise evaluation, so the grading panel reopens with what was awarded.
           evaluation: (() => {
             const e = sub.sectionEvaluations.find((ev: any) => ev.sectionId === section.id);
@@ -133,13 +145,26 @@ export async function GET(req: Request) {
       fullscreenExitCount: sub.workspace.fullscreenExitCount,
       fullscreenExitThreshold: sub.lab.fullscreenExitThreshold,
       violationCount: violationCountMap.get(`${sub.labId}:${sub.studentId}`) || 0,
-      files: sub.workspace.files.map((f: any) => ({
-        id: f.id,
-        filename: f.filename,
-        content: f.content,
-        language: f.language,
+      files: snapFiles
+        ? snapFiles.map((f, i) => ({ id: `snapshot-${latest!.version}-${i}`, filename: f.filename, content: f.content, language: f.language }))
+        : sub.workspace.files.map((f: any) => ({
+            id: f.id,
+            filename: f.filename,
+            content: f.content,
+            language: f.language,
+          })),
+      // Version history of what was handed in, each re-verified against its stored hash.
+      snapshots: sub.snapshots.map((snap) => ({
+        version: snap.version,
+        submittedAt: snap.submittedAt,
+        auto: snap.auto,
+        reason: snap.reason,
+        onTime: snap.onTime,
+        contentHash: snap.contentHash,
+        verified: verifySnapshot(snap, { labId: sub.labId, studentId: sub.studentId }),
       })),
-    }));
+      };
+    });
 
     return NextResponse.json({ submissions: formattedSubmissions });
   } catch (error) {

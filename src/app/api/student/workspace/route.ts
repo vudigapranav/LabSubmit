@@ -110,6 +110,11 @@ export async function GET(req: Request) {
       where: { labId, studentId: session!.userId },
       orderBy: { submittedAt: 'desc' },
     });
+    // The student's lasting receipt for a submitted attempt (shown in the exam page banner).
+    const latestSnapshot =
+      submission && workspace.isSubmitted
+        ? await prisma.submissionSnapshot.findFirst({ where: { submissionId: submission.id }, orderBy: { version: 'desc' } })
+        : null;
 
     const answerSheetSections = await prisma.answerSheetSection.findMany({
       where: { labId, enabled: true },
@@ -164,6 +169,9 @@ export async function GET(req: Request) {
       questions: withholdExamContent ? [] : paper,
       answerSheetSections: withholdExamContent ? [] : answerSheetSections,
       examContentWithheld: withholdExamContent,
+      receipt: latestSnapshot
+        ? { version: latestSnapshot.version, submittedAt: latestSnapshot.submittedAt, reference: latestSnapshot.contentHash.slice(0, 12), onTime: latestSnapshot.onTime }
+        : null,
       // True until the student presses Start; the UI shows the start gate, not an empty paper.
       paperWithheldUntilStart: !paperReleased,
       // Built from what a student may know: no marks or remarks before release.
@@ -312,6 +320,24 @@ export async function POST(req: Request) {
         { error: device.reason, deviceBlocked: true, deviceClass: device.deviceClass },
         { status: 403 }
       );
+    }
+
+    // A repeated submit (e.g. the client retrying after a lost response) is confirmed, not
+    // refused: it returns the receipt of what was already stored, and changes nothing.
+    if (workspace.isSubmitted && action === 'submit_lab') {
+      const prior = await prisma.submission.findFirst({ where: { labId, studentId: session!.userId } });
+      const latest = prior
+        ? await prisma.submissionSnapshot.findFirst({ where: { submissionId: prior.id }, orderBy: { version: 'desc' } })
+        : null;
+      return NextResponse.json({
+        message: 'This exam was already submitted.',
+        alreadySubmitted: true,
+        // Same withholding as every other student view: no marks or outcome before release.
+        submission: toStudentSubmission(prior, lab.resultsReleasedAt),
+        receipt: latest
+          ? { version: latest.version, submittedAt: latest.submittedAt, reference: latest.contentHash.slice(0, 12), onTime: latest.onTime }
+          : null,
+      });
     }
 
     // Every other action requires an already-submitted lock check and a live deadline check.
@@ -486,9 +512,20 @@ export async function POST(req: Request) {
         auto: false,
       });
 
+      // A receipt the student can quote in a dispute: server time, version and a hash prefix
+      // of exactly what was stored. A later repeated submit returns the same receipt (above).
+      const latest = sub
+        ? await prisma.submissionSnapshot.findFirst({ where: { submissionId: sub.id }, orderBy: { version: 'desc' } })
+        : null;
+      const receipt = latest
+        ? { version: latest.version, submittedAt: latest.submittedAt, reference: latest.contentHash.slice(0, 12), onTime: latest.onTime }
+        : null;
       return NextResponse.json({
-        message: 'Exam submitted successfully! Your workspace is now locked.',
+        message: receipt
+          ? `Exam submitted at ${latest!.submittedAt.toISOString()} (server time). Reference ${receipt.reference}. Your workspace is now locked.`
+          : 'Exam submitted successfully! Your workspace is now locked.',
         submission: toStudentSubmission(sub, lab.resultsReleasedAt),
+        receipt,
       });
     }
 

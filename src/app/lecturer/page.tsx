@@ -1253,6 +1253,20 @@ export default function LecturerDashboard() {
                 {selectedSubmission.startDeviceClass && (
                   <StatusBadge tone="neutral">{selectedSubmission.startDeviceClass}</StatusBadge>
                 )}
+                {/* What is shown is the latest immutable hand-in; its hash is re-verified server-side. */}
+                {selectedSubmission.snapshots?.[0] && (
+                  <StatusBadge tone={selectedSubmission.snapshots[0].verified ? 'emerald' : 'rose'}>
+                    {`Hand-in v${selectedSubmission.snapshots[0].version} · ${selectedSubmission.snapshots[0].verified ? 'integrity verified' : 'INTEGRITY CHECK FAILED'}`}
+                  </StatusBadge>
+                )}
+                {selectedSubmission.snapshots?.[0] && !selectedSubmission.snapshots[0].onTime && (
+                  <StatusBadge tone="amber">Handed in after the deadline</StatusBadge>
+                )}
+                {(selectedSubmission.snapshots?.length || 0) > 1 && (
+                  <span className="text-[11px] text-slate-500" title={selectedSubmission.snapshots.map((s: any) => `v${s.version} ${new Date(s.submittedAt).toLocaleString()} ${s.contentHash.slice(0, 12)}`).join('\n')}>
+                    {selectedSubmission.snapshots.length} versions
+                  </span>
+                )}
               </div>
               <button onClick={() => setSelectedSubmission(null)} className="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white rounded-control text-xs font-bold">Close</button>
             </div>

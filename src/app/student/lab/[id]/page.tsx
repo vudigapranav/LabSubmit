@@ -62,6 +62,8 @@ export default function StudentLabWorkspacePage() {
   const [labData, setLabData] = useState<any | null>(null);
   const [workspace, setWorkspace] = useState<any | null>(null);
   const [effectiveDeadline, setEffectiveDeadline] = useState<string | null>(null);
+  // Server-issued confirmation of the stored hand-in (version, server time, hash prefix).
+  const [receipt, setReceipt] = useState<{ version: number; submittedAt: string; reference: string; onTime: boolean } | null>(null);
   const [sections, setSections] = useState<AnswerSheetSection[]>([]);
   const [deviceEligibility, setDeviceEligibility] = useState<{ eligible: boolean; reason: string; deviceClass: string } | null>(null);
   const [activePane, setActivePane] = useState<'sheet' | 'code'>('sheet');
@@ -97,6 +99,7 @@ export default function StudentLabWorkspacePage() {
         setSections(data.answerSheetSections || []);
         setQuestions(data.questions || []);
         setDeviceEligibility(data.deviceEligibility || null);
+        setReceipt(data.receipt || null);
       } else {
         setLabData(null);
       }
@@ -327,6 +330,12 @@ export default function StudentLabWorkspacePage() {
               Exam submitted{workspace.autoSubmitted ? ' automatically' : ''}
               {workspace.submittedAt ? ` at ${new Date(workspace.submittedAt).toLocaleString()}` : ''}. Your code is
               read-only.
+              {receipt && (
+                <span className="block font-normal text-emerald-400/90 mt-0.5">
+                  Submission reference <span className="font-mono">{receipt.reference}</span> (version {receipt.version}, recorded{' '}
+                  {new Date(receipt.submittedAt).toLocaleString()} server time). Keep this if you need to query your submission.
+                </span>
+              )}
             </span>
           </div>
           {sections.length > 0 && <ExamPaneTabs active={activePane} onChange={setActivePane} />}

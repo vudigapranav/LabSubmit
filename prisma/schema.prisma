@@ -214,6 +214,33 @@ model Submission {
   workspace          LabWorkspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   evaluator          User?               @relation("EvaluatedSubmissions", fields: [evaluatorId], references: [id], onDelete: SetNull)
   sectionEvaluations SectionEvaluation[]
+  snapshots          SubmissionSnapshot[]
+}
+
+// An immutable copy of exactly what was handed in, taken at every finalization (manual
+// submit, timeout, integrity threshold). The workspace itself stays editable — "needs
+// correction" reopens it — so without this the originally submitted code was overwritten
+// by later edits and could never be reviewed again. Rows are only ever inserted.
+model SubmissionSnapshot {
+  id           String   @id @default(uuid())
+  submissionId String
+  version      Int // 1 for the first hand-in, 2 after the first resubmission, ...
+  // [{ filename, language, content }] and [{ sectionKey, label, content }], in a canonical order.
+  files        Json
+  answers      Json
+  // SHA-256 over the canonical JSON of files + answers + identifiers + timestamp, so any
+  // later edit to the stored copy is detectable (src/lib/submissionSnapshot.ts).
+  contentHash  String
+  submittedAt  DateTime @default(now()) // server clock only
+  auto         Boolean  @default(false)
+  reason       String? // TIMEOUT | FULLSCREEN_THRESHOLD | null (manual)
+  onTime       Boolean  @default(true) // decided by the server against the effective deadline
+  sessionId    String?
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, version])
+  @@index([submissionId])
 }
 
 model ExamViolation {

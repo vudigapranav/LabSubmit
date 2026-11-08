@@ -3,7 +3,7 @@
 Persistent engineering state across sessions. Updated at the end of every iteration.
 History of each iteration: `ENGINEERING_CHANGELOG.md`. Feature inventory: `/STATE.md`.
 
-**Last updated:** 2026-11-08, after iterations 11–14 (exam integrity foundations).
+**Last updated:** 2026-11-08, after the security blocker closure milestone.
 **Branch:** `claude/labsubmit-development-y605fv` (not pushed since `85240d1`; owner pushes after review).
 
 ## Current phase
@@ -38,6 +38,10 @@ Stage 5 — IMPLEMENT, working through the P0 security items in `MVP_ROADMAP.md`
   hash-chained audit log; code autosave with safe recovery and versioned saves; exam editor layout
   fix. Suite 113/113 (production); browser 73/73. Scope map for the 2026-11-08 modules brief:
   `SCOPE_STATUS.md`.
+- Security blocker closure: seccomp network isolation, HMAC-signed snapshots/audit, append-only
+  triggers, exam-delete guard, session/deadline and IDOR test matrices, migration plan rehearsed,
+  staging on the production image (found and fixed an image crash). Staging 131/131; local 128 + 7
+  skips. Report: `SECURITY_BLOCKER_CLOSURE_REPORT.md`.
 
 ## In progress / next
 
@@ -105,7 +109,8 @@ npm test        # loads tsx so tests can import src/**/*.ts directly
 
 ## Next recommended action
 
-Owner decisions on the modules brief first: auto-grading vs CLAUDE.md, SQL workbench, practice
+**Next: owner performs the manual actions in `SECURITY_BLOCKER_CLOSURE_REPORT.md`; then the Live
+Exam Control Room milestone.** Also open: owner decisions on the modules brief: auto-grading vs CLAUDE.md, SQL workbench, practice
 projects/achievements (`SCOPE_STATUS.md`). Then, in order of impact: (1) set `EXEC_RUN_UID_RANGE` on Railway and add an init
 process (S4, S20); (2) choose a network-less sandbox (S19); (3) account issuance for S28; (4) Next 15.5
 upgrade (S8). Then lint config and S9.

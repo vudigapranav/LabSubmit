@@ -1,9 +1,9 @@
 # COMPILER_SECURITY_REVIEW.md — LabSubmit execution engine
 
-**Verdict: UNSAFE for untrusted execution in the current deployment configuration.**
-With `EXEC_RUN_UID_RANGE` enabled the engine no longer exposes server secrets, the server process or
-other students' work (verified), but student programs can still reach the network. That remaining gap
-requires a real sandbox and is a release blocker for hosting beyond supervised demonstration.
+**Verdict: safe for untrusted student code when configured as in `SECURITY_BLOCKER_CLOSURE_REPORT.md`
+(per-run uid pool + seccomp launcher + `EXEC_REQUIRE_SANDBOX=true`) — verified in staging on the
+production image. The CURRENT deployment is not configured that way and remains unsafe until the
+manual actions are done.** Not a VM boundary: kernel exploits are out of scope.
 
 Date: 2026-11-08. Code: `src/lib/execution/*`, `server.js`, `Dockerfile`.
 

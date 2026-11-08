@@ -37,8 +37,9 @@ implemented · ⛔ blocked on an external decision or infrastructure · ❌ not 
 | Tamper-evident centralised audit log, search, export, verify | ✅ | iteration 13 (`AUDIT_LOGGING_DESIGN.md`) |
 | Audit retention policy | 📐 | design in `AUDIT_LOGGING_DESIGN.md`; not automated |
 | Permission matrix + automated authorisation tests | ✅ | `ROLE_PERMISSION_MATRIX.md`, `API_SECURITY_MATRIX.md` |
-| Compiler: limits, uid isolation, cleanup, queue/concurrency limits | 🟡 | code verified on Linux; **not deployed** (needs Railway setting) |
-| Compiler: network isolation, syscall filtering | ⛔ | needs a sandbox (nsjail/bwrap or runner service) — owner approval |
+| Compiler: limits, uid isolation, cleanup, concurrency limits | ✅ | verified in staging on the production image; **deployment is a manual action** |
+| Compiler: network isolation, syscall filtering | ✅ | seccomp launcher; verified in staging (aarch64); x86_64 self-test is a manual action |
+| Signed (HMAC) hand-ins and audit rows; append-only tables | ✅ | security blocker closure |
 
 ## O. Student experience
 

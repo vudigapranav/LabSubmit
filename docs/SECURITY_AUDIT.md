@@ -18,8 +18,10 @@ not demonstrated. CVSS v3.1 base scores are the assessor's estimates for this de
 
 ## Final assessment
 
-**NOT READY FOR PRODUCTION** for untrusted students on the current deployment configuration.
-**SECURE FOR TESTING** (supervised demonstration with trusted users).
+**CONDITIONALLY READY** — every blocker is fixed and verified in a staging environment built from
+the production image (`SECURITY_BLOCKER_CLOSURE_REPORT.md`). The condition: the manual deployment
+actions in that report (integrity key, isolation variables, x86_64 sandbox self-test, schema) must be
+performed and verified. **Until then the live deployment remains NOT READY FOR PRODUCTION.**
 
 Reason, from evidence: in the configuration the `Dockerfile` currently produces (server as root, no
 `EXEC_RUN_UID*`), a student program **read `JWT_SECRET` from `/proc/<server>/environ`** and could
@@ -37,8 +39,10 @@ every configuration until a real sandbox is introduced. See "Release gate" at th
 | S1 | CRITICAL | 9.9 | Student programs inherited server env (`JWT_SECRET`, `DATABASE_URL`) | Verified | **Fixed** (it.1; Linux P1) |
 | S2 | CRITICAL | 9.9 | Path traversal via client filenames | Verified | **Fixed** (it.1) |
 | S3 | HIGH | 8.8 | Shell injection in compile command | Verified | **Fixed** (it.1) |
-| S4 | CRITICAL | 9.9 | No OS isolation: same uid as server → secret theft via `/proc`, kill server, read other runs | Verified (Linux) | **Fixed in code, not deployed** — needs `EXEC_RUN_UID_RANGE` + root on Railway |
-| S19 | HIGH | 7.7 | Unrestricted network egress from student programs | Verified (Linux P6) | **Open** — needs sandbox (approval) |
+| S4 | CRITICAL | 9.9 | No OS isolation: same uid as server → secret theft via `/proc`, kill server, read other runs | Verified (Linux) | **Fixed and verified in staging (production image); not deployed** — see `SECURITY_BLOCKER_CLOSURE_REPORT.md` |
+| S19 | HIGH | 7.7 | Unrestricted network egress from student programs | Verified (Linux P6) | **Fixed (seccomp launcher), verified in staging on aarch64; not deployed; x86_64 self-test pending** |
+| S29 | HIGH | 7.5 | Fresh build of the `Dockerfile` crashed at start (Prisma assumed OpenSSL 1.1) | Verified (staging) | **Fixed** (`openssl` in image) |
+| S30 | HIGH | 7.1 | Snapshot/audit hashes recomputable by anyone with DB write access; exam deletion cascaded hand-ins | Verified | **Fixed** (HMAC with `INTEGRITY_KEY`, append-only triggers, delete guard) |
 | S5 | HIGH | 9.1 | Hardcoded fallback JWT secret | Code-verified | **Fixed** (it.2, startup check it.4) |
 | S6 | HIGH | 6.5 | Students could list all exam papers via `/api/lecturer/labs` | Verified | **Fixed** (it.2) |
 | S13 | HIGH | 7.1 | Exam paper served before start, before Start (timer bypass), and across cohorts | Verified | **Fixed** (it.8) |
@@ -53,7 +57,7 @@ every configuration until a real sandbox is introduced. See "Release gate" at th
 | S9 | LOW | 4.2 | No server-side session revocation (7-day stateless tokens) | Code-verified | **Open** |
 | S10 | LOW | 5.3 | Lecturer directory (names, emails) public | Verified | **Fixed** (it.8) |
 | S17 | LOW | 4.3 | No anti-framing / security headers | Verified | **Fixed** (it.8) — no script CSP |
-| S20 | LOW | 3.1 | Zombie processes accumulate (PID 1 is `node`, which does not reap) | Verified (Linux) | **Open** — `--init`/tini (deploy change) |
+| S20 | LOW | 3.1 | Zombie processes accumulate (PID 1 is `node`, which does not reap) | Verified (Linux) | **Fixed** (`tini` as PID 1; 0 zombies after the full suite in staging) |
 | S22 | LOW | 3.5 | Any lecturer can list students of any cohort | Code-verified | **Accepted** (staff directory) |
 | S26 | LOW | 5.5 | No `.dockerignore`: local `.env` baked into image layers | Verified | **Fixed** (it.10) |
 | S27 | MEDIUM | 6.8 | Deployment guide runs the seed on production: public admin password, and a second run wipes all data | Verified (guard) | **Fixed** (it.10) |

@@ -28,10 +28,12 @@ Question-set administration keeps its existing `ExamAdminAction` trail. **Not ye
 
 ## Guarantees and limits
 
-- **Tamper-evident, not tamper-proof.** Editing, deleting, inserting or reordering a row is detected
-  at that row (tested). Someone with database write access could rewrite the chain *from* the change
-  onward. **Anchoring** — periodically copying the latest `hash` somewhere they cannot write (e.g. a
-  signed email to the HOD, a git commit) — closes that; not automated.
+- **Tamper-evident against privileged DB access.** Editing, deleting, inserting or reordering a row is
+  detected at that row. Each row is also HMAC-signed with `INTEGRITY_KEY` (server env only), so
+  rewriting the chain with recomputed hashes, or stripping signatures, is detected too (tested as a DB
+  owner with triggers disabled). `prisma/sql/001_append_only.sql` makes the table refuse UPDATE/DELETE.
+  Someone with both DB access and the server environment could still forge — **anchoring** the latest
+  hash off-site (e.g. a daily email to the HOD) covers that; not automated.
 - **No forks:** appends hold `pg_advisory_xact_lock`; 25 concurrent events → gapless, verifying chain (tested).
 - **Never stores secrets:** keys matching password/token/secret/authorization/cookie are redacted at
   any depth; tests assert the login password and token never appear.

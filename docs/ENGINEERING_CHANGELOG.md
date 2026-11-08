@@ -339,3 +339,23 @@ offline simulated with request interception let the unload save escape — switc
 mode; Monaco renders spaces as NBSP; toasts shorter than page load — recorded with a MutationObserver.
 
 **Final.** `npm test` 113/113 (production); browser 73/73 across 7 scripts; 0 fixtures left.
+
+---
+
+## Security blocker closure milestone · 2026-11-08
+
+Ten owner-specified items; all closed in code and verified (`SECURITY_BLOCKER_CLOSURE_REPORT.md`).
+Commits: `1f4e297` (seccomp launcher), `2c8266e` (signatures, triggers, delete guard), `c841ffa`
+(session/deadline + IDOR tests), `ee883da` (staging verification, image fix, migration plan).
+
+**Found during the milestone:** a fresh `Dockerfile` build crashed at start (Prisma/OpenSSL) — would
+have taken down the execution service on the next rebuild; two signature-downgrade gaps (unsigned
+snapshot treated as fine; stripping every audit signature) caught on re-read before testing; tests
+relying on a lab that existed only in the dev DB.
+
+**Evidence:** container probes (aarch64) with/without seccomp; staging on the production image with
+isolation required — isolation tests 3/3, full suite 131/131, 0 zombies, 0 leftover pooled processes;
+integrity tests as a DB owner with triggers disabled 7/7; session/deadline 7/7; IDOR 5/5; migration
+rehearsed on an old-schema DB with rollback. Local: 128 pass + 7 skips.
+
+**Not done (manual / owner):** deployment actions; x86_64 runtime self-test; production schema push.

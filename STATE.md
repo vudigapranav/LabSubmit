@@ -470,9 +470,26 @@ Each item was reproduced as a live attack before the fix and is covered by `npm 
 - Seed refuses to run in production without `SEED_ADMIN_PASSWORD`, or against a non-empty database
   without `SEED_RESET=yes`. `.dockerignore` keeps `.env` out of images.
 
+### Exam-integrity foundations — *2026-11-08, iterations 11–14*
+- **Immutable hand-ins:** every finalisation writes a versioned `SubmissionSnapshot` (files,
+  answers, server time, on-time flag, SHA-256); the submit is an atomic claim (8 concurrent submits
+  → 1 record; old code made up to 7); repeat submits return the same receipt; evaluators grade the
+  latest snapshot with each version's hash re-verified; "needs correction" keeps version 1.
+- **Server-clock countdown:** the exam timer counts on server time; a student clock ±15 min no
+  longer auto-submits early or shows the wrong time (reproduced, fixed, Chrome-verified).
+- **Hash-chained audit log** of auth, admin, exam, submission and grading events; admin-only
+  search, CSV export and chain verification (`docs/AUDIT_LOGGING_DESIGN.md`).
+- **Code autosave and safe recovery:** debounced save of every edited file, visible status, retry
+  when offline, local draft restored only onto the server version it was based on, versioned saves
+  (409 on stale), flush before any auto-submit. Previously code was saved only on Run/Submit.
+- **Exam editor visible:** fixed a pre-existing layout bug — the editor rendered ~5 px tall at every
+  screen size.
+- Status of everything else requested in that brief: `docs/SCOPE_STATUS.md`.
+
 ### Automated tests
 `npm test` — Node's built-in runner against a running server, local PostgreSQL and real
-compilers (`tests/`). 91 tests at last run: 91/91 in production mode (87 + 4 production-only skips in dev).
+compilers (`tests/`). 113 tests at last run: 113/113 in production mode (109 + 4 production-only
+skips in dev). Browser checks (playwright-core in the session scratchpad, not committed): 73/73.
 
 ## 2. In progress
 

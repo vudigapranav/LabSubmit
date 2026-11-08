@@ -303,3 +303,39 @@ guard check run on the dev DB).
 
 **Remaining (decisions).** S4 deployment (`EXEC_RUN_UID_RANGE`), S19 network sandbox, S20 init process,
 S8 major upgrade, S9 revocation, S28 account issuance.
+
+---
+
+## Iterations 11–14 — Exam integrity foundations · 2026-11-08
+
+**Brief.** Modules N–T (exam security, student/faculty experience, control room, operations).
+Triaged first: auto-grading, SQL workbench and practice projects/achievements conflict with
+CLAUDE.md or are new products — held for owner decision (`SCOPE_STATUS.md`). Built the
+highest-priority unambiguous gaps, each reproduced before fixing.
+
+**11 — Immutable submissions (`d9b8a38`).** Reproduced: 8 concurrent submits → up to 7 Submission
+rows (3/5 rounds) on old code; reopened attempts overwrote the original hand-in. Fixed with an atomic
+claim and `SubmissionSnapshot` (hash, version, server time, on-time). Tests 7; browser receipt 2/2.
+
+**12 — Server-clock countdown (`42d206a`).** Reproduced in Chrome: client clock +15 min auto-submitted
+with 10 real minutes left; −15 min showed 24:54. Fixed: `serverNow` + round-trip offset, refreshed on
+heartbeat. After: both show 09:54. Tests 5; browser 3/3.
+
+**13 — Audit log (`851c009`).** Hash chain with advisory-lock appends, redaction, admin API with CSV and
+verify. Corrections before testing: undefined metadata keys and `Date` values would have caused
+false tamper alarms (storage normalises them) — both handled. Tests 8 (tamper detected at the exact
+row and healed on restore; 25 concurrent appends gapless); live chain of 195 events verified.
+
+**14 — Autosave (`a1e3b8a`).** Found while verifying the scope map (which had wrongly claimed file
+autosave): code was saved only on Run/Submit, errors swallowed, Submit saved only the active file,
+and the deadline auto-submit saved nothing first. Built debounced autosave, retry, local drafts,
+flush-before-auto-submit. The browser test then exposed a real last-write-wins overwrite by a delayed
+save → added optimistic concurrency (409). Also found and fixed a **pre-existing layout bug**: the
+exam editor was ~5 px tall at every screen size (confirmed on the pre-session commit in a worktree).
+Tests 2; browser autosave 10/10, short-screen start 11/11.
+
+**Corrections during the loop.** Stale dev compile mistaken for a missing component (restart fixed);
+offline simulated with request interception let the unload save escape — switched to real offline
+mode; Monaco renders spaces as NBSP; toasts shorter than page load — recorded with a MutationObserver.
+
+**Final.** `npm test` 113/113 (production); browser 73/73 across 7 scripts; 0 fixtures left.

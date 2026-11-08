@@ -3,7 +3,7 @@
 Persistent engineering state across sessions. Updated at the end of every iteration.
 History of each iteration: `ENGINEERING_CHANGELOG.md`. Feature inventory: `/STATE.md`.
 
-**Last updated:** 2026-11-08, after the security assessment (iterations 8–10).
+**Last updated:** 2026-11-08, after iterations 11–14 (exam integrity foundations).
 **Branch:** `claude/labsubmit-development-y605fv` (not pushed since `85240d1`; owner pushes after review).
 
 ## Current phase
@@ -34,6 +34,10 @@ Stage 5 — IMPLEMENT, working through the P0 security items in `MVP_ROADMAP.md`
   S13–S18, S23, S26, S27; per-run uid pool (`EXEC_RUN_UID_RANGE`) for S4. Suite 91/91 (production);
   browser 47/47. Deliverables: `SECURITY_AUDIT.md`, `THREAT_MODEL.md`, `API_SECURITY_MATRIX.md`,
   `COMPILER_SECURITY_REVIEW.md`, `SECURITY_REMEDIATION_LOG.md`, `SECURITY_TEST_RESULTS.md`.
+- Iterations 11–14: immutable hashed submissions + idempotent submit; server-clock countdown;
+  hash-chained audit log; code autosave with safe recovery and versioned saves; exam editor layout
+  fix. Suite 113/113 (production); browser 73/73. Scope map for the 2026-11-08 modules brief:
+  `SCOPE_STATUS.md`.
 
 ## In progress / next
 
@@ -101,6 +105,7 @@ npm test        # loads tsx so tests can import src/**/*.ts directly
 
 ## Next recommended action
 
-Owner decisions (in order of impact): (1) set `EXEC_RUN_UID_RANGE` on Railway and add an init
+Owner decisions on the modules brief first: auto-grading vs CLAUDE.md, SQL workbench, practice
+projects/achievements (`SCOPE_STATUS.md`). Then, in order of impact: (1) set `EXEC_RUN_UID_RANGE` on Railway and add an init
 process (S4, S20); (2) choose a network-less sandbox (S19); (3) account issuance for S28; (4) Next 15.5
 upgrade (S8). Then lint config and S9.

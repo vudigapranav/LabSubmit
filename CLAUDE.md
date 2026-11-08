@@ -195,6 +195,14 @@ Supporting conventions:
   without pulling the database client into a browser bundle.
 - **Comment the *why*.** Explain non-obvious decisions and the failure they prevent, not
   what the line does.
+- **Hand-ins are immutable.** Grade the latest `SubmissionSnapshot`, never the live workspace;
+  never update or delete snapshot rows. All finalisation goes through `finalizeSubmission()`.
+- **Audit security-sensitive actions** with `recordAudit()` (auth, account changes, exam
+  changes, submissions, grading, publication). Never put passwords, tokens or secrets in it.
+- **Never use the browser's clock for exam time.** Use the server deadline and `serverClock.ts`.
+- **Never silently discard or overwrite student work.** Saves are versioned (`baseUpdatedAt`);
+  a stale save is refused, not applied.
+- **Tests:** `npm test` (needs `node server.js` on port 3100, PostgreSQL and the compilers).
 
 ---
 
@@ -311,7 +319,12 @@ and hosts Postgres. Both read the same database. See `DEPLOYMENT.md`.
 | Auth / roles | `src/lib/jwt.ts`, `src/lib/auth.ts`, `src/context/AppContext.tsx` |
 | Exam timing & status | `src/lib/examTiming.ts` |
 | Integrity / violations | `src/lib/examIntegrity.ts`, `src/lib/useViolationLogger.ts` |
-| Submission finalization | `src/lib/examSubmission.ts` |
+| Submission finalization | `src/lib/examSubmission.ts` (atomic claim + immutable `SubmissionSnapshot`, `src/lib/submissionSnapshot.ts`) |
+| Exam access (cohort, paper release) | `src/lib/examAccess.ts` |
+| Server clock for the countdown | `src/lib/serverClock.ts` |
+| Code autosave / draft recovery | `src/lib/useFileAutosave.ts` (+ versioned `save_file`) |
+| Audit log (hash-chained) | `src/lib/audit.ts`, `GET /api/admin/audit` |
+| Execution sandbox policy | `src/lib/execution/sandbox.ts` (env allow-list, ulimits, per-run uid pool) |
 | Answer-sheet catalogue & rules | `src/lib/answerSheet.ts` |
 | Exam deletion / archive policy | `src/lib/examLifecycle.ts` (pure), `src/components/ExamRetirementDialog.tsx` |
 | Result release / publication | `src/lib/resultRelease.ts` (pure), `src/components/ResultReleaseDialog.tsx` |

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { gradableSections } from '@/lib/answerSheet';
 
 export async function GET(req: Request) {
   const { errorResponse, session } = requireAuth(req, ['STUDENT']);
@@ -23,8 +24,10 @@ export async function GET(req: Request) {
             lecturer: { select: { name: true, email: true } },
             branch: true,
             subject: true,
+            answerSheetSections: { orderBy: { order: 'asc' } },
           },
         },
+        sectionEvaluations: true,
       },
       orderBy: { evaluatedAt: 'desc' },
     });
@@ -42,10 +45,17 @@ export async function GET(req: Request) {
       remarks: sub.remarks,
       submittedAt: sub.submittedAt,
       evaluatedAt: sub.evaluatedAt,
+      // Per-section breakdown, only for sections the lecturer weighted. Reaches the student
+      // only through this route, which already returns published results only.
+      sections: gradableSections(sub.lab.answerSheetSections).map((section) => {
+        const e = sub.sectionEvaluations.find((ev) => ev.sectionId === section.id);
+        return { label: section.label, maxMarks: section.maxMarks, marks: e?.marks ?? null, remarks: e?.remarks ?? null };
+      }),
     }));
 
     return NextResponse.json({ grades });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+  } catch (error) {
+    console.error('[grades] GET failed:', error);
+    return NextResponse.json({ error: 'Could not load your results.' }, { status: 500 });
   }
 }

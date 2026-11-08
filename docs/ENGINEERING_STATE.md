@@ -3,7 +3,7 @@
 Persistent engineering state across sessions. Updated at the end of every iteration.
 History of each iteration: `ENGINEERING_CHANGELOG.md`. Feature inventory: `/STATE.md`.
 
-**Last updated:** 2026-11-08, after iteration 6.
+**Last updated:** 2026-11-08, after iteration 7.
 **Branch:** `claude/labsubmit-development-y605fv` (not pushed since `85240d1`; owner pushes after review).
 
 ## Current phase
@@ -27,12 +27,16 @@ Stage 5 — IMPLEMENT, working through the P0 security items in `MVP_ROADMAP.md`
   production-only tests skip in dev by design).
 - Iteration 6: `ExecutionRecord` persistence + faculty API + inspector Runs tab with Output
   matching. Suite 62 (all pass in production mode); 13/13 browser checks in Chrome.
+- Iteration 7: section-wise evaluation rolling up into the total; flat marks validated; grading
+  panel prefills and gains a publish control; student breakdown. Suite 75 (all pass in
+  production); browser 23/23 (+ Runs tab 13/13 re-run).
 
 ## In progress / next
 
 - All P0 items in `MVP_ROADMAP.md` are done except the Railway uid drop (awaiting approval).
-- Next, per owner direction (2026-11-08): next security item → `ExecutionRecord` persistence →
-  section-wise evaluation. Lint config and docs follow.
+- Owner-directed sequence (security → execution records → section evaluation) is complete.
+- Next by roadmap: lint config (P1 #5); low/info security items S9–S11; README rewrite and
+  DATABASE/API/JURY docs (P3 #12); pre-existing UI defects listed in STATE.md §3b.
 
 
 ## Pending (see `MVP_ROADMAP.md`)
@@ -93,4 +97,4 @@ npm test        # loads tsx so tests can import src/**/*.ts directly
 
 ## Next recommended action
 
-Iteration 7: section-wise evaluation (`SectionEvaluation`).
+Owner decisions first (uid drop on Railway, Next 15.5 major upgrade), then lint config and S9 (session revocation / user deactivation).

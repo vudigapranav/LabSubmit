@@ -441,6 +441,22 @@ Each item was reproduced as a live attack before the fix and is covered by `npm 
   input and transcript, and an explicit verdict on whether the Output section exactly matches
   a recorded run (trailing whitespace / line endings ignored). Verified in Chrome, light and dark.
 
+### Section-wise evaluation — *2026-11-08, iteration 7*
+- Sections the lecturer weighted (`maxMarks`, enabled) are marked individually in the grading
+  panel, each with an optional remark, and **roll up** into `Submission.marks` (out of the sum
+  of the weights). Exams with no weighted sections keep the single flat mark unchanged.
+- Rules shared by server and panel (`evaluateSectionMarks` / `validateFlatMarks` in
+  `src/lib/answerSheet.ts`): 0..max, numbers only, no duplicates, only this exam's weighted
+  sections. Flat marks are now range-checked too (previously written through unvalidated).
+- Partial marks can be saved unpublished (total left empty); **publishing requires every
+  weighted section marked**. Section rows and the total are written in one transaction.
+- Grading panel rebuilt on the shared primitives: prefills the saved status, marks, remarks,
+  section marks and publish state (it used to reopen blank as APPROVED + publish), live total,
+  inline range errors, and a **Publish to student** checkbox — previously absent, so every
+  grade was published immediately despite this file claiming a publish toggle.
+- Students see the per-section breakdown with remarks on published results (cards on phones,
+  under the row on desktop).
+
 ### Automated tests
 `npm test` — Node's built-in runner against a running server, local PostgreSQL and real
 compilers (`tests/`). 47 tests at last run, all passing in dev and production mode.
@@ -457,10 +473,7 @@ usable end to end.
   section matches one. Remaining gap: the record stores the transcript, not the source code
   that ran, so it cannot show *which version* of the code produced a run.
 
-### Section-wise evaluation
-- `SectionEvaluation` model exists. **Zero code reads or writes it.**
-- Per-section `maxMarks` is configurable and displayed, but evaluation still records a
-  single flat total on `Submission`. No breakdown is captured.
+### Section-wise evaluation — *completed in iteration 7; see Completed*
 
 ## 3. Newly planned (agreed requirements)
 
@@ -475,8 +488,8 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
 | 5 | Mobile-compatible general application | ✅ Audited and fixed at phone width (exam page remains desktop-only by policy) |
 | 6 | Desktop/laptop-only active exams | ✅ Complete, enforced server-side at all entry points |
 | 7 | Digital record containing configurable sections | ✅ Complete |
-| 8 | Code execution with input/output capture | ⏳ Execution complete; capture wired into the answer sheet; server-side persistence outstanding |
-| 9 | Lecturer manual evaluation workflow | ⏳ Works at submission level; section-wise marking not started |
+| 8 | Code execution with input/output capture | ✅ Execution, capture into the sheet, server-side run records with Output matching |
+| 9 | Lecturer manual evaluation workflow | ✅ Submission-level and section-wise marking, roll-up, publish control |
 
 ---
 
@@ -613,8 +626,12 @@ without a second navigation component.
   beyond role.
 
 **Found during iteration 6 browser verification (pre-existing, not yet fixed):**
-- Submission Inspector, light theme: the "Integrity Timeline" and "Grading Panel" headings are
-  near-invisible, and inactive inspector tab buttons render near-black.
+- Submission Inspector, light theme: the "Integrity Timeline" heading is near-invisible, and
+  inactive inspector tab buttons render near-black. (The "Grading Panel" heading was fixed in
+  iteration 7.)
+- `cn()` in `ui/index.tsx` joins classes without de-conflicting them, so a width/colour passed
+  to a primitive can lose to the primitive's own class (hit in iteration 7; worked around with a
+  wrapper). Adopting `tailwind-merge` (already a dependency) inside `cn` would fix it globally.
 - No `favicon.ico` (404 on every page load).
 - The lecturer sidebar highlights "Evaluations" while still showing the subject list when no
   subject is open.
@@ -675,7 +692,8 @@ without a second navigation component.
   across a device matrix.** Faculty data tables still scroll horizontally on a phone by
   design; that is appropriate for dense multi-column data but is not the same as a
   purpose-built mobile faculty view.
-- **Grading remains a single flat mark** despite per-section weighting being configurable.
+- **Section weights do not have to sum to 100.** The submission is out of the sum of the
+  weighted sections; there is no separate "viva/other" component.
 - **No notices module exists**, though notices are named in the product direction as
   mobile-accessible content.
 - **Auto-submit depends on a reachable server.** The lazy deadline check self-heals on the
@@ -724,7 +742,6 @@ The prioritised, owner-assigned plan now lives in `docs/MVP_ROADMAP.md`; current
 audit were removed on 2026-11-08 because both are complete (see §1). Still outstanding from
 this list:
 
-1. **Section-wise evaluation** — `SectionEvaluation` is still schema only.
-2. **Per-exam enrolment (optional).**
-3. **Notices module.**
+1. **Per-exam enrolment (optional).**
+2. **Notices module.**
 5. **Debt reduction** — README rewrite, shared API types, dashboard tab extraction, lint config.

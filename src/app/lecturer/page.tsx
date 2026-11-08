@@ -21,7 +21,13 @@ import {
   StatCard,
   StatusBadge,
   Toast as UiToast,
+  Alert,
+  Field,
+  Input,
+  Select,
+  Textarea,
 } from '@/components/ui';
+import { evaluateSectionMarks, gradableSections } from '@/lib/answerSheet';
 import { ProfileModal } from '@/components/ProfileModal';
 import { OnlineIDE } from '@/components/OnlineIDE';
 import { RunHistory } from '@/components/RunHistory';
@@ -155,6 +161,30 @@ export default function LecturerDashboard() {
   const [evalMarks, setEvalMarks] = useState('');
   const [evalRemarks, setEvalRemarks] = useState('');
   const [evalStatus, setEvalStatus] = useState('APPROVED');
+  // Per-section marks for exams whose answer sheet has weighted sections, keyed by section id.
+  const [evalSectionMarks, setEvalSectionMarks] = useState<Record<string, { marks: string; remarks: string }>>({});
+
+  // Open the grading panel on what was actually saved. It used to open blank as APPROVED,
+  // so re-saving an evaluated submission could silently change a decision the lecturer had
+  // deliberately left otherwise.
+  useEffect(() => {
+    const sub = selectedSubmission;
+    if (!sub) return;
+    const evaluated = sub.evaluatedAt || sub.marks !== null;
+    setEvalStatus(evaluated ? sub.status : 'APPROVED');
+    setEvalMarks(sub.marks !== null && sub.marks !== undefined ? String(sub.marks) : '');
+    setEvalRemarks(sub.remarks || '');
+    const prefill: Record<string, { marks: string; remarks: string }> = {};
+    (sub.answerSheet || []).forEach((sec: any) => {
+      prefill[sec.id] = {
+        marks: sec.evaluation?.marks !== null && sec.evaluation?.marks !== undefined ? String(sec.evaluation.marks) : '',
+        remarks: sec.evaluation?.remarks || '',
+      };
+    });
+    setEvalSectionMarks(prefill);
+    // Keyed on the id: refetches must not overwrite marks being typed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSubmission?.id]);
   const [inspectorPane, setInspectorPane] = useState<'sheet' | 'code' | 'runs'>('sheet');
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -472,6 +502,19 @@ export default function LecturerDashboard() {
     setRetireRefusal(null);
   };
 
+  // Weighted sections of the open submission, and the live roll-up the server will compute.
+  // The inspector payload only carries enabled sections.
+  const gradingSections = gradableSections(
+    ((selectedSubmission?.answerSheet || []) as any[]).map((sec) => ({ ...sec, enabled: true }))
+  );
+  const sectionPreview = evaluateSectionMarks(
+    gradingSections,
+    gradingSections.map((sec) => ({ sectionId: sec.id, marks: evalSectionMarks[sec.id]?.marks ?? '', remarks: evalSectionMarks[sec.id]?.remarks ?? '' }))
+  );
+  // Mirrors the server: a final (non-PENDING) status needs every weighted section marked, because
+  // release publishes final-status submissions and must never show a partial total.
+  const finalStatusBlocked = gradingSections.length > 0 && evalStatus !== 'PENDING' && !sectionPreview.complete;
+
   const handleEvaluateSubmission = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSubmission) return;
@@ -483,8 +526,12 @@ export default function LecturerDashboard() {
         body: JSON.stringify({
           submissionId: selectedSubmission.id,
           status: evalStatus,
-          marks: evalMarks ? parseFloat(evalMarks) : null,
           remarks: evalRemarks,
+          // Weighted exams send section marks and the server computes the total; others keep
+          // the single flat mark.
+          ...(gradingSections.length > 0
+            ? { sectionMarks: gradingSections.map((sec) => ({ sectionId: sec.id, marks: evalSectionMarks[sec.id]?.marks ?? '', remarks: evalSectionMarks[sec.id]?.remarks ?? '' })) }
+            : { marks: evalMarks === '' ? null : evalMarks }),
         }),
       });
       const data = await res.json();
@@ -1333,25 +1380,96 @@ export default function LecturerDashboard() {
                 )}
 
                 <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-5 flex flex-col justify-between space-y-4">
-                  <form onSubmit={handleEvaluateSubmission} className="space-y-4">
-                    <h4 className="font-bold text-sm text-white border-b border-slate-800 pb-2">Grading Panel</h4>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Status</label>
-                      <select value={evalStatus} onChange={(e) => setEvalStatus(e.target.value)} className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs">
-                        <option value="APPROVED">APPROVED</option>
-                        <option value="REJECTED">REJECTED</option>
-                        <option value="NEEDS_CORRECTION">NEEDS CORRECTION</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Marks (out of 100)</label>
-                      <input type="number" placeholder="100" value={evalMarks} onChange={(e) => setEvalMarks(e.target.value)} className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Remarks</label>
-                      <textarea placeholder="Feedback..." value={evalRemarks} onChange={(e) => setEvalRemarks(e.target.value)} rows={3} className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-control p-3 text-xs" />
-                    </div>
-                    <button type="submit" className="w-full py-2.5 bg-brand-olive-700 text-white rounded-control font-bold text-xs">Submit Grade</button>
+                  <form onSubmit={handleEvaluateSubmission} className="space-y-4" noValidate>
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-2">Grading Panel</h4>
+                    <Field label="Status" htmlFor="eval-status">
+                      <Select id="eval-status" value={evalStatus} onChange={(e) => setEvalStatus(e.target.value)}>
+                        <option value="APPROVED">Approved</option>
+                        <option value="REJECTED">Rejected</option>
+                        <option value="NEEDS_CORRECTION">Needs correction (reopens the attempt)</option>
+                        <option value="PENDING">Pending (not yet decided)</option>
+                      </Select>
+                    </Field>
+
+                    {gradingSections.length > 0 ? (
+                      <fieldset className="space-y-3">
+                        <legend className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Section marks</legend>
+                        {gradingSections.map((sec: any) => {
+                          const entry = evalSectionMarks[sec.id] || { marks: '', remarks: '' };
+                          const n = entry.marks === '' ? null : Number(entry.marks);
+                          const invalid = n !== null && (!Number.isFinite(n) || n < 0 || n > sec.maxMarks);
+                          return (
+                            <div key={sec.id} className="space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <label htmlFor={`sec-${sec.id}`} className="flex-1 min-w-0 text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
+                                  {sec.label}
+                                </label>
+                                {/* Fixed-width wrapper: cn() does not de-conflict classes, so a width on the
+                                    Input itself loses to the primitive's w-full and hides the label. */}
+                                <div className="w-20 flex-shrink-0">
+                                <Input
+                                  id={`sec-${sec.id}`}
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={0}
+                                  max={sec.maxMarks}
+                                  step="0.5"
+                                  value={entry.marks}
+                                  invalid={invalid}
+                                  aria-describedby={`sec-${sec.id}-max`}
+                                  onChange={(e) => setEvalSectionMarks((m) => ({ ...m, [sec.id]: { ...entry, marks: e.target.value } }))}
+                                  className="text-right tabular"
+                                />
+                                </div>
+                                <span id={`sec-${sec.id}-max`} className="text-xs text-slate-500 tabular w-10 flex-shrink-0">/ {sec.maxMarks}</span>
+                              </div>
+                              <Input
+                                aria-label={`Remark for ${sec.label} (optional)`}
+                                placeholder="Remark (optional)"
+                                value={entry.remarks}
+                                onChange={(e) => setEvalSectionMarks((m) => ({ ...m, [sec.id]: { ...entry, remarks: e.target.value } }))}
+                                className="text-[11px]"
+                              />
+                              {invalid && <p className="text-[11px] text-rose-600 dark:text-rose-400">Enter 0–{sec.maxMarks}.</p>}
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-baseline justify-between border-t border-slate-200 dark:border-slate-800 pt-2" aria-live="polite">
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Total</span>
+                          <span className="text-sm font-bold tabular text-slate-900 dark:text-white">
+                            {sectionPreview.total !== null
+                              ? `${sectionPreview.total} / ${sectionPreview.maxTotal}`
+                              : `${gradingSections.filter((sec) => (evalSectionMarks[sec.id]?.marks ?? '') !== '').length} of ${gradingSections.length} sections marked`}
+                          </span>
+                        </div>
+                      </fieldset>
+                    ) : (
+                      <Field label={`Marks (out of ${selectedSubmission.maxMarks ?? 100})`} htmlFor="eval-marks">
+                        <Input
+                          id="eval-marks"
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          max={selectedSubmission.maxMarks ?? 100}
+                          step="0.5"
+                          value={evalMarks}
+                          onChange={(e) => setEvalMarks(e.target.value)}
+                        />
+                      </Field>
+                    )}
+
+                    <Field label="Remarks" htmlFor="eval-remarks">
+                      <Textarea id="eval-remarks" placeholder="Feedback for the student…" value={evalRemarks} onChange={(e) => setEvalRemarks(e.target.value)} rows={3} />
+                    </Field>
+
+                    {finalStatusBlocked && (
+                      <Alert tone="warning">Mark every section to save a final status, or choose Pending to keep partial marks.</Alert>
+                    )}
+                    {sectionPreview.errors.length > 0 && <Alert tone="danger">{sectionPreview.errors[0]}</Alert>}
+
+                    <Button type="submit" className="w-full" disabled={finalStatusBlocked || sectionPreview.errors.length > 0}>
+                      Save evaluation
+                    </Button>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                       {selectedSubmission?.resultsReleasedAt
                         ? 'Results for this exam are released — saving makes this mark visible to the student immediately.'

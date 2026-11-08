@@ -222,3 +222,53 @@ contrast, near-black inactive tabs, missing favicon, sidebar highlight without a
 
 **Remaining.** Records hold the transcript, not the source that ran. Only the Output section
 is compared (not Input).
+
+---
+
+## Iteration 7 — Section-wise evaluation · 2026-11-08
+
+**Objective.** Mark weighted answer-sheet sections individually and roll them up into the
+submission total (CLAUDE.md §3), without changing exams that have no weighted sections.
+(`SectionEvaluation` existed in the schema with zero code reading or writing it.)
+
+**Pre-existing defects found while observing.**
+- `api/lecturer/evaluate` wrote `marks` unvalidated (negative, above maximum, non-numeric).
+- The grading panel reopened blank as APPROVED + publish: re-saving an evaluated submission
+  could silently approve and publish it.
+- No publish control existed in the UI (state variable with no input) although STATE.md
+  claimed a publish toggle — every grade was published immediately.
+- "Marks (out of 100)" was hardcoded; the "Grading Panel" heading was white on white in light mode.
+
+**Changes.**
+- `src/lib/answerSheet.ts`: `gradableSections`, `evaluateSectionMarks`, `validateFlatMarks`.
+- `api/lecturer/evaluate`: `sectionMarks` mode (server-computed total, merge with saved marks,
+  publish requires completeness, one transaction, no rows for untouched blank sections); flat
+  mode validated; generic 500 message.
+- `api/lecturer/submissions`: per-section saved evaluation for prefill.
+- `api/student/grades`: per-section breakdown (published results only, as before).
+- Lecturer grading panel rebuilt on primitives with prefill, section inputs, live total,
+  publish checkbox, PENDING status; student results show the breakdown.
+- `tests/section-evaluation.test.mjs` (13 tests).
+
+**Tests executed.**
+- API/unit: 13/13 first run.
+- Full suite: **71 pass + 4 skipped (dev)**; `npm run build` compiles; **75/75 (production)**.
+- Browser (Chrome, production build): **23/23** — section inputs and visible labels, progress
+  and live total, publish blocked when incomplete, inline range error, partial save stored
+  exactly (1 row, no total, unpublished, PENDING), reopen prefill (mark, remark, status,
+  publish), completion → 41.5/50 published, flat exam unchanged, student breakdown on desktop
+  and at 390 px with no horizontal scroll, heading readable in light theme, no page errors.
+  Iteration 6 Runs-tab script re-run: 13/13.
+
+**Corrections during the loop.**
+1. Wrote a broken transaction block in the first draft of the route; caught on re-read before
+   any test and replaced.
+2. Browser run showed blank sections being stored as empty rows → server now skips them
+   unless a row exists (so clearing still works). API suite re-run 13/13.
+3. **Screenshot review caught what assertions missed:** section labels rendered at zero width
+   (the primitive's `w-full` beat `w-20` because `cn()` does not de-conflict classes). Fixed
+   with a wrapper and added a label-width assertion.
+4. Three test-script issues of mine (ambiguous row locator for two submissions by one student;
+   phone drawer navigation; reading the prefilled value before the effect ran).
+
+**Remaining.** `cn()` class conflicts are a latent issue for every primitive (logged in STATE.md).

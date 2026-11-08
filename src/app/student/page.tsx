@@ -328,6 +328,7 @@ export default function StudentDashboard() {
                         </span>
                         <span className="text-[11px] text-slate-500 dark:text-slate-400">{new Date(g.submittedAt).toLocaleDateString()}</span>
                       </div>
+                      <SectionBreakdown sections={g.sections} />
                       {g.remarks && (
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-2">{g.remarks}</p>
                       )}
@@ -348,7 +349,8 @@ export default function StudentDashboard() {
                     </THead>
                     <TBody>
                       {grades.map((g) => (
-                        <Tr key={g.id}>
+                        <React.Fragment key={g.id}>
+                        <Tr>
                           <Td className="font-semibold text-slate-900 dark:text-white">{g.labTitle}</Td>
                           <Td className="text-slate-500 tabular">{new Date(g.submittedAt).toLocaleDateString()}</Td>
                           <Td>
@@ -359,6 +361,14 @@ export default function StudentDashboard() {
                           </Td>
                           <Td className="text-slate-500 max-w-xs truncate">{g.remarks || '—'}</Td>
                         </Tr>
+                        {(g.sections?.length || 0) > 0 && (
+                          <tr>
+                            <td colSpan={5} className="px-4 pb-3 pt-0">
+                              <SectionBreakdown sections={g.sections} />
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       ))}
                     </TBody>
                   </TableWrap>
@@ -377,5 +387,26 @@ export default function StudentDashboard() {
 
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
     </>
+  );
+}
+
+// Per-section marks for a published result, when the lecturer marked the answer sheet by
+// section. Each mark is labelled with its maximum and an explicit "Not marked" text, so the
+// state is readable without relying on colour.
+function SectionBreakdown({ sections }: { sections?: { label: string; marks: number | null; maxMarks: number | null; remarks: string | null }[] }) {
+  if (!sections || sections.length === 0) return null;
+  return (
+    <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-2" aria-label="Marks by section">
+      {sections.map((sec) => (
+        // dt/dd must be direct children of the grouping div for the list to be valid.
+        <div key={sec.label} className="min-w-0 flex flex-wrap items-baseline justify-between gap-x-2 text-[11px]">
+          <dt className="text-slate-600 dark:text-slate-400 truncate">{sec.label}</dt>
+          <dd className="font-semibold tabular text-slate-900 dark:text-white">
+            {sec.marks !== null ? `${sec.marks}/${sec.maxMarks}` : 'Not marked'}
+          </dd>
+          {sec.remarks && <dd className="w-full text-[10px] text-slate-500 dark:text-slate-400 leading-snug">{sec.remarks}</dd>}
+        </div>
+      ))}
+    </dl>
   );
 }

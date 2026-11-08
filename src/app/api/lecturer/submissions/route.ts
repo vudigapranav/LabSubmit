@@ -52,6 +52,7 @@ export async function GET(req: Request) {
             },
           },
         },
+        sectionEvaluations: true,
         workspace: {
           include: {
             files: true,
@@ -123,6 +124,11 @@ export async function GET(req: Request) {
           contentSource: section.contentSource,
           content:
             sub.workspace.answerSheetResponses.find((r: any) => r.sectionId === section.id)?.content || '',
+          // Saved section-wise evaluation, so the grading panel reopens with what was awarded.
+          evaluation: (() => {
+            const e = sub.sectionEvaluations.find((ev: any) => ev.sectionId === section.id);
+            return e ? { marks: e.marks, remarks: e.remarks } : null;
+          })(),
         })),
       fullscreenExitCount: sub.workspace.fullscreenExitCount,
       fullscreenExitThreshold: sub.lab.fullscreenExitThreshold,
@@ -136,7 +142,8 @@ export async function GET(req: Request) {
     }));
 
     return NextResponse.json({ submissions: formattedSubmissions });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+  } catch (error) {
+    console.error('[submissions] GET failed:', error);
+    return NextResponse.json({ error: 'Could not load submissions.' }, { status: 500 });
   }
 }

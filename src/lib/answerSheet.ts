@@ -230,3 +230,110 @@ export function findIncompleteRequiredSections(
     })
     .map((s) => s.label);
 }
+
+// ── Section-wise evaluation ─────────────────────────────────────────────────────────────
+// A section is marked separately when the lecturer gave it a weighting (maxMarks) and it
+// is switched on. Section marks ROLL UP into Submission.marks — the total stays the one
+// field results, grades and averages read — rather than living beside it. An exam with no
+// weighted sections keeps the original single flat mark (unconfigured = unchanged).
+
+export interface GradableSectionLike {
+  id: string;
+  label: string;
+  enabled: boolean;
+  maxMarks: number | null;
+}
+
+export interface SectionMarkInput {
+  sectionId: string;
+  /** A number, or null/'' for "not marked yet". */
+  marks: unknown;
+  remarks?: unknown;
+}
+
+export interface SectionMarkEntry {
+  sectionId: string;
+  marks: number | null;
+  remarks: string | null;
+}
+
+export interface SectionMarkResult {
+  errors: string[];
+  entries: SectionMarkEntry[];
+  /** Sum of section marks — only when every weighted section is marked, else null. */
+  total: number | null;
+  /** Sum of the weighted sections' maxMarks: the submission's "out of". */
+  maxTotal: number;
+  complete: boolean;
+}
+
+export const MAX_REMARK_LENGTH = 2000;
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export function gradableSections<T extends GradableSectionLike>(sections: T[]): T[] {
+  return sections.filter((s) => s.enabled && typeof s.maxMarks === 'number' && s.maxMarks > 0);
+}
+
+function parseMark(value: unknown): number | null | undefined {
+  if (value === null || value === undefined || value === '') return null; // not marked
+  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value.trim()) : NaN;
+  return Number.isFinite(n) ? n : undefined; // undefined = invalid
+}
+
+/**
+ * Validates a lecturer's per-section marks against the exam's weighted sections and computes
+ * the roll-up. Shared by the evaluate route (authoritative) and the grading panel (live
+ * preview), so the total a lecturer sees is the total the server stores.
+ */
+export function evaluateSectionMarks(sections: GradableSectionLike[], inputs: SectionMarkInput[]): SectionMarkResult {
+  const gradable = gradableSections(sections);
+  const byId = new Map(gradable.map((s) => [s.id, s]));
+  const errors: string[] = [];
+  const entries: SectionMarkEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const input of inputs) {
+    const section = input && typeof input.sectionId === 'string' ? byId.get(input.sectionId) : undefined;
+    if (!section) {
+      errors.push('A mark was given for a section that is not a marked section of this examination.');
+      continue;
+    }
+    if (seen.has(section.id)) {
+      errors.push(`"${section.label}" was marked twice.`);
+      continue;
+    }
+    seen.add(section.id);
+
+    const marks = parseMark(input.marks);
+    if (marks === undefined) {
+      errors.push(`"${section.label}": marks must be a number.`);
+      continue;
+    }
+    if (marks !== null && (marks < 0 || marks > (section.maxMarks as number))) {
+      errors.push(`"${section.label}": marks must be between 0 and ${section.maxMarks}.`);
+      continue;
+    }
+    const remarks = typeof input.remarks === 'string' && input.remarks.trim() ? input.remarks.trim() : null;
+    if (remarks && remarks.length > MAX_REMARK_LENGTH) {
+      errors.push(`"${section.label}": remark is longer than ${MAX_REMARK_LENGTH} characters.`);
+      continue;
+    }
+    entries.push({ sectionId: section.id, marks: marks === null ? null : round2(marks), remarks });
+  }
+
+  const marked = new Map(entries.filter((e) => e.marks !== null).map((e) => [e.sectionId, e.marks as number]));
+  const complete = gradable.length > 0 && gradable.every((s) => marked.has(s.id));
+  const maxTotal = round2(gradable.reduce((sum, s) => sum + (s.maxMarks as number), 0));
+  const total = complete ? round2(Array.from(marked.values()).reduce((a, b) => a + b, 0)) : null;
+
+  return { errors, entries, total, maxTotal, complete };
+}
+
+/** The single flat mark used when an exam has no weighted sections. */
+export function validateFlatMarks(value: unknown, maxMarks: number): { marks: number | null; error: string | null } {
+  const marks = parseMark(value);
+  if (marks === undefined) return { marks: null, error: 'Marks must be a number.' };
+  if (marks !== null && (marks < 0 || marks > maxMarks)) return { marks: null, error: `Marks must be between 0 and ${maxMarks}.` };
+  return { marks: marks === null ? null : round2(marks), error: null };
+}

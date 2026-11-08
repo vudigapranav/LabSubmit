@@ -3,7 +3,7 @@
 Persistent engineering state across sessions. Updated at the end of every iteration.
 History of each iteration: `ENGINEERING_CHANGELOG.md`. Feature inventory: `/STATE.md`.
 
-**Last updated:** 2026-11-08, after iteration 3.
+**Last updated:** 2026-11-08, after iteration 4.
 **Branch:** `claude/labsubmit-development-y605fv` (not pushed since `85240d1`; owner pushes after review).
 
 ## Current phase
@@ -19,11 +19,15 @@ Stage 5 — IMPLEMENT, working through the P0 security items in `MVP_ROADMAP.md`
   S12 (file actions scoped to own workspace).
 - Iteration 3: S7 login hardening (generic errors, timing equalisation, failure limiter).
   Suite at 30 tests, all passing in dev and production mode; `npm run build` succeeds.
+- Iteration 4: JWT startup validation (`server.js` refuses to start without a usable
+  `JWT_SECRET`/`DATABASE_URL`); token/role/expiry test coverage; README env section fixed;
+  STATE.md reconciled. Suite at 47 tests, all passing in dev and production mode.
 
 ## In progress / next
 
 - All P0 items in `MVP_ROADMAP.md` are done except the Railway uid drop (awaiting approval).
-- Next: P1 — lint config, Next.js 14.2.x patch upgrade (S8).
+- Next, per owner direction (2026-11-08): next security item → `ExecutionRecord` persistence →
+  section-wise evaluation. Lint config and docs follow.
 
 
 ## Pending (see `MVP_ROADMAP.md`)
@@ -59,7 +63,7 @@ None at last run.
 
 ```bash
 PORT=3100 NODE_ENV=development node server.js &   # needs .env and a seeded DB
-npm test
+npm test        # loads tsx so tests can import src/**/*.ts directly
 ```
 
 ## Files modified in this phase
@@ -72,4 +76,4 @@ npm test
 
 ## Next recommended action
 
-P1 task 5 (lint config), then task 6 (Next.js patch upgrade, S8), re-running `npm test` and `npm run build` after each.
+Iteration 5: S8 Next.js patch upgrade within 14.2.x (highest open security item), then iteration 6 `ExecutionRecord` persistence.

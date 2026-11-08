@@ -99,3 +99,45 @@ without affecting legitimate sign-in for any role.
 
 **Remaining.** Limiter is per instance (not global on Vercel). Account lockout can be
 triggered by a third party for one window — documented trade-off.
+
+---
+
+## Iteration 4 — JWT secret validation at startup; auth test coverage · 2026-11-08
+
+**Reconciliation first.** Confirmed the hardcoded fallback was already removed in iteration 2
+(`f041e06`) and not re-implemented it. Gaps that remained:
+- the server still *started* with no `JWT_SECRET`, failing only at the first sign-in;
+- `README.md` instructed users to set `JWT_SECRET` to the published fallback value (and a
+  SQLite `DATABASE_URL` the schema cannot use);
+- `STATE.md` still listed the fallback as open debt, claimed no test suite, and listed two
+  completed features (question-set authoring, mobile audit) as next steps.
+Also verified: `ExecutionRecord` and `SectionEvaluation` still have no reading/writing code;
+`User` has no `isActive` (it exists only on `Branch` and `QuestionSet`).
+
+**Changes.**
+- `src/lib/jwt.ts`: exported `assertJwtSecretConfigured()` (the single rule; also rejects
+  whitespace-only) and `jwtSecretWarnings()` (< 32 characters → warning only).
+- `server.js`: validates `DATABASE_URL` and the JWT secret before listening; exits 1 with
+  `[STARTUP ERROR]`; logs `[STARTUP] Required configuration validated.` on success.
+- `README.md`: env section and troubleshooting entry corrected.
+- `STATE.md`: reconciled (see above).
+- `tests/jwt.test.mjs` (17 tests); `npm test` now runs with `--import tsx`.
+
+**Tests executed.**
+- Unit: round-trip for ADMIN/LECTURER/STUDENT with 7-day expiry; expired, foreign-secret,
+  tampered (STUDENT→ADMIN), `alg: none`, HS512, malformed and empty tokens all rejected;
+  missing/empty/whitespace secret → sign throws and verify fails closed; published secret
+  refused; short-secret warning; header and cookie extraction.
+- HTTP: real password login for all three roles → token verifies and `/api/auth/me` 200;
+  role matrix over 5 endpoints × 3 roles; missing/expired/foreign/escalated/garbage tokens →
+  401; WebSocket run with an expired token → `UNAUTHORIZED`, program never ran.
+- Startup: empty secret → exit 1; published secret → exit 1; configured secret → validated.
+- Full suite: **47 pass, 0 fail** (dev server); `npm run build` compiles; **47 pass, 0 fail**
+  against the production server; `tsc --noEmit` clean.
+
+**Corrections during the loop.** (1) The startup regression test first failed because the dev
+server had replaced the production build in `.next` — a test-setup fault; the test now stops at
+the validation log line instead of needing a build. (2) Removed an assertion I had added that
+depended on the local `.env` secret length, which would fail on another developer's machine.
+
+**Remaining.** On Vercel the check is per-request, not at boot (no long-lived process).

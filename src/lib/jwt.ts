@@ -4,18 +4,42 @@ import jwt from 'jsonwebtoken';
 // history, so a deployment that happens to use it is no better than one with no secret.
 const PUBLISHED_FALLBACK_SECRET = 'cbit-labsubmit-super-secret-jwt-key-2026';
 
-// Fail closed. With a fallback, an unset JWT_SECRET on either host silently meant "sign
-// with a value anyone can read" — i.e. anyone could mint an ADMIN token (SECURITY_AUDIT.md
-// S5). Throwing makes the misconfiguration loud at the first login instead.
-function getJwtSecret(): string {
+const MIN_RECOMMENDED_SECRET_LENGTH = 32;
+
+/**
+ * The single rule for whether the configured signing secret is usable. Throws with an
+ * operator-facing message when it is not. Called on every sign/verify (the boundary on
+ * Vercel, where there is no long-lived process to check at boot) and once at startup by
+ * server.js (the Railway / local boundary), so a misconfigured host refuses to start instead
+ * of looking healthy until the first login.
+ *
+ * Fail closed. With the old fallback, an unset JWT_SECRET silently meant "sign with a value
+ * anyone can read" — anyone could mint an ADMIN token (SECURITY_AUDIT.md S5).
+ */
+export function assertJwtSecretConfigured(): string {
   const secret = process.env.JWT_SECRET;
-  if (!secret) {
+  if (!secret || !secret.trim()) {
     throw new Error('JWT_SECRET is not set. Refusing to sign or verify tokens.');
   }
   if (secret === PUBLISHED_FALLBACK_SECRET) {
     throw new Error('JWT_SECRET is set to the publicly known legacy fallback value. Set a new random secret.');
   }
   return secret;
+}
+
+/**
+ * Advisory only. A short secret is weaker, but refusing it would lock out any existing
+ * deployment configured that way, and rotating it logs every user out — the operator's call.
+ */
+export function jwtSecretWarnings(): string[] {
+  const secret = process.env.JWT_SECRET || '';
+  return secret && secret.length < MIN_RECOMMENDED_SECRET_LENGTH
+    ? [`JWT_SECRET is ${secret.length} characters; ${MIN_RECOMMENDED_SECRET_LENGTH}+ random characters are recommended (e.g. \`openssl rand -base64 48\`).`]
+    : [];
+}
+
+function getJwtSecret(): string {
+  return assertJwtSecretConfigured();
 }
 
 export interface TokenPayload {

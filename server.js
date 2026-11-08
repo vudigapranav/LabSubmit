@@ -21,6 +21,30 @@ try {
 }
 
 const dev = process.env.NODE_ENV !== 'production';
+
+// Required configuration, checked before the server listens. Without this a host with no
+// JWT_SECRET started normally and only failed at the first sign-in — and the execution
+// engine on this process would reject every run. Refusing to start makes the
+// misconfiguration impossible to miss. The rule itself lives in src/lib/jwt.ts so the
+// REST layer and this check can never disagree. (Vercel does not run this file; there the
+// same rule is enforced on every sign/verify.)
+{
+  const problems = [];
+  if (!process.env.DATABASE_URL) problems.push('DATABASE_URL is not set.');
+  try {
+    const jwtModule = require('./src/lib/jwt');
+    jwtModule.assertJwtSecretConfigured();
+    jwtModule.jwtSecretWarnings().forEach((w) => console.warn(`[STARTUP WARNING] ${w}`));
+  } catch (err) {
+    problems.push(err && err.message ? err.message : String(err));
+  }
+  if (problems.length > 0) {
+    problems.forEach((p) => console.error(`[STARTUP ERROR] ${p}`));
+    console.error('[STARTUP ERROR] Refusing to start. Set the missing values in .env (local) or the host environment (Railway).');
+    process.exit(1);
+  }
+  console.log('[STARTUP] Required configuration validated.');
+}
 const hostname = process.env.HOSTNAME || 'localhost';
 const port = parseInt(process.env.PORT || '3000', 10);
 

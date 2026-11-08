@@ -119,6 +119,13 @@ that is in the public repository; anyone can forge an ADMIN token.
 
 **Remediation (iteration 2).** No fallback. A missing secret, or one equal to the historical
 fallback, throws on first use (fail closed). Verification pins `algorithms: ['HS256']`.
+**Startup validation (iteration 4).** The rule moved into `assertJwtSecretConfigured()` in
+`jwt.ts`, and `server.js` calls it (and checks `DATABASE_URL`) before listening, exiting with
+`[STARTUP ERROR]` on failure — previously the host started normally and failed only at the
+first sign-in. Vercel does not run `server.js`; there the same rule fails closed on every
+sign/verify. Secrets under 32 characters log a warning but are accepted so existing
+deployments are not locked out. `README.md` had instructed users to set `JWT_SECRET` to the
+published value; corrected.
 **Operational note:** any deployment that was silently relying on the fallback will stop
 issuing/accepting tokens until `JWT_SECRET` is set — that is intended.
 

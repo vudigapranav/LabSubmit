@@ -3,8 +3,10 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-03, after result release / publication control on
-`claude/labsubmit-development-y605fv`.
+**Last updated:** 2026-11-08, reconciled against the code after security iterations 1–4
+on `claude/labsubmit-development-y605fv` (includes the 2026-09-03 result-release and
+exam-archive work). Iteration-level detail and evidence: `docs/ENGINEERING_CHANGELOG.md`;
+security findings: `docs/SECURITY_AUDIT.md`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
 exists in the repository. A database model with no code reading or writing it is *schema
@@ -412,6 +414,22 @@ delete-protection suites (52 API + 20 browser + 3 WebSocket) all still pass.
   only cohort-level aggregate counts, no per-student marks, so it is not a publication leak —
   but it remains the separate audit finding it was.
 
+### Security hardening — *2026-11-08, iterations 1–4*
+Each item was reproduced as a live attack before the fix and is covered by `npm test`.
+- Execution engine: student programs get an allow-listed environment (no `JWT_SECRET` /
+  `DATABASE_URL`); filenames validated by one shared rule (`src/lib/sourceFilename.ts`);
+  compilers invoked with `execFile` (no shell); CPU/file-size/memory `ulimit`s; optional
+  privilege drop via `EXEC_RUN_UID/GID` (`src/lib/execution/sandbox.ts`).
+- Auth: no hardcoded JWT fallback; the server refuses to start without a usable
+  `JWT_SECRET`/`DATABASE_URL`; HS256 pinned; login has one generic failure message, timing
+  equalisation and a failure limiter (`src/lib/rateLimit.ts`).
+- Authorisation: students can no longer list all exam papers via `/api/lecturer/labs`; file
+  save/rename/delete restricted to the caller's own workspace.
+
+### Automated tests
+`npm test` — Node's built-in runner against a running server, local PostgreSQL and real
+compilers (`tests/`). 47 tests at last run, all passing in dev and production mode.
+
 ## 2. In progress
 
 These have **database schema and, where noted, partial runtime support**, but are not
@@ -648,13 +666,14 @@ without a second navigation component.
 
 ## 5. Technical debt
 
-- **`README.md` is stale.** It documents an `/api/compile/run` route that no longer exists,
+- **`README.md` is stale** (environment-variable section corrected 2026-11-08; the rest is
+  not). It documents an `/api/compile/run` route that no longer exists,
   describes SQLite as the default database (the project is PostgreSQL-only), and lists a
   folder structure predating the execution engine and exam layers. It should not be trusted
   as documentation.
-- **No automated test suite in the repository.** The verification described above was run
-  as throwaway scripts against a temporary database and a headless browser, not committed as
-  tests. There is no `npm test`, no CI, and no regression safety net.
+- **Test suite has no CI and no browser tests.** `npm test` exists (see Completed) but needs
+  a running server and is not run automatically; the earlier browser verification was never
+  committed.
 - **`npm run lint` is not usable.** The script exists but no ESLint config does, so
   `next lint` drops into interactive first-time setup instead of linting. Either configure
   it or remove the script.
@@ -671,9 +690,6 @@ without a second navigation component.
   parent — two sources of truth for the same data. In the faculty inspector that fetch
   fails silently (a lecturer token cannot call the student endpoint) and the component
   falls back to props, which works by accident rather than design.
-- **The JWT secret has a hardcoded development fallback** in `src/lib/jwt.ts`. If
-  `JWT_SECRET` is ever unset in production, tokens become forgeable with a value that is in
-  the repository.
 - **Violation type strings are duplicated** across the schema comment, `examIntegrity.ts`,
   the violations route allowlist and `ExamGuard`. A shared enum would prevent drift.
 - **Next.js 14.2.10 has a known security advisory** (flagged at install). An upgrade should
@@ -683,38 +699,13 @@ without a second navigation component.
 
 ## 6. Next implementation steps
 
-Ordered by dependency. Steps 1 and 2 finish work whose schema already exists.
+The prioritised, owner-assigned plan now lives in `docs/MVP_ROADMAP.md`; current position in
+`docs/ENGINEERING_STATE.md`. Earlier entries here for question-set authoring and the mobile
+audit were removed on 2026-11-08 because both are complete (see §1). Still outstanding from
+this list:
 
-1. **Question-set authoring and multi-question sets.**
-   Extend `QuestionSet` from a single statement to an ordered collection of questions
-   (a `Question` child model), add lecturer CRUD for sets and their questions in the exam
-   modal, and surface the assigned set's questions to the student. The random-assignment
-   path already exists and should be reused unchanged. Keep the identity-stripping rule
-   intact as the payload grows — a question list must not leak set size or ordering.
-
-2. **Per-exam enrolment (optional).** Assignment eligibility is currently year plus branch.
-   An explicit enrolment list per exam would let a lecturer sit a subset of a cohort.
-
-3. **Persist execution records.**
-   Client-side capture and answer-sheet insertion are done; the server still stores nothing.
-   Persist an `ExecutionRecord` per run in `ExecutionController` (the `system` output flag
-   already separates program output from platform banners), surface a student's run history
-   in the evaluator view, and mark whether an Output section matches a real recorded run.
-   Mind the 5 MB output cap and truncate before persisting.
-
-4. **Section-wise evaluation.**
-   Write `SectionEvaluation` rows from the inspector, roll them up into
-   `Submission.marks`, and show the breakdown to the student alongside published results.
-
-5. **Mobile audit of the general UI.**
-   Verify and fix dashboards, results, login and registration at phone widths. The exam
-   page is deliberately out of scope — it is desktop-only by policy.
-
-6. **Notices module.**
-   A lecturer/admin-authored notice feed visible to students, mobile-first, outside the
-   exam flow.
-
-7. **Debt reduction, ongoing.**
-   Rewrite `README.md`; commit the verification scripts as a real test suite; introduce
-   shared API types; extract dashboard tabs into components; remove the JWT fallback
-   secret.
+1. **Persist execution records** — `ExecutionRecord` is still schema only.
+2. **Section-wise evaluation** — `SectionEvaluation` is still schema only.
+3. **Per-exam enrolment (optional).**
+4. **Notices module.**
+5. **Debt reduction** — README rewrite, shared API types, dashboard tab extraction, lint config.

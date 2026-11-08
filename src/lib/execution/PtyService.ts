@@ -31,8 +31,8 @@ export class PtyService {
       // see sandbox.ts. Spreading process.env here used to hand the program JWT_SECRET
       // and DATABASE_URL (SECURITY_AUDIT.md S1).
       warnIfRunningWithoutIdentity();
-      const limited = withResourceLimits(options.runCmd, options.runArgs, session.language);
-      const id = runIdentity();
+      const id = session.identity === undefined ? runIdentity() : session.identity;
+      const limited = withResourceLimits(options.runCmd, options.runArgs, session.language, session.identity);
       const ptyProcess = pty.spawn(limited.cmd, limited.args, {
         name: 'xterm-256color',
         cols: cols,

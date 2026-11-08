@@ -33,6 +33,8 @@ export interface ExecutionSession {
   isCleaningUp: boolean;
   /** User the run belongs to; used to cap concurrent runs per user. */
   ownerId?: string;
+  /** OS identity the run's compile and program execute as (see sandbox.ts). */
+  identity?: { uid: number; gid: number; pooled: boolean } | null;
 }
 
 export interface CompilationResult {

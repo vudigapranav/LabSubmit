@@ -16,6 +16,7 @@ import { ExecutionLogger } from './ExecutionLogger';
 import { isSafeSourceFilename, SOURCE_FILENAME_RULE, MAX_FILES_PER_WORKSPACE } from '../sourceFilename';
 import { appendBounded, applyTerminalInput, RECORD_FIELD_LIMIT, stripAnsi } from '../runTranscript';
 import { persistExecutionRecord } from '../executionRecords';
+import { acquireRunIdentity } from './sandbox';
 // Relative imports (not the @/* alias) — this file is loaded by server.js via tsx's
 // CJS require hook, a different resolution path than Next's own webpack/SWC bundling
 // used everywhere else in the app, so path-alias resolution here is unverified.
@@ -177,6 +178,14 @@ export class ExecutionController {
       return;
     }
 
+    // Claimed in the same tick as the slot check and registration below (no await between).
+    const identity = acquireRunIdentity();
+    if (identity === 'EXHAUSTED') {
+      this.sendWs({ type: 'error', code: 'HOST_BUSY', message: 'The execution server is at capacity. Please try again in a few seconds.' });
+      this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
+      return;
+    }
+
     const sessionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     this.currentSessionId = sessionId;
     this.currentRun = auth.workspaceId
@@ -208,6 +217,7 @@ export class ExecutionController {
       outputByteCount: 0,
       isCleaningUp: false,
       ownerId: auth.userId,
+      identity,
     };
 
     // Registered before the first await so the run-slot claim above is atomic.
@@ -218,7 +228,7 @@ export class ExecutionController {
     // 2. Compilation Stage
     this.sendWs({ type: 'status', status: 'compiling' });
 
-    const compileResult = await CompilerService.prepareAndCompile(sessionId, tempDir, filename, code, fileList);
+    const compileResult = await CompilerService.prepareAndCompile(sessionId, tempDir, filename, code, fileList, identity);
 
     if (!compileResult.success) {
       // The compiler's diagnostics are what this run produced; the evaluator should see them.

@@ -53,9 +53,12 @@ const LIMITED_MEMORY_LANGUAGES: SupportedLanguage[] = ['c', 'cpp', 'python'];
 export function withResourceLimits(
   cmd: string,
   args: string[],
-  language: SupportedLanguage | 'compile'
+  language: SupportedLanguage | 'compile',
+  identity?: { pooled: boolean } | null
 ): { cmd: string; args: string[] } {
   const lines = [
+    // Files the program creates are private to its uid unless it deliberately chmods them.
+    'umask 077',
     `ulimit -t ${RESOURCE_LIMITS.cpuSeconds} 2>/dev/null`,
     `ulimit -f ${RESOURCE_LIMITS.fileSizeBlocks} 2>/dev/null`,
   ];
@@ -64,6 +67,10 @@ export function withResourceLimits(
   if (language !== 'compile' && LIMITED_MEMORY_LANGUAGES.includes(language)) {
     lines.push(`ulimit -v ${RESOURCE_LIMITS.virtualMemoryKb} 2>/dev/null`);
   }
+  // Only safe with a per-run uid: RLIMIT_NPROC counts every process of the uid, so under a
+  // shared uid it would be a limit shared by all students (and, without a uid drop, by the
+  // server itself).
+  if (identity?.pooled) lines.push(`ulimit -u ${PER_RUN_PROCESS_LIMIT} 2>/dev/null`);
   lines.push('exec "$@"');
   // `labsubmit-run` becomes $0; the real command and its args become "$@".
   return { cmd: '/bin/sh', args: ['-c', lines.join('; '), 'labsubmit-run', cmd, ...args] };
@@ -98,8 +105,8 @@ export function warnIfRunningWithoutIdentity(): void {
 
 // Hands the run's temp dir to the unprivileged account so it can write a.out / .class
 // files there, and closes it to everyone else.
-export async function prepareTempDirOwnership(tempDir: string): Promise<void> {
-  const id = runIdentity();
+export async function prepareTempDirOwnership(tempDir: string, identity?: RunIdentity | null): Promise<void> {
+  const id = identity === undefined ? runIdentity() : identity;
   if (!id) return;
   await fs.chown(tempDir, id.uid, id.gid);
   await fs.chmod(tempDir, 0o700);
@@ -114,4 +121,118 @@ export function resolveInsideTempDir(tempDir: string, filename: string): string 
     throw new Error(`Refusing to write outside the execution directory: ${filename}`);
   }
   return resolved;
+}
+
+// ── Per-run identity pool (EXEC_RUN_UID_RANGE) ─────────────────────────────────────────
+// With one shared runner uid (EXEC_RUN_UID), every concurrent run is the same OS user, so
+// one student's program can read another's live files, a process-count limit is shared by
+// everyone, and a child that leaves its process group (setsid) cannot be found again.
+// Verified on Linux in the security assessment (COMPILER_SECURITY_REVIEW.md, P7/P9/P11).
+// Giving each concurrent run its OWN uid fixes all three inside the existing engine:
+//   - run directories are 0700 and owned by different uids → mutually unreadable;
+//   - `ulimit -u` counts only that run's processes → a real fork-bomb cap;
+//   - cleanup kills every process owned by the uid, wherever it went.
+// Linux needs no /etc/passwd entry to switch to a numeric uid, so the pool needs no image
+// changes beyond running the server as root. Network isolation still needs a real sandbox.
+
+export interface RunIdentity {
+  uid: number;
+  gid: number;
+  /** True when the uid belongs to this run alone (pool mode). */
+  pooled: boolean;
+}
+
+/** Processes (incl. threads) one pooled run may have. The JVM alone uses ~20 threads. */
+export const PER_RUN_PROCESS_LIMIT = 128;
+
+function parseRange(value: string | undefined): [number, number] | null {
+  const m = /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(value || '');
+  if (!m) return null;
+  const [lo, hi] = [Number(m[1]), Number(m[2])];
+  return lo > 0 && hi >= lo && hi - lo < 10000 ? [lo, hi] : null;
+}
+
+// Kept on globalThis, not in module scope: if this module is ever loaded twice (two loaders,
+// two bundles), module-scoped state would split into two pools — one acquiring, another
+// releasing — and every uid would leak until the pool was exhausted and all runs refused.
+// Observed under tsx's ESM loader during testing; server.js's CJS path was not affected.
+const POOL_KEY = '__labsubmitRunUidsInUse';
+const uidsInUse: Set<number> = ((globalThis as Record<string, unknown>)[POOL_KEY] as Set<number>) ??
+  ((globalThis as Record<string, unknown>)[POOL_KEY] = new Set<number>());
+
+/**
+ * The identity a new run executes as: a pooled uid when EXEC_RUN_UID_RANGE is configured,
+ * else the single shared EXEC_RUN_UID, else null (run as the server user — local dev).
+ * Returns 'EXHAUSTED' when every pooled uid is busy; the run must then be refused rather
+ * than share a uid.
+ */
+export function acquireRunIdentity(): RunIdentity | null | 'EXHAUSTED' {
+  const range = parseRange(process.env.EXEC_RUN_UID_RANGE);
+  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+  if (range && isRoot) {
+    for (let uid = range[0]; uid <= range[1]; uid++) {
+      if (!uidsInUse.has(uid)) {
+        uidsInUse.add(uid);
+        return { uid, gid: uid, pooled: true };
+      }
+    }
+    return 'EXHAUSTED';
+  }
+  const single = runIdentity();
+  return single ? { ...single, pooled: false } : null;
+}
+
+/** Real uid of every process currently in /proc (Linux). Empty where /proc is absent. */
+async function processesOwnedBy(uid: number): Promise<number[]> {
+  let entries: string[];
+  try {
+    entries = await fs.readdir('/proc');
+  } catch {
+    return [];
+  }
+  const pids: number[] = [];
+  for (const e of entries) {
+    if (!/^\d+$/.test(e)) continue;
+    try {
+      const status = await fs.readFile(`/proc/${e}/status`, 'utf8');
+      const m = /^Uid:\s+(\d+)/m.exec(status);
+      if (m && Number(m[1]) === uid) pids.push(Number(e));
+    } catch {
+      // process exited while we looked
+    }
+  }
+  return pids;
+}
+
+/**
+ * Kills everything the pooled uid owns, removes what it left in /tmp, and returns the uid
+ * to the pool. Repeats the kill because a forking program can create processes while we
+ * work; the per-run process limit keeps that bounded.
+ */
+export async function reapRunIdentity(identity: RunIdentity): Promise<void> {
+  if (!identity.pooled) return;
+  try {
+    for (let round = 0; round < 10; round++) {
+      const pids = await processesOwnedBy(identity.uid);
+      if (pids.length === 0) break;
+      for (const pid of pids) {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch {}
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    // Files the run dropped outside its own directory (e.g. /tmp/x).
+    for (const name of await fs.readdir('/tmp').catch(() => [] as string[])) {
+      const p = path.join('/tmp', name);
+      try {
+        const st = await fs.lstat(p);
+        if (st.uid === identity.uid) await fs.rm(p, { recursive: true, force: true });
+      } catch {}
+    }
+  } finally {
+    // Release only after the uid owns nothing, so the next run cannot inherit its processes.
+    if ((await processesOwnedBy(identity.uid)).length === 0) uidsInUse.delete(identity.uid);
+    else console.error(`[SECURITY] uid ${identity.uid} still owns processes after reaping; leaving it out of the pool.`);
+  }
 }

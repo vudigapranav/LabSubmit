@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import { ExecutionSession } from './types';
 import { ExecutionLogger } from './ExecutionLogger';
+import { reapRunIdentity } from './sandbox';
 
 export class CleanupService {
   static async cleanupSession(session: ExecutionSession): Promise<void> {
@@ -24,6 +25,12 @@ export class CleanupService {
         session.ptyProcess.kill('SIGKILL');
       } catch (e) {}
       session.ptyProcess = null;
+    }
+
+    // A pooled uid belongs to this run alone: kill everything it owns (including children
+    // that escaped the process group with setsid) and return it to the pool.
+    if (session.identity?.pooled) {
+      await reapRunIdentity(session.identity);
     }
 
     if (session.tempDir) {

@@ -11,15 +11,20 @@ import {
   resolveInsideTempDir,
   runIdentity,
   withResourceLimits,
+  type RunIdentity,
 } from './sandbox';
 
 // One compiler invocation: an executable and its argument list. Never a shell string —
 // the old `exec("gcc \"${file}\" ...")` let a filename containing $(...) run shell (S3).
 type CompileStep = { cmd: string; args: string[] };
 
-function runCompileStep(step: CompileStep, tempDir: string): Promise<{ err: Error | null; stdout: string; stderr: string }> {
-  const limited = withResourceLimits(step.cmd, step.args, 'compile');
-  const id = runIdentity();
+function runCompileStep(
+  step: CompileStep,
+  tempDir: string,
+  identity: RunIdentity | null | undefined
+): Promise<{ err: Error | null; stdout: string; stderr: string }> {
+  const id = identity === undefined ? runIdentity() : identity;
+  const limited = withResourceLimits(step.cmd, step.args, 'compile', identity);
   return new Promise((resolve) => {
     execFile(
       limited.cmd,
@@ -43,7 +48,10 @@ export class CompilerService {
     tempDir: string,
     filename: string,
     code: string,
-    files: SourceFile[] = []
+    files: SourceFile[] = [],
+    // The run's identity, chosen by the controller. Undefined = legacy single-uid behaviour
+    // (lib/compiler.ts); null = run as the server user.
+    identity?: RunIdentity | null
   ): Promise<CompilationResult> {
     const startTime = Date.now();
     const lang = detectLanguage(filename);
@@ -65,7 +73,7 @@ export class CompilerService {
     }
 
     console.log(`[STAGE: 3. TEMP WORKSPACE CREATED] TempDir: "${tempDir}"`);
-    await prepareTempDirOwnership(tempDir);
+    await prepareTempDirOwnership(tempDir, identity);
 
     // 1. Write main source file
     const mainFilePath = resolveInsideTempDir(tempDir, filename);
@@ -143,7 +151,7 @@ export class CompilerService {
 
       let compileResult = { err: null as Error | null, stdout: '', stderr: '' };
       for (const step of compileSteps) {
-        const r = await runCompileStep(step, tempDir);
+        const r = await runCompileStep(step, tempDir, identity);
         compileResult = { err: r.err, stdout: compileResult.stdout + r.stdout, stderr: compileResult.stderr + r.stderr };
         if (r.err) break;
       }

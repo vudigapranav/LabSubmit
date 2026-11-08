@@ -39,12 +39,17 @@ export async function lecturerWithLab(language) {
 
 // Runs one program through the execution WebSocket and resolves with everything the
 // server sent. `inputs` are written to the program's stdin once it reports "running".
+// An input may be `{ after: /regex/, data }` to wait until the program's output matches —
+// i.e. type only once the prompt is on screen, as a student would. Use this whenever the
+// test asserts on the exact transcript: a fixed delay races a slow first spawn, and an
+// early keystroke is echoed before the prompt.
 export function runOnEngine({ token, labId, filename, code, files = [], inputs = [], timeoutMs = 30000 }) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(WS_URL, {
       headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LabSubmitTest/1.0' },
     });
     const result = { output: '', programOutput: '', errors: [], exitCode: null };
+    const pending = inputs.filter((i) => typeof i === 'object');
     const timer = setTimeout(() => {
       ws.terminate();
       reject(new Error(`Engine run timed out. Output so far:\n${result.output}`));
@@ -56,11 +61,14 @@ export function runOnEngine({ token, labId, filename, code, files = [], inputs =
       if (msg.type === 'output') {
         result.output += msg.data;
         if (!msg.system) result.programOutput += msg.data;
+        while (pending.length && pending[0].after.test(result.programOutput)) {
+          ws.send(JSON.stringify({ type: 'input', data: pending.shift().data }));
+        }
       } else if (msg.type === 'error') {
         result.errors.push(msg);
       } else if (msg.type === 'status' && msg.status === 'running') {
-        // Small delay so the program has reached its read() before input arrives.
-        inputs.forEach((data, i) => setTimeout(() => ws.send(JSON.stringify({ type: 'input', data })), 300 * (i + 1)));
+        // Plain strings: small delay so the program has reached its read() before input arrives.
+        inputs.filter((i) => typeof i === 'string').forEach((data, i) => setTimeout(() => ws.send(JSON.stringify({ type: 'input', data })), 300 * (i + 1)));
       } else if (msg.type === 'exit') {
         result.exitCode = msg.exitCode;
         clearTimeout(timer);

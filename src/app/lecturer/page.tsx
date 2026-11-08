@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import { ProfileModal } from '@/components/ProfileModal';
 import { OnlineIDE } from '@/components/OnlineIDE';
+import { RunHistory } from '@/components/RunHistory';
 import {
   AnswerSheetConfigurator,
   SectionDraft,
@@ -56,6 +57,7 @@ import {
   Layers,
   ClipboardCheck,
   Send,
+  TerminalSquare,
 } from 'lucide-react';
 
 const LANGUAGE_OPTIONS = [
@@ -153,7 +155,7 @@ export default function LecturerDashboard() {
   const [evalMarks, setEvalMarks] = useState('');
   const [evalRemarks, setEvalRemarks] = useState('');
   const [evalStatus, setEvalStatus] = useState('APPROVED');
-  const [inspectorPane, setInspectorPane] = useState<'sheet' | 'code'>('sheet');
+  const [inspectorPane, setInspectorPane] = useState<'sheet' | 'code' | 'runs'>('sheet');
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -1210,26 +1212,41 @@ export default function LecturerDashboard() {
 
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-4 gap-4">
               <div className="flex-1 h-full overflow-hidden flex flex-col min-h-0">
-                {(selectedSubmission.answerSheet?.length || 0) > 0 && (
-                  <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+                {/* Always shown now: the Runs tab applies whether or not the exam has an answer sheet. */}
+                <div className="flex items-center gap-2 mb-2 flex-shrink-0" role="tablist" aria-label="Submission views">
+                  {(selectedSubmission.answerSheet?.length || 0) > 0 && (
                     <button
                       type="button"
+                      role="tab"
+                      aria-selected={inspectorPane === 'sheet'}
                       onClick={() => setInspectorPane('sheet')}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'sheet' ? 'bg-brand-blue-600 border-brand-blue-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
                     >
                       <FileText className="w-3.5 h-3.5" />
                       <span>Answer Sheet</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setInspectorPane('code')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'code' ? 'bg-brand-olive-700 border-brand-olive-600 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
-                    >
-                      <Code className="w-3.5 h-3.5" />
-                      <span>Code</span>
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={inspectorPane === 'code' || (inspectorPane === 'sheet' && !(selectedSubmission.answerSheet?.length > 0))}
+                    onClick={() => setInspectorPane('code')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'code' || (inspectorPane === 'sheet' && !(selectedSubmission.answerSheet?.length > 0)) ? 'bg-brand-olive-700 border-brand-olive-600 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                  >
+                    <Code className="w-3.5 h-3.5" />
+                    <span>Code</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={inspectorPane === 'runs'}
+                    onClick={() => setInspectorPane('runs')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'runs' ? 'bg-brand-blue-600 border-brand-blue-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                  >
+                    <TerminalSquare className="w-3.5 h-3.5" />
+                    <span>Runs</span>
+                  </button>
+                </div>
 
                 {(selectedSubmission.answerSheet?.length || 0) > 0 && inspectorPane === 'sheet' ? (
                   <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-5 space-y-5">
@@ -1269,6 +1286,16 @@ export default function LecturerDashboard() {
                         )}
                       </div>
                     ))}
+                  </div>
+                ) : inspectorPane === 'runs' ? (
+                  <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-4">
+                    <RunHistory
+                      submissionId={selectedSubmission.id}
+                      token={token}
+                      outputSectionText={
+                        (selectedSubmission.answerSheet || []).find((sec: any) => sec.key === 'OUTPUT')?.content ?? null
+                      }
+                    />
                   </div>
                 ) : (
                   <div className="flex-1 min-h-0 overflow-hidden">

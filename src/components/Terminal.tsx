@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { detectClientDeviceClass } from '@/lib/useDeviceClass';
+import { stripAnsi, applyTerminalInput } from '@/lib/runTranscript';
 import {
   Terminal as TerminalIcon,
   Square,
@@ -41,19 +42,8 @@ interface TerminalProps {
   onRunCaptured?: (run: CapturedRun) => void;
 }
 
-// xterm renders ANSI; a lab record should not contain escape codes. Strips CSI/OSC
-// sequences and normalises CRLF, leaving the plain text a student would write down.
-export function stripAnsi(input: string): string {
-  return input
-    // eslint-disable-next-line no-control-regex
-    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
-    // eslint-disable-next-line no-control-regex
-    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
-    // eslint-disable-next-line no-control-regex
-    .replace(/\x1b[@-Z\\-_]/g, '')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n');
-}
+// Capture rules (stripAnsi, applyTerminalInput) are shared with the execution engine, which
+// persists every run with the same transformation — see src/lib/runTranscript.ts.
 
 export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange, onRunCaptured }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -215,15 +205,8 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
             wsRef.current.send(JSON.stringify({ type: 'input', data }));
           }
 
-          // Reconstruct what the student actually entered: apply backspace, keep newlines,
-          // and drop control keys (arrows, escapes) that are not part of the input.
-          if (data === '\x7f' || data === '\b') {
-            captureRef.current.stdin = captureRef.current.stdin.slice(0, -1);
-          } else if (data === '\r' || data === '\n') {
-            captureRef.current.stdin += '\n';
-          } else if (!/[\x00-\x1f]/.test(data)) {
-            captureRef.current.stdin += data;
-          }
+          // Reconstruct what the student actually entered — same rule the server records with.
+          captureRef.current.stdin = applyTerminalInput(captureRef.current.stdin, data);
         });
 
         // Resize listener -> WebSocket

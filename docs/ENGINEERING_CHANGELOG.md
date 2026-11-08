@@ -173,3 +173,52 @@ codebase (table in `SECURITY_AUDIT.md` S8). Probes on the production server befo
 login HTML was checked to reference `/cbit-logo.png` directly and the file served with 200.
 
 **Remaining.** RSC advisories need Next 15.5+ (owner decision). `dompurify` pinned by Monaco.
+
+---
+
+## Iteration 6 — ExecutionRecord persistence · 2026-11-08
+
+**Objective.** Store every student run server-side and let the evaluator check the student's
+Output section against what actually executed. (`ExecutionRecord` existed in the schema with
+zero code reading or writing it.)
+
+**Changes.**
+- `src/lib/runTranscript.ts` (new, dependency-free): `stripAnsi`, `applyTerminalInput`
+  (now per character, so pasted multi-line input is captured), `appendBounded`,
+  `findMatchingRun`. `Terminal.tsx` now uses it instead of its own copy.
+- `src/lib/executionRecords.ts` (new): `persistExecutionRecord` — 64 KB per field, 200 per
+  workspace, never throws.
+- `ExecutionController`: per-run capture; one guarded `finalizeRun()` called from every
+  ending; `authorizeRun` returns the student's workspace id.
+- `GET /api/lecturer/executions` (new).
+- `src/components/RunHistory.tsx` (new) + inspector **Runs** tab; tab strip now always shown
+  with `role="tab"`/`aria-selected`.
+- `tests/execution-records.test.mjs` (11 tests); `tests/helpers.mjs` gained prompt-driven input.
+
+**Tests executed.**
+- Records for success / compile failure / manual stop; none for faculty runs or rejected runs;
+  API access matrix (owner 200, admin 200, other lecturer 404, student 403, bad id 404, missing
+  param 400); retention cap + truncation; DB failure does not throw; pure capture rules.
+- Full suite: **58 pass + 4 skipped (dev)**, **62 pass (production)**; `npm run build` compiles;
+  `tsc` clean; 0 fixture rows left.
+- Browser (system Chrome via playwright-core, real engine runs): **13/13** — match banner and
+  badge for an unedited Output, warning for an edited one, input and transcript shown,
+  Answer Sheet and Code tabs unaffected, no console errors from the Runs tab, dark theme
+  (applied through the account's saved theme and restored afterwards).
+
+**Corrections during the loop.**
+1. Test 1 failed once on a cold server: input sent on a fixed 300 ms timer can arrive before
+   the prompt, so the echo precedes it in the transcript. Product behaviour is correct (the
+   student's terminal shows the same order). Fixed the test, not the code: input is now sent
+   when the prompt appears. 3 cold starts → 11/11 each. Same fix applied pre-emptively to the
+   stop test.
+2. Browser script: three locator/navigation mistakes of mine (sidebar vs `lg:hidden` tab strip;
+   "Open Workspace" button; input check). A first "dark theme" pass was **invalid** — the
+   screenshot was still light because the app applies the account's saved theme — and was
+   redone properly.
+
+**Found, not fixed (pre-existing; logged in STATE.md §3b):** light-theme inspector heading
+contrast, near-black inactive tabs, missing favicon, sidebar highlight without a subject.
+
+**Remaining.** Records hold the transcript, not the source that ran. Only the Output section
+is compared (not Input).

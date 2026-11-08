@@ -3,7 +3,7 @@
 Persistent engineering state across sessions. Updated at the end of every iteration.
 History of each iteration: `ENGINEERING_CHANGELOG.md`. Feature inventory: `/STATE.md`.
 
-**Last updated:** 2026-11-08, after iteration 5.
+**Last updated:** 2026-11-08, after iteration 6.
 **Branch:** `claude/labsubmit-development-y605fv` (not pushed since `85240d1`; owner pushes after review).
 
 ## Current phase
@@ -25,6 +25,8 @@ Stage 5 — IMPLEMENT, working through the P0 security items in `MVP_ROADMAP.md`
 - Iteration 5: S8 — Next 14.2.35, non-breaking transitive fixes, image optimizer disabled,
   stray WebSocket upgrades closed in production. Suite 51 (all pass in production; 4
   production-only tests skip in dev by design).
+- Iteration 6: `ExecutionRecord` persistence + faculty API + inspector Runs tab with Output
+  matching. Suite 62 (all pass in production mode); 13/13 browser checks in Chrome.
 
 ## In progress / next
 
@@ -57,11 +59,20 @@ None at last run.
   `chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper` after `npm install`, or
   every execution fails with `posix_spawnp failed`.
 
+## Browser verification
+
+Not in the repo (needs `playwright-core`, which is not a project dependency). Iteration 6 used
+`playwright-core@1.48.2` installed in the session scratchpad, driving the system Google Chrome.
+Committing a browser suite would need an approved devDependency.
+
 ## Architecture decisions
 
 - Filename rule lives in a dependency-free module (`src/lib/sourceFilename.ts`) shared by the
   REST route and the engine — one rule, two entry points (CLAUDE.md §6 "pure modules").
 - Execution policy (env, limits, identity) centralised in `src/lib/execution/sandbox.ts`.
+- Run capture rules live in one dependency-free module (`src/lib/runTranscript.ts`) used by
+  both the browser terminal and the engine, so the evaluator's Output-vs-run comparison
+  compares like with like.
 - Tests use Node's built-in `node:test` against a real server, real Postgres and real
   compilers — no new dependencies, no mocks.
 
@@ -82,4 +93,4 @@ npm test        # loads tsx so tests can import src/**/*.ts directly
 
 ## Next recommended action
 
-Iteration 6: `ExecutionRecord` persistence, then iteration 7: section-wise evaluation.
+Iteration 7: section-wise evaluation (`SectionEvaluation`).

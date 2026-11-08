@@ -14,6 +14,8 @@ import { RuntimeSandbox } from './RuntimeSandbox';
 import { PtyService } from './PtyService';
 import { ExecutionLogger } from './ExecutionLogger';
 import { isSafeSourceFilename, SOURCE_FILENAME_RULE } from '../sourceFilename';
+import { appendBounded, applyTerminalInput, RECORD_FIELD_LIMIT, stripAnsi } from '../runTranscript';
+import { persistExecutionRecord } from '../executionRecords';
 // Relative imports (not the @/* alias) — this file is loaded by server.js via tsx's
 // CJS require hook, a different resolution path than Next's own webpack/SWC bundling
 // used everywhere else in the app, so path-alias resolution here is unverified.
@@ -31,10 +33,26 @@ import {
 const MAX_FILES_PER_RUN = 20;
 const MAX_SOURCE_BYTES_PER_RUN = 1024 * 1024;
 
+// What is being captured for the run in progress. Only student runs inside their own
+// workspace are recorded; a lecturer testing code in the inspector is not student history.
+interface RunCapture {
+  sessionId: string;
+  workspaceId: string;
+  filename: string;
+  language: string;
+  startTime: number;
+  stdin: string;
+  stdout: string;
+  finalized: boolean;
+}
+
+type RunAuthorization = { code: string; message: string } | { workspaceId: string | null };
+
 export class ExecutionController {
   private ws: WebSocket;
   private requestHeaders: Record<string, string | string[] | undefined> | undefined;
   private currentSessionId: string | null = null;
+  private currentRun: RunCapture | null = null;
 
   constructor(ws: WebSocket, requestHeaders?: Record<string, string | string[] | undefined>) {
     this.ws = ws;
@@ -70,9 +88,34 @@ export class ExecutionController {
     }
   }
 
+  /**
+   * Closes the capture for `sessionId` and persists it — exactly once. Every way a run can
+   * end calls this; the session-id match stops a late onExit from a killed process being
+   * recorded against (or as) the next run.
+   */
+  private finalizeRun(sessionId: string, outcome: { exitCode: number | null; compileFailed?: boolean; stdout?: string }): void {
+    const run = this.currentRun;
+    if (!run || run.sessionId !== sessionId || run.finalized) return;
+    run.finalized = true;
+    this.currentRun = null;
+    // Not awaited: the student's terminal must not wait on the database.
+    void persistExecutionRecord(prisma, {
+      workspaceId: run.workspaceId,
+      filename: run.filename,
+      language: run.language,
+      stdin: run.stdin,
+      stdout: outcome.stdout ?? run.stdout,
+      exitCode: outcome.exitCode,
+      durationMs: Date.now() - run.startTime,
+      compileFailed: outcome.compileFailed ?? false,
+    });
+  }
+
   private async handleRun(msg: Extract<WsClientMessage, { type: 'run' }>): Promise<void> {
     // 1. Clean up any previous session running on this socket
     if (this.currentSessionId) {
+      // Replaced by a new run before it ended: record what it did, with no exit code.
+      this.finalizeRun(this.currentSessionId, { exitCode: null });
       await SessionManager.remove(this.currentSessionId);
       this.currentSessionId = null;
     }
@@ -111,15 +154,27 @@ export class ExecutionController {
     // Authorization: verify identity, workspace ownership, and exam window before
     // touching the filesystem or spawning any process. This is the actual security
     // boundary for code execution — everything the client sends is otherwise untrusted.
-    const rejection = await this.authorizeRun(token, labId, filename, msg.deviceClass);
-    if (rejection) {
-      this.sendWs({ type: 'error', code: rejection.code, message: rejection.message });
+    const auth = await this.authorizeRun(token, labId, filename, msg.deviceClass);
+    if ('code' in auth) {
+      this.sendWs({ type: 'error', code: auth.code, message: auth.message });
       this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
       return;
     }
 
     const sessionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     this.currentSessionId = sessionId;
+    this.currentRun = auth.workspaceId
+      ? {
+          sessionId,
+          workspaceId: auth.workspaceId,
+          filename,
+          language: detectLanguage(filename),
+          startTime: Date.now(),
+          stdin: '',
+          stdout: '',
+          finalized: false,
+        }
+      : null;
 
     console.log(`[STAGE: 2. SESSION CREATED] Session ID: ${sessionId}`);
 
@@ -148,6 +203,8 @@ export class ExecutionController {
     const compileResult = await CompilerService.prepareAndCompile(sessionId, tempDir, filename, code, fileList);
 
     if (!compileResult.success) {
+      // The compiler's diagnostics are what this run produced; the evaluator should see them.
+      this.finalizeRun(sessionId, { exitCode: 1, compileFailed: true, stdout: stripAnsi(compileResult.stderr) });
       this.sendWs({
         type: 'output',
         data: `\r\n\x1b[31mCompilation Failed:\r\n${compileResult.stderr.replace(/\n/g, '\r\n')}\x1b[0m\r\n`,
@@ -169,6 +226,7 @@ export class ExecutionController {
 
     // Set up runtime timeout limit guard
     session.timeoutTimer = RuntimeSandbox.setupTimeoutGuard(session, async (reasonMessage) => {
+      this.finalizeRun(sessionId, { exitCode: 124 });
       this.sendWs({ type: 'output', data: reasonMessage, system: true });
       this.sendWs({ type: 'exit', exitCode: 124, executionTimeMs: Date.now() - session.startTime });
       await SessionManager.remove(sessionId);
@@ -184,6 +242,7 @@ export class ExecutionController {
         rows,
         onData: (data) => {
           const exceeded = RuntimeSandbox.checkOutputLimit(session, data.length, async (limitMessage) => {
+            this.finalizeRun(sessionId, { exitCode: 137 });
             this.sendWs({ type: 'output', data: limitMessage, system: true });
             this.sendWs({ type: 'exit', exitCode: 137, executionTimeMs: Date.now() - session.startTime });
             await SessionManager.remove(sessionId);
@@ -191,6 +250,11 @@ export class ExecutionController {
           });
 
           if (!exceeded) {
+            // Same transformation the browser terminal applies, so a recorded run and an
+            // Output section filled with "Use last run" compare equal.
+            if (this.currentRun?.sessionId === sessionId) {
+              this.currentRun.stdout = appendBounded(this.currentRun.stdout, stripAnsi(data));
+            }
             this.sendWs({ type: 'output', data });
           }
         },
@@ -213,6 +277,7 @@ export class ExecutionController {
             }
 
             ExecutionLogger.logProcessExit(sessionId, exitCode, executionTimeMs);
+            this.finalizeRun(sessionId, { exitCode });
             this.sendWs({ type: 'exit', exitCode, executionTimeMs });
 
             await SessionManager.remove(sessionId);
@@ -224,6 +289,7 @@ export class ExecutionController {
       });
     } catch (spawnErr: any) {
       console.error(`[ExecutionController FULL STACK ERROR]`, spawnErr.stack || spawnErr);
+      this.finalizeRun(sessionId, { exitCode: null });
       this.sendWs({ type: 'output', data: `\r\n\x1b[31mExecution Error: ${spawnErr.message || spawnErr}\x1b[0m\r\n`, system: true });
       this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: Date.now() - session.startTime });
       await SessionManager.remove(sessionId);
@@ -236,7 +302,7 @@ export class ExecutionController {
     labId: string | undefined,
     filename: string,
     deviceClassHint?: string
-  ): Promise<{ code: string; message: string } | null> {
+  ): Promise<RunAuthorization> {
     if (!token || !labId) {
       return { code: 'UNAUTHORIZED', message: 'Missing authentication or exam context.' };
     }
@@ -258,7 +324,7 @@ export class ExecutionController {
       if (payload.role === 'LECTURER' && lab.lecturerId !== payload.userId) {
         return { code: 'FORBIDDEN', message: 'You do not have access to this exam.' };
       }
-      return null;
+      return { workspaceId: null };
     }
 
     if (payload.role !== 'STUDENT') {
@@ -303,7 +369,7 @@ export class ExecutionController {
       return { code: 'LANGUAGE_NOT_ALLOWED', message: `Language "${language}" is not permitted for this exam.` };
     }
 
-    return null;
+    return { workspaceId: workspace.id };
   }
 
   private handleInput(data: string): void {
@@ -311,6 +377,9 @@ export class ExecutionController {
     const session = SessionManager.get(this.currentSessionId);
     if (session) {
       PtyService.writeInput(session, data);
+      if (this.currentRun?.sessionId === this.currentSessionId && this.currentRun.stdin.length < RECORD_FIELD_LIMIT) {
+        this.currentRun.stdin = applyTerminalInput(this.currentRun.stdin, String(data));
+      }
     }
   }
 
@@ -328,6 +397,7 @@ export class ExecutionController {
     const session = SessionManager.get(sessionId);
 
     if (session) {
+      this.finalizeRun(sessionId, { exitCode: null });
       PtyService.killPty(session);
       this.sendWs({ type: 'output', data: '\r\n\x1b[33m[Process terminated manually (SIGKILL)]\x1b[0m\r\n', system: true });
       this.sendWs({ type: 'exit', exitCode: 137, executionTimeMs: 0 });
@@ -339,6 +409,7 @@ export class ExecutionController {
 
   public async handleDisconnect(): Promise<void> {
     if (this.currentSessionId) {
+      this.finalizeRun(this.currentSessionId, { exitCode: null });
       await SessionManager.remove(this.currentSessionId);
       this.currentSessionId = null;
     }

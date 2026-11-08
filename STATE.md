@@ -426,6 +426,21 @@ Each item was reproduced as a live attack before the fix and is covered by `npm 
 - Authorisation: students can no longer list all exam papers via `/api/lecturer/labs`; file
   save/rename/delete restricted to the caller's own workspace.
 
+### Execution records — *2026-11-08, iteration 6*
+- Every **student** run is persisted as an `ExecutionRecord` by `ExecutionController`, however
+  it ends (exit, compile failure, timeout, output limit, manual stop, disconnect, replaced by a
+  new run). Faculty runs in the inspector are not recorded.
+- Captured with the same rules as the browser terminal (`src/lib/runTranscript.ts`, shared by
+  both): ANSI stripped, platform banners excluded, stdin reconstructed from keystrokes. A
+  compile failure stores the compiler diagnostics.
+- Bounded: 64 KB per field (marked when truncated), 200 records per workspace (oldest pruned).
+  A failed write is logged and never interrupts the run.
+- `GET /api/lecturer/executions?submissionId=` — owning lecturer and admin only; students 403;
+  another lecturer's submission 404.
+- Submission Inspector **Runs** tab (`src/components/RunHistory.tsx`): run list with outcome,
+  input and transcript, and an explicit verdict on whether the Output section exactly matches
+  a recorded run (trailing whitespace / line endings ignored). Verified in Chrome, light and dark.
+
 ### Automated tests
 `npm test` — Node's built-in runner against a running server, local PostgreSQL and real
 compilers (`tests/`). 47 tests at last run, all passing in dev and production mode.
@@ -435,15 +450,12 @@ compilers (`tests/`). 47 tests at last run, all passing in dev and production mo
 These have **database schema and, where noted, partial runtime support**, but are not
 usable end to end.
 
-### Input/output capture — client-side capture done, persistence not
+### Input/output capture — *persistence completed in iteration 6; see Completed*
 - Runs **are** captured client-side and can be inserted into the Input/Output sections of
   the answer sheet (see Completed). Once inserted, the text persists as an ordinary answer.
-- `ExecutionRecord` model exists but **zero code reads or writes it**. Nothing about a run
-  is stored as a run: there is no server-side execution history, no record of runs the
-  student chose not to insert, and no way for an evaluator to see what else was executed.
-- Because insertion is student-initiated, Input/Output remain *attested* rather than
-  *proven*. A student can still type something a program never produced. Closing that gap
-  needs the `ExecutionRecord` write path.
+- Resolved: runs are now recorded server-side and the evaluator sees whether the Output
+  section matches one. Remaining gap: the record stores the transcript, not the source code
+  that ran, so it cannot show *which version* of the code produced a run.
 
 ### Section-wise evaluation
 - `SectionEvaluation` model exists. **Zero code reads or writes it.**
@@ -600,6 +612,15 @@ without a second navigation component.
 - The shell renders navigation from a static per-role list; it does not reflect permissions
   beyond role.
 
+**Found during iteration 6 browser verification (pre-existing, not yet fixed):**
+- Submission Inspector, light theme: the "Integrity Timeline" and "Grading Panel" headings are
+  near-invisible, and inactive inspector tab buttons render near-black.
+- No `favicon.ico` (404 on every page load).
+- The lecturer sidebar highlights "Evaluations" while still showing the subject list when no
+  subject is open.
+- `OnlineIDE` in the inspector's Code tab makes a 403 request to the student workspace
+  endpoint (already listed under Technical debt).
+
 ### Next UI/UX tasks
 1. Rebuild `QuestionSetManager` and `AnswerSheetConfigurator` bodies on the primitives (their
    dialog shells are now shared; their internals still compose their own layout).
@@ -624,12 +645,11 @@ without a second navigation component.
   lecturer may need to fix a broken question mid-exam, and it is audited — but a student who
   already answered against the old wording is not notified, and their existing answers are
   not migrated.
-- **Input/Output sections remain student-attested.** "Use last run" fills them from a real
-  execution, but a student may still edit the text afterwards or type it by hand, and runs
-  are not persisted server-side. The captured content is a convenience and an accuracy aid,
-  not proof of what executed.
-- **Run capture is in-memory and per-session.** Only the most recent run is offered, and it
-  is lost on reload. Nothing is stored.
+- **Input/Output sections are checkable, not locked.** A student may still edit them; the
+  evaluator's Runs tab now states whether the Output text matches a recorded run. Only the
+  Output section is compared (not Input). Records store the transcript, not the source.
+- **"Use last run" in the student UI is still in-memory.** The server keeps every run, but the
+  student's insert control only offers the latest run of the current session.
 - **Devtools detection is shortcut-only.** F12 and Ctrl+Shift+I/J/C are intercepted; an
   already-open panel, or one opened via the browser menu, is not detected. There is no
   reliable cross-browser API for this.
@@ -704,8 +724,7 @@ The prioritised, owner-assigned plan now lives in `docs/MVP_ROADMAP.md`; current
 audit were removed on 2026-11-08 because both are complete (see §1). Still outstanding from
 this list:
 
-1. **Persist execution records** — `ExecutionRecord` is still schema only.
-2. **Section-wise evaluation** — `SectionEvaluation` is still schema only.
-3. **Per-exam enrolment (optional).**
-4. **Notices module.**
+1. **Section-wise evaluation** — `SectionEvaluation` is still schema only.
+2. **Per-exam enrolment (optional).**
+3. **Notices module.**
 5. **Debt reduction** — README rewrite, shared API types, dashboard tab extraction, lint config.

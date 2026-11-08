@@ -141,3 +141,35 @@ the validation log line instead of needing a build. (2) Removed an assertion I h
 depended on the local `.env` secret length, which would fail on another developer's machine.
 
 **Remaining.** On Vercel the check is per-request, not at boot (no long-lived process).
+
+---
+
+## Iteration 5 — Framework and dependency advisories (S8) · 2026-11-08
+
+**Objective.** Remove known framework vulnerabilities without an unapproved major upgrade.
+
+**Analysis.** `npm audit` listed ~35 Next.js advisories. 14.2.35 is the last 14.2 release;
+many advisories are fixed only in 15.5+. Each class was checked for reachability in this
+codebase (table in `SECURITY_AUDIT.md` S8). Probes on the production server before changes:
+`/_next/image?url=/cbit-logo.png` → **200 image/png**; WebSocket upgrade to an arbitrary path →
+**still open after 3 s**.
+
+**Changes.**
+- `next` 14.2.10 → 14.2.35 (exact pin); `npm audit fix` without `--force` (6 transitive
+  patch bumps, listed in S8).
+- `next.config.mjs`: `images: { unoptimized: true }`.
+- `server.js`: in production, destroy upgrade sockets for any path other than `/api/ws`.
+- `tests/framework-hardening.test.mjs` (4 tests; boots its own production server, skips with
+  a reason if no build exists).
+
+**Tests executed.**
+- `tsc --noEmit` clean; `npm run build` compiles.
+- Production server: `npm test` → **51 pass, 0 fail, 0 skipped**.
+- Dev server: `/`, `/login`, `/student`, `/lecturer`, `/admin` → 200; HMR WebSocket
+  (`/_next/webpack-hmr`) still opens; `npm test` → **47 pass, 0 fail, 4 skipped** (the
+  production-only tests, by design).
+
+**Not done.** No browser screenshot of the pages after disabling image optimisation; the
+login HTML was checked to reference `/cbit-logo.png` directly and the file served with 200.
+
+**Remaining.** RSC advisories need Next 15.5+ (owner decision). `dompurify` pinned by Monaco.

@@ -3,7 +3,7 @@
 Persistent engineering state across sessions. Updated at the end of every iteration.
 History of each iteration: `ENGINEERING_CHANGELOG.md`. Feature inventory: `/STATE.md`.
 
-**Last updated:** 2026-11-08, after iteration 4.
+**Last updated:** 2026-11-08, after iteration 5.
 **Branch:** `claude/labsubmit-development-y605fv` (not pushed since `85240d1`; owner pushes after review).
 
 ## Current phase
@@ -22,6 +22,9 @@ Stage 5 — IMPLEMENT, working through the P0 security items in `MVP_ROADMAP.md`
 - Iteration 4: JWT startup validation (`server.js` refuses to start without a usable
   `JWT_SECRET`/`DATABASE_URL`); token/role/expiry test coverage; README env section fixed;
   STATE.md reconciled. Suite at 47 tests, all passing in dev and production mode.
+- Iteration 5: S8 — Next 14.2.35, non-breaking transitive fixes, image optimizer disabled,
+  stray WebSocket upgrades closed in production. Suite 51 (all pass in production; 4
+  production-only tests skip in dev by design).
 
 ## In progress / next
 
@@ -45,6 +48,9 @@ None at last run.
 - **Deploy prerequisite:** `JWT_SECRET` must be set on both hosts; without it logins now fail (by design).
 - **S4 Linux verification outstanding.** `ulimit -v`, `/proc` environ protection and the uid
   drop have not been executed on Linux.
+- **Owner decision needed:** Next 15.5+ major upgrade (React 19) to clear residual S8 advisories.
+- **Local install note:** this machine's npm skips install scripts unless approved
+  (`npm install-scripts approve <pkg>`); a fresh clone needs node-pty/prisma scripts approved.
 - **Production change awaiting approval:** add an unprivileged user to the `Dockerfile` and
   set `EXEC_RUN_UID`/`EXEC_RUN_GID` on Railway.
 - **Local dev gotcha:** on macOS run
@@ -76,4 +82,4 @@ npm test        # loads tsx so tests can import src/**/*.ts directly
 
 ## Next recommended action
 
-Iteration 5: S8 Next.js patch upgrade within 14.2.x (highest open security item), then iteration 6 `ExecutionRecord` persistence.
+Iteration 6: `ExecutionRecord` persistence, then iteration 7: section-wise evaluation.

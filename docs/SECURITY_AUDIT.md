@@ -21,7 +21,7 @@ Severity scale: CRITICAL · HIGH · MEDIUM · LOW · INFORMATIONAL.
 | S5 | HIGH | Hardcoded fallback JWT signing secret in `src/lib/jwt.ts` | **Fixed — iteration 2** (verified) |
 | S6 | HIGH | Students can read every exam paper (incl. drafts, upcoming) via `GET /api/lecturer/labs` | **Fixed — iteration 2** (verified) |
 | S7 | MEDIUM | Login: no rate limiting; distinct error messages enable account enumeration | **Fixed — iteration 3** (verified) |
-| S8 | MEDIUM | `next@14.2.10` has published critical/high advisories | Open |
+| S8 | MEDIUM | `next@14.2.10` has published critical/high advisories | **Partially fixed — iteration 5.** Patched to 14.2.35; reachable unpatched surfaces disabled; residual advisories need Next 15.5+ (owner decision) |
 | S9 | LOW | 7-day tokens with no server-side revocation; deactivating/deleting a user does not end an existing session | Open — needs verification |
 | S10 | LOW | `GET /api/auth/lecturers-available` is unauthenticated and returns lecturer names and emails | Open |
 | S12 | MEDIUM | `save_file` / `rename_file` / `delete_file` act on `fileId` without checking it belongs to the caller's workspace (IDOR; ids are unguessable, hence MEDIUM) | **Fixed — iteration 2** (verified) |
@@ -157,28 +157,31 @@ Accepted trade-off: someone knowing a roll number can lock that account for up t
 Limitation: in-memory, so per-instance on Vercel — raises cost of guessing, not a global
 guarantee.
 
-## S8 — Vulnerable Next.js version · MEDIUM
+## S8 — Vulnerable framework and dependencies · MEDIUM (partially fixed)
 
-`npm audit --omit=dev` (2026-11-08) reports critical advisories against `next@14.2.10` and
-transitive `postcss`, `nanoid`, `source-map-js`, `dompurify` (via Monaco). The best-known
-critical (middleware authorisation bypass) does not apply — the project has no
-`middleware.ts` — but others (cache poisoning, DoS) may. Upgrade to the latest `14.2.x`
-patch, then build and regression-test. Not done blindly.
+**Iteration 5.** `next` 14.2.10 → **14.2.35** (last 14.2 release), clearing every advisory fixed
+within the 14.2 line, including the critical middleware authorisation bypass. `npm audit fix`
+(no `--force`) moved six transitive packages within range: dompurify 3.4.8→3.4.15,
+monaco-editor 0.56→0.57, nanoid 3.3.16→3.3.20, postcss 8.5.22→8.5.32,
+postcss-selector-parser 6.1.4→6.1.5, source-map-js 1.2.1→1.2.2.
 
-## S12 — File actions not scoped to the caller's workspace · MEDIUM
+The 14.x line is end-of-life: many advisories (three critical RCEs among them) are fixed
+**only in 15.5+**. Each was checked against this codebase:
 
-**File:** `src/app/api/student/workspace/route.ts` (`save_file`, `rename_file`, `delete_file`).
+| Advisory class | Exposure here | Action |
+|---|---|---|
+| Middleware/proxy bypass, i18n bypass | None — no `middleware.ts`, no Pages Router | — |
+| Server Actions DoS/SSRF/disclosure | None — no `'use server'` in `src/` | — |
+| Rewrites SSRF / request smuggling | None — no rewrites configured | — |
+| Image Optimization RCE (AVIF/SVG), DoS, cache growth | **Was reachable** (`/_next/image` returned 200) | **Disabled** via `images.unoptimized` — only a local logo is used |
+| WebSocket-upgrade SSRF on custom servers | **Plausible** — custom `server.js` left non-`/api/ws` upgrades open indefinitely | **Closed** in production (dev keeps HMR) |
+| RSC Denial of Service; RSC cache poisoning; CSP-nonce XSS | Inherent to App Router | **Residual** — needs Next 15.5+ |
 
-**Evidence.** Each did `prisma.labFile.update/delete({ where: { id: fileId } })` after
-loading the caller's workspace but without checking the file was in it. Reproduced against
-the live server: student A's `save_file` with student B's file id returned 200 and
-overwrote B's code.
-
-**Impact.** Any student holding another's file id could alter or delete their exam code.
-File ids are UUIDs and are not exposed to other students, which is why this is MEDIUM.
-
-**Remediation (iteration 2).** The three actions are refused with 404 unless `fileId` is
-one of the caller's own workspace files.
+**Residual.** RSC DoS / cache-poisoning advisories remain until a major upgrade (Next 15.5+
+requires React 19 for the App Router — an architectural change awaiting owner approval).
+`dompurify ≤3.4.16` remains because Monaco pins it; its advisories concern `IN_PLACE`, hook
+and `SAFE_FOR_TEMPLATES` modes applied to attacker HTML, and Monaco only sanitises markdown it
+generates — low exploitability. `postcss` remaining under `next/node_modules` is build-time only.
 
 ## S9 — No session revocation · LOW (needs verification)
 

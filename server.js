@@ -72,7 +72,13 @@ app.prepare().then(() => {
         wss.emit('connection', ws, request);
       });
     }
-    // Note: Do NOT call socket.destroy() here so Next.js HMR /_next/webpack-hmr and other upgrade handlers work properly!
+    // In development, other upgrades (Next's HMR at /_next/webpack-hmr) must be left alone.
+    // In production nothing else legitimately upgrades, so close them: an unanswered upgrade
+    // otherwise hangs open indefinitely, and Next 14.x has an unpatched SSRF advisory for
+    // WebSocket upgrades on custom servers (SECURITY_AUDIT.md S8).
+    else if (!dev) {
+      socket.destroy();
+    }
   });
 
   wss.on('connection', (ws, request) => {

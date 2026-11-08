@@ -134,6 +134,30 @@ async function syncAnswerSheetSections(labId: string, input: unknown) {
   ]);
 }
 
+// An exam must sit under a subject the lecturer actually teaches, and in that subject's
+// cohort. Without this a lecturer could publish an exam into another lecturer's subject —
+// visible to that subject's students — or file it under a year/branch the subject does not
+// belong to (SECURITY_AUDIT.md S23). Admins may use any subject but the cohort must still match.
+async function checkSubjectPlacement(
+  session: { role: string; userId: string },
+  subjectId: string | null,
+  year: number,
+  branchId: string | null
+): Promise<NextResponse | null> {
+  if (!subjectId) return null; // legacy exams with no subject: nothing to place against
+  const subject = await prisma.subject.findUnique({ where: { id: subjectId } });
+  if (!subject) {
+    return NextResponse.json({ error: 'Subject not found.' }, { status: 400 });
+  }
+  if (session.role === 'LECTURER' && subject.lecturerId !== session.userId) {
+    return NextResponse.json({ error: 'You can only create exams for subjects assigned to you.' }, { status: 403 });
+  }
+  if (subject.year !== year || subject.branchId !== branchId) {
+    return NextResponse.json({ error: "The exam's year and branch must match its subject." }, { status: 400 });
+  }
+  return null;
+}
+
 export async function GET(req: Request) {
   // Faculty only. This returns full problem statements for every exam including drafts;
   // students read papers solely through /api/student/workspace, which withholds them until
@@ -246,6 +270,8 @@ export async function POST(req: Request) {
     if (!title || !problemStatement || !year || !branchId || !subjectId) {
       return NextResponse.json({ error: 'Title, problem statement, year, branch, and subject are required' }, { status: 400 });
     }
+    const placementProblem = await checkSubjectPlacement(session!, subjectId, parseInt(year), branchId);
+    if (placementProblem) return placementProblem;
 
     if (examModeEnabled && !endTime) {
       return NextResponse.json({ error: 'An end time is required for exam-mode exams' }, { status: 400 });
@@ -331,6 +357,16 @@ export async function PUT(req: Request) {
     }
     if (session!.role === 'LECTURER' && existing.lecturerId !== session!.userId) {
       return NextResponse.json({ error: 'You do not have access to this exam.' }, { status: 403 });
+    }
+    // Moving an exam (subject, year or branch) is checked like creating one.
+    if (subjectId !== undefined || year !== undefined || branchId !== undefined) {
+      const placementProblem = await checkSubjectPlacement(
+        session!,
+        subjectId ?? existing.subjectId,
+        year !== undefined ? parseInt(year) : existing.year,
+        branchId ?? existing.branchId
+      );
+      if (placementProblem) return placementProblem;
     }
 
     const effectiveExamModeEnabled = examModeEnabled !== undefined ? Boolean(examModeEnabled) : undefined;

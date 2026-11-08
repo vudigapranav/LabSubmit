@@ -242,3 +242,39 @@ test('S11: no route returns raw exception messages to the client', () => {
   walk('src/app/api');
   assert.deepEqual(offenders, []);
 });
+
+// ── S23: a lecturer may only create/move exams into subjects they teach ─────────────────
+test('S23: a lecturer cannot create or move an exam into another lecturer\'s subject', async () => {
+  const [mine, theirs] = await Promise.all([
+    prisma.subject.findFirst({ where: { lecturerId: { not: null } }, include: { lecturer: true } }),
+    null,
+  ]);
+  const foreign = await prisma.subject.findFirst({ where: { lecturerId: { not: mine.lecturerId } } });
+  assert.ok(mine && foreign, 'needs two subjects with different lecturers in the seed');
+  const token = tokenFor(mine.lecturer);
+  const day = new Date(Date.now() + 2 * 86_400_000);
+  const at = (h) => new Date(day.getFullYear(), day.getMonth(), day.getDate(), h).toISOString();
+  const body = (s) => ({
+    title: `${tag} s23`, description: 'd', problemStatement: 'p', year: s.year, branchId: s.branchId, subjectId: s.id,
+    allowedLanguages: ['python'], examDate: at(0), startTime: at(10), endTime: at(12), durationMinutes: 60,
+  });
+
+  const intoForeign = await api('/api/lecturer/labs', { token, method: 'POST', body: body(foreign) });
+  assert.equal(intoForeign.status, 403, JSON.stringify(intoForeign.json));
+  assert.equal(await prisma.lab.count({ where: { title: `${tag} s23` } }), 0);
+
+  const own = await api('/api/lecturer/labs', { token, method: 'POST', body: body(mine) });
+  assert.equal(own.status, 200, JSON.stringify(own.json));
+  const created = own.json.lab;
+  try {
+    const move = await api('/api/lecturer/labs', { token, method: 'PUT', body: { id: created.id, subjectId: foreign.id, branchId: foreign.branchId, year: foreign.year } });
+    assert.equal(move.status, 403, JSON.stringify(move.json));
+    assert.equal((await prisma.lab.findUnique({ where: { id: created.id } })).subjectId, mine.id);
+    // Cohort must match the subject's: no exam for Year 1 under a Year 2 subject.
+    const mismatch = await api('/api/lecturer/labs', { token, method: 'POST', body: { ...body(mine), year: mine.year === 1 ? 2 : 1 } });
+    assert.equal(mismatch.status, 400, JSON.stringify(mismatch.json));
+  } finally {
+    await prisma.answerSheetSection.deleteMany({ where: { labId: created.id } });
+    await prisma.lab.deleteMany({ where: { title: `${tag} s23` } });
+  }
+});

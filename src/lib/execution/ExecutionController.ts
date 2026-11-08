@@ -13,6 +13,7 @@ import { CompilerService } from './CompilerService';
 import { RuntimeSandbox } from './RuntimeSandbox';
 import { PtyService } from './PtyService';
 import { ExecutionLogger } from './ExecutionLogger';
+import { isSafeSourceFilename, SOURCE_FILENAME_RULE } from '../sourceFilename';
 // Relative imports (not the @/* alias) — this file is loaded by server.js via tsx's
 // CJS require hook, a different resolution path than Next's own webpack/SWC bundling
 // used everywhere else in the app, so path-alias resolution here is unverified.
@@ -25,6 +26,10 @@ import {
   headerReaderFromNodeHeaders,
   readDeviceSignals,
 } from '../deviceEligibility';
+
+// Generous for any lab program; bounds what one run can write to the execution host's disk.
+const MAX_FILES_PER_RUN = 20;
+const MAX_SOURCE_BYTES_PER_RUN = 1024 * 1024;
 
 export class ExecutionController {
   private ws: WebSocket;
@@ -80,6 +85,29 @@ export class ExecutionController {
       return;
     }
 
+    // Every name here comes from the client, not the database, and becomes a filesystem
+    // path and a compiler argument. Reject the whole run on any unsafe name — before
+    // authorisation, before the temp dir exists, before anything touches the disk (S2/S3).
+    const fileList = Array.isArray(files) ? files : [];
+    const badName = [filename, ...fileList.map((f) => f?.filename)].find((n) => !isSafeSourceFilename(n));
+    if (badName !== undefined || fileList.length > MAX_FILES_PER_RUN || fileList.some((f) => typeof f?.content !== 'string')) {
+      const message =
+        badName !== undefined
+          ? `Invalid file name "${String(badName).slice(0, 100)}". ${SOURCE_FILENAME_RULE}`
+          : 'Invalid file list.';
+      this.sendWs({ type: 'error', code: 'INVALID_FILENAME', message });
+      this.sendWs({ type: 'output', data: `\r\n\x1b[31m${message}\x1b[0m\r\n`, system: true });
+      this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
+      return;
+    }
+    const totalBytes = [code, ...fileList.map((f) => f.content)].reduce((n, c) => n + Buffer.byteLength(String(c)), 0);
+    if (totalBytes > MAX_SOURCE_BYTES_PER_RUN) {
+      const message = `Source too large (${Math.ceil(totalBytes / 1024)} KB; limit ${MAX_SOURCE_BYTES_PER_RUN / 1024} KB).`;
+      this.sendWs({ type: 'error', code: 'SOURCE_TOO_LARGE', message });
+      this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
+      return;
+    }
+
     // Authorization: verify identity, workspace ownership, and exam window before
     // touching the filesystem or spawning any process. This is the actual security
     // boundary for code execution — everything the client sends is otherwise untrusted.
@@ -117,7 +145,7 @@ export class ExecutionController {
     // 2. Compilation Stage
     this.sendWs({ type: 'status', status: 'compiling' });
 
-    const compileResult = await CompilerService.prepareAndCompile(sessionId, tempDir, filename, code, files);
+    const compileResult = await CompilerService.prepareAndCompile(sessionId, tempDir, filename, code, fileList);
 
     if (!compileResult.success) {
       this.sendWs({

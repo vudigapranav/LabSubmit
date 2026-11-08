@@ -9,6 +9,7 @@ import { findIncompleteRequiredSections } from '@/lib/answerSheet';
 import { assignableSets, chooseSetId, toStudentPaper, paperToPlainText } from '@/lib/questionSets';
 import { initialFileForLab } from '@/lib/workspaceBootstrap';
 import { RESULTS_WITHHELD_MESSAGE } from '@/lib/resultRelease';
+import { isSafeSourceFilename, SOURCE_FILENAME_RULE } from '@/lib/sourceFilename';
 
 
 /**
@@ -314,6 +315,11 @@ export async function POST(req: Request) {
       if (!filename) {
         return NextResponse.json({ error: 'Filename is required' }, { status: 400 });
       }
+      // Same rule the execution engine enforces, applied at creation so a student is never
+      // left holding a file the engine will refuse to run.
+      if (!isSafeSourceFilename(String(filename).trim())) {
+        return NextResponse.json({ error: SOURCE_FILENAME_RULE }, { status: 400 });
+      }
       const existing = workspace.files.find((f) => f.filename.toLowerCase() === filename.trim().toLowerCase());
       if (existing) {
         return NextResponse.json({ error: `File with name "${filename}" already exists` }, { status: 400 });
@@ -347,6 +353,9 @@ export async function POST(req: Request) {
     if (action === 'rename_file') {
       if (!fileId || !newFilename) {
         return NextResponse.json({ error: 'File ID and new filename are required' }, { status: 400 });
+      }
+      if (!isSafeSourceFilename(String(newFilename).trim())) {
+        return NextResponse.json({ error: SOURCE_FILENAME_RULE }, { status: 400 });
       }
       const lang = detectLanguage(newFilename);
       if (!isLanguageAllowed(lab, lang)) {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { Navbar } from '@/components/Navbar';
@@ -14,6 +14,7 @@ import { getOrCreateExamSessionId } from '@/lib/examSession';
 import { detectClientDeviceClass, useDeviceClass } from '@/lib/useDeviceClass';
 import { ArrowLeft, BookOpen, AlertCircle, ShieldAlert, Maximize, Clock, CheckCircle2, Hourglass, Laptop, FileText, Code2 } from 'lucide-react';
 import { estimateClockOffset } from '@/lib/serverClock';
+import type { FlushOutcome } from '@/lib/useFileAutosave';
 import Link from 'next/link';
 
 // Switches between the two halves of one attempt: the written record and the code
@@ -65,6 +66,8 @@ export default function StudentLabWorkspacePage() {
   const [effectiveDeadline, setEffectiveDeadline] = useState<string | null>(null);
   // Local clock → server clock correction, measured on every exam API round trip.
   const [clockOffsetMs, setClockOffsetMs] = useState(0);
+  // Set by OnlineIDE: saves every unsaved file. Called before an auto-submit.
+  const flushEditsRef = useRef<(() => Promise<FlushOutcome>) | null>(null);
   // Server-issued confirmation of the stored hand-in (version, server time, hash prefix).
   const [receipt, setReceipt] = useState<{ version: number; submittedAt: string; reference: string; onTime: boolean } | null>(null);
   const [sections, setSections] = useState<AnswerSheetSection[]>([]);
@@ -178,6 +181,9 @@ export default function StudentLabWorkspacePage() {
 
   const handleAutoSubmit = useCallback(async () => {
     try {
+      // Save what is in the editor first. Best effort: a save the server refuses (deadline
+      // already passed) must not stop the auto-submit, which captures whatever was stored.
+      await flushEditsRef.current?.().catch(() => undefined);
       await fetch('/api/student/workspace', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -218,7 +224,10 @@ export default function StudentLabWorkspacePage() {
   const isSubmitted = Boolean(workspace?.isSubmitted);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col overflow-hidden">
+    <div className="h-screen bg-slate-950 flex flex-col overflow-hidden">
+      {/* h-screen, not min-h-screen: the IDE below sizes itself with h-full/flex-1, and those only
+          resolve against a DEFINITE height. With min-h-screen the editor collapsed to ~5px at every
+          screen size — the code was effectively invisible (measured; pre-existing). */}
       <Navbar onOpenProfile={() => setProfileOpen(true)} />
 
       {/* Back Bar */}
@@ -238,8 +247,10 @@ export default function StudentLabWorkspacePage() {
 
       {/* Gate: exam not started yet */}
       {!hasStarted && !isSubmitted && (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-card max-w-lg w-full p-5 sm:p-8 space-y-4 sm:space-y-5 shadow-overlay text-center">
+        // Scrolls rather than clips on short screens; m-auto centres without pushing the top
+        // (and the Start button) out of reach when the content is taller than the screen.
+        <div className="flex-1 min-h-0 overflow-y-auto flex p-4">
+          <div className="m-auto bg-slate-900 border border-slate-800 rounded-card max-w-lg w-full p-5 sm:p-8 space-y-4 sm:space-y-5 shadow-overlay text-center">
             <div className="w-14 h-14 rounded-card bg-brand-olive-950/60 border border-brand-olive-800/60 flex items-center justify-center mx-auto">
               <BookOpen className="w-7 h-7 text-brand-olive-400" />
             </div>
@@ -332,7 +343,7 @@ export default function StudentLabWorkspacePage() {
 
       {/* Locked: already submitted */}
       {isSubmitted && (
-        <div className="flex-1 p-2 sm:p-4 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 p-2 sm:p-4 overflow-hidden flex flex-col">
           <div className="bg-emerald-950/40 border border-emerald-800/60 rounded-control p-3 mb-3 flex items-center space-x-2 text-emerald-300 text-xs font-semibold">
             <CheckCircle2 className="w-4 h-4" />
             <span>
@@ -381,7 +392,7 @@ export default function StudentLabWorkspacePage() {
 
       {/* Active exam: exam-guard wrapped IDE */}
       {hasStarted && !isSubmitted && (
-        <div className="flex-1 p-2 sm:p-4 overflow-hidden">
+        <div className="flex-1 min-h-0 p-2 sm:p-4 overflow-hidden flex flex-col">
           <ExamGuard
             labId={labData.id}
             token={token || ''}
@@ -423,6 +434,7 @@ export default function StudentLabWorkspacePage() {
                   readOnly={false}
                   initialFiles={workspace?.files || []}
                   isSubmitted={false}
+                  flushRef={flushEditsRef}
                   onSubmittedSuccess={fetchWorkspace}
                   allowCopy={labData.allowCopy}
                   allowPaste={labData.allowPaste}

@@ -231,7 +231,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, labId, fileId, filename, content, newFilename, sessionId, sectionId, deviceClass } = body;
+    const { action, labId, fileId, filename, content, newFilename, sessionId, sectionId, deviceClass, baseUpdatedAt } = body;
 
     if (!labId || !action) {
       return NextResponse.json({ error: 'Exam ID and action are required' }, { status: 400 });
@@ -427,6 +427,31 @@ export async function POST(req: Request) {
     if (action === 'save_file') {
       if (!fileId || content === undefined) {
         return NextResponse.json({ error: 'File ID and content are required' }, { status: 400 });
+      }
+      // Optimistic concurrency: a save says which version it was based on, and is refused if
+      // the file changed since (another tab, a delayed retry). Without this a late save
+      // silently overwrote newer work — reproduced with a delayed unload save. The update is
+      // conditional in one statement, so two racing saves cannot both pass the check.
+      // Clients that send no base (older ones) keep last-write-wins.
+      if (typeof baseUpdatedAt === 'string') {
+        const base = new Date(baseUpdatedAt);
+        const result = await prisma.labFile.updateMany({
+          where: { id: fileId, workspaceId: workspace.id, updatedAt: base },
+          data: { content },
+        });
+        if (result.count === 0) {
+          const current = await prisma.labFile.findUnique({ where: { id: fileId } });
+          return NextResponse.json(
+            {
+              error: 'This file was changed elsewhere (another tab or device) after you started editing. Your version is kept in this browser; reload the exam to see the saved version.',
+              conflict: true,
+              serverUpdatedAt: current?.updatedAt ?? null,
+            },
+            { status: 409 }
+          );
+        }
+        const saved = await prisma.labFile.findUnique({ where: { id: fileId } });
+        return NextResponse.json({ message: 'File saved', file: saved });
       }
       const updatedFile = await prisma.labFile.update({
         where: { id: fileId },

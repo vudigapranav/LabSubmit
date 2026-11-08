@@ -5,6 +5,7 @@ import Editor from '@monaco-editor/react';
 import { useApp } from '@/context/AppContext';
 import { AntiCheatWrapper } from './AntiCheatWrapper';
 import { detectClientDeviceClass } from '@/lib/useDeviceClass';
+import { useFileAutosave, type FlushOutcome } from '@/lib/useFileAutosave';
 import { QuestionPaper } from './QuestionPaper';
 import { Terminal, TerminalRef, CapturedRun } from './Terminal';
 import {
@@ -25,6 +26,7 @@ interface LabFile {
   filename: string;
   content: string;
   language: string;
+  updatedAt?: string | null;
 }
 
 // Extension is always derived from an explicit language choice in the New Source File
@@ -67,6 +69,8 @@ interface OnlineIDEProps {
    * that have no question sets.
    */
   questions?: { order: number; text: string; marks: number | null }[];
+  /** Filled with a function that saves every unsaved file — the page calls it before an auto-submit. */
+  flushRef?: React.MutableRefObject<(() => Promise<FlushOutcome>) | null>;
 }
 
 export const OnlineIDE: React.FC<OnlineIDEProps> = ({
@@ -87,6 +91,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   fillParent = false,
   onRunCaptured,
   questions,
+  flushRef,
 }) => {
   const { token, theme } = useApp();
   const newFileLanguageOptions = allowedLanguages && allowedLanguages.length > 0
@@ -110,6 +115,12 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   const [renameInput, setRenameInput] = useState<string>('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Saves every edit (see src/lib/useFileAutosave.ts). Off for read-only views and once submitted.
+  const autosave = useFileAutosave({ labId, token, enabled: !readOnly && !workspaceSubmitted });
+  useEffect(() => {
+    if (flushRef) flushRef.current = autosave.flush;
+  }, [flushRef, autosave.flush]);
+
   useEffect(() => {
     fetchWorkspace();
   }, [labId]);
@@ -127,8 +138,17 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data.workspace && data.workspace.files.length > 0) {
-          setFiles(data.workspace.files);
-          setActiveFileId(data.workspace.files[0].id);
+          // Crash/refresh recovery: restore local drafts only where the server copy is unchanged.
+          const { files: loaded, restored, discarded } = data.workspace.isSubmitted
+            ? { files: data.workspace.files, restored: [], discarded: [] }
+            : autosave.reconcile<LabFile>(data.workspace.files);
+          setFiles(loaded);
+          setActiveFileId(loaded[0].id);
+          if (restored.length > 0) {
+            showToast('success', `Recovered unsaved changes in ${restored.length} file(s) from this browser. Saving them now.`);
+          } else if (discarded.length > 0) {
+            showToast('error', `An older unsaved draft of ${discarded.length} file(s) was not restored because the saved version is newer.`);
+          }
           setWorkspaceSubmitted(data.workspace.isSubmitted);
         }
       }
@@ -145,28 +165,13 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
     setFiles((prev) =>
       prev.map((f) => (f.id === activeFile.id ? { ...f, content: newContent } : f))
     );
+    autosave.markDirty({ id: activeFile.id, content: newContent, updatedAt: activeFile.updatedAt });
   };
 
-  const saveActiveFile = async () => {
-    if (!activeFile || workspaceSubmitted || readOnly) return;
-    try {
-      await fetch('/api/student/workspace', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token || localStorage.getItem('cbit_token')}`,
-          'X-LabSubmit-Device-Class': detectClientDeviceClass(),
-        },
-        body: JSON.stringify({
-          action: 'save_file',
-          labId,
-          fileId: activeFile.id,
-          content: activeFile.content,
-        }),
-      });
-    } catch (e) {
-      console.error('Auto save error:', e);
-    }
+  // Saves EVERY file with unsaved edits (it used to save only the active one).
+  const saveActiveFile = async (): Promise<FlushOutcome> => {
+    if (workspaceSubmitted || readOnly) return 'saved';
+    return autosave.flush();
   };
 
   const handleCreateFile = async () => {
@@ -259,6 +264,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         }),
       });
       if (res.ok) {
+        autosave.forget(fileId);
         const remaining = files.filter((f) => f.id !== fileId);
         setFiles(remaining);
         if (activeFileId === fileId && remaining.length > 0) {
@@ -299,7 +305,13 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
     if (workspaceSubmitted) return;
     if (!confirm('Are you sure you want to submit your lab assessment? Once submitted, your workspace will be locked.')) return;
 
-    await saveActiveFile();
+    const saved = await saveActiveFile();
+    if (saved === 'retrying' || saved === 'pending') {
+      // Submitting now would hand in older code than the student sees. A server REFUSAL (e.g.
+      // the deadline passed) is different: the server holds what it accepted, so submit that.
+      showToast('error', 'Your latest changes are not saved yet (connection problem). Check your connection and press Submit again.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/student/workspace', {
@@ -383,6 +395,23 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
             <h2 className="font-semibold text-xs text-slate-200 max-w-xs sm:max-w-md truncate">
               {labTitle}
             </h2>
+
+            {!readOnly && !workspaceSubmitted && (
+              <span
+                role="status"
+                aria-live="polite"
+                title={autosave.message || undefined}
+                className={`text-[11px] font-medium ${
+                  autosave.status === 'error' ? 'text-rose-400' : autosave.status === 'retrying' ? 'text-amber-400' : 'text-slate-400'
+                }`}
+              >
+                {autosave.status === 'saved' && 'All changes saved'}
+                {autosave.status === 'saving' && 'Saving…'}
+                {autosave.status === 'unsaved' && 'Unsaved changes'}
+                {autosave.status === 'retrying' && 'Offline — your work is kept in this browser and will be saved when you reconnect'}
+                {autosave.status === 'error' && `Not saved: ${autosave.message || 'the server refused the change'}`}
+              </span>
+            )}
 
             {/* Problem Statement Overlay Modal Toggle */}
             <button

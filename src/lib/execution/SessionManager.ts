@@ -8,6 +8,15 @@ export class SessionManager {
     this.sessions.set(session.sessionId, session);
   }
 
+  /** How many runs this user has live right now, across all their sockets. */
+  static activeFor(ownerId: string): number {
+    let n = 0;
+    this.sessions.forEach((s) => {
+      if (s.ownerId === ownerId) n += 1;
+    });
+    return n;
+  }
+
   static get(sessionId: string): ExecutionSession | undefined {
     return this.sessions.get(sessionId);
   }

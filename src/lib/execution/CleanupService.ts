@@ -13,6 +13,13 @@ export class CleanupService {
     }
 
     if (session.ptyProcess) {
+      // Kill the whole process group, not just the program. node-pty starts the program as a
+      // session leader, so its pid is the group id; children it started (including ones that
+      // ignore SIGHUP) are in that group and would otherwise outlive the run (S16). A child
+      // that calls setsid() leaves the group — only a real sandbox contains that (S4).
+      try {
+        process.kill(-session.ptyProcess.pid, 'SIGKILL');
+      } catch (e) {}
       try {
         session.ptyProcess.kill('SIGKILL');
       } catch (e) {}

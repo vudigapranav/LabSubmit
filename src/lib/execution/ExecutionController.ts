@@ -13,7 +13,7 @@ import { CompilerService } from './CompilerService';
 import { RuntimeSandbox } from './RuntimeSandbox';
 import { PtyService } from './PtyService';
 import { ExecutionLogger } from './ExecutionLogger';
-import { isSafeSourceFilename, SOURCE_FILENAME_RULE } from '../sourceFilename';
+import { isSafeSourceFilename, SOURCE_FILENAME_RULE, MAX_FILES_PER_WORKSPACE } from '../sourceFilename';
 import { appendBounded, applyTerminalInput, RECORD_FIELD_LIMIT, stripAnsi } from '../runTranscript';
 import { persistExecutionRecord } from '../executionRecords';
 // Relative imports (not the @/* alias) — this file is loaded by server.js via tsx's
@@ -30,7 +30,11 @@ import {
 } from '../deviceEligibility';
 
 // Generous for any lab program; bounds what one run can write to the execution host's disk.
-const MAX_FILES_PER_RUN = 20;
+const MAX_FILES_PER_RUN = MAX_FILES_PER_WORKSPACE;
+// Per user, across all their sockets. Opening many sockets used to mean many parallel
+// compiles and programs — a cheap way for one student to starve everyone else (S15).
+// Two allows a run in the IDE plus one in another tab without enabling a pile-up.
+export const MAX_CONCURRENT_RUNS_PER_USER = 2;
 const MAX_SOURCE_BYTES_PER_RUN = 1024 * 1024;
 
 // What is being captured for the run in progress. Only student runs inside their own
@@ -46,7 +50,7 @@ interface RunCapture {
   finalized: boolean;
 }
 
-type RunAuthorization = { code: string; message: string } | { workspaceId: string | null };
+type RunAuthorization = { code: string; message: string } | { workspaceId: string | null; userId: string };
 
 export class ExecutionController {
   private ws: WebSocket;
@@ -161,6 +165,18 @@ export class ExecutionController {
       return;
     }
 
+    // Checked and claimed in the same tick (no await in between), so parallel sockets
+    // cannot all pass the check before any of them registers.
+    if (SessionManager.activeFor(auth.userId) >= MAX_CONCURRENT_RUNS_PER_USER) {
+      this.sendWs({
+        type: 'error',
+        code: 'TOO_MANY_RUNS',
+        message: `You already have ${MAX_CONCURRENT_RUNS_PER_USER} programs running. Stop one before starting another.`,
+      });
+      this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
+      return;
+    }
+
     const sessionId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     this.currentSessionId = sessionId;
     this.currentRun = auth.workspaceId
@@ -180,7 +196,6 @@ export class ExecutionController {
 
     const lang = detectLanguage(filename);
     const tempDir = path.join(os.tmpdir(), `labsubmit_exec_${sessionId}`);
-    await fs.mkdir(tempDir, { recursive: true });
 
     const session: ExecutionSession = {
       sessionId,
@@ -192,9 +207,12 @@ export class ExecutionController {
       timeoutTimer: null,
       outputByteCount: 0,
       isCleaningUp: false,
+      ownerId: auth.userId,
     };
 
+    // Registered before the first await so the run-slot claim above is atomic.
     SessionManager.register(session);
+    await fs.mkdir(tempDir, { recursive: true });
     ExecutionLogger.logSessionStart(sessionId, filename, lang, (files?.length || 0) + 1);
 
     // 2. Compilation Stage
@@ -324,7 +342,7 @@ export class ExecutionController {
       if (payload.role === 'LECTURER' && lab.lecturerId !== payload.userId) {
         return { code: 'FORBIDDEN', message: 'You do not have access to this exam.' };
       }
-      return { workspaceId: null };
+      return { workspaceId: null, userId: payload.userId };
     }
 
     if (payload.role !== 'STUDENT') {
@@ -369,7 +387,7 @@ export class ExecutionController {
       return { code: 'LANGUAGE_NOT_ALLOWED', message: `Language "${language}" is not permitted for this exam.` };
     }
 
-    return { workspaceId: workspace.id };
+    return { workspaceId: workspace.id, userId: payload.userId };
   }
 
   private handleInput(data: string): void {

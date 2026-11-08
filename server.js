@@ -63,7 +63,10 @@ app.prepare().then(() => {
     }
   });
 
-  const wss = new WebSocketServer({ noServer: true });
+  // maxPayload: the ws default is 100 MB per message. A run carries at most 1 MB of source
+  // (enforced in ExecutionController), so 2 MB covers it with JSON overhead; anything larger
+  // closes the socket with 1009 before it is buffered and parsed (SECURITY_AUDIT.md S15).
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
 
   server.on('upgrade', (request, socket, head) => {
     const { pathname } = parse(request.url || '', true);

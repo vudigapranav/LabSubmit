@@ -31,6 +31,8 @@ export interface ExecutionSession {
   timeoutTimer: NodeJS.Timeout | null;
   outputByteCount: number;
   isCleaningUp: boolean;
+  /** User the run belongs to; used to cap concurrent runs per user. */
+  ownerId?: string;
 }
 
 export interface CompilationResult {

@@ -8,6 +8,9 @@
 // (see AUDIT_LOGGING_DESIGN.md, "anchoring").
 import { createHash } from 'crypto';
 import { prisma } from './db';
+import { integrityCheck, integrityKeyConfigured, integritySign } from './integrityKey';
+
+const signedAuditMessage = (hash: string) => `labsubmit:audit:v1:${hash}`;
 
 export type AuditCategory = 'AUTH' | 'ADMIN' | 'EXAM' | 'SUBMISSION' | 'GRADING';
 
@@ -71,6 +74,7 @@ export interface AuditRowLike {
   ip: string | null;
   prevHash: string;
   hash: string;
+  signature?: string | null;
 }
 
 export function computeAuditHash(prevHash: string, row: Omit<AuditRowLike, 'hash' | 'prevHash'>): string {
@@ -93,15 +97,53 @@ export function computeAuditHash(prevHash: string, row: Omit<AuditRowLike, 'hash
     .digest('hex');
 }
 
-/** Walks rows in sequence order; returns the first row whose link or content does not verify. */
-export function verifyAuditRows(rows: AuditRowLike[]): { ok: boolean; checked: number; brokenAtSeq: number | null; reason?: string } {
+export interface AuditVerification {
+  ok: boolean;
+  checked: number;
+  brokenAtSeq: number | null;
+  reason?: string;
+  signed: number;
+  unsigned: number;
+  unverifiable: number;
+}
+
+/**
+ * Walks rows in sequence order and reports the first row that fails:
+ *  1. its link to the previous row (deleted, inserted or reordered rows);
+ *  2. its own hash (edited content);
+ *  3. its keyed signature — catches someone who edited a row AND recomputed the whole chain
+ *     from there, which hashes alone cannot detect;
+ *  4. a missing signature after signing began — otherwise the attacker would simply blank the
+ *     signatures of the rows they rewrote (a downgrade).
+ * Rows before the first signed row (written before a key existed) are counted as unsigned.
+ */
+export function verifyAuditRows(rows: AuditRowLike[]): AuditVerification {
   let prev = GENESIS_HASH;
+  let signingStarted = false;
+  const counts = { signed: 0, unsigned: 0, unverifiable: 0 };
+  const fail = (row: AuditRowLike, reason: string): AuditVerification => ({ ok: false, checked: rows.length, brokenAtSeq: row.seq, reason, ...counts });
   for (const row of rows) {
-    if (row.prevHash !== prev) return { ok: false, checked: rows.length, brokenAtSeq: row.seq, reason: 'link to previous row does not match (row deleted, inserted or reordered)' };
-    if (computeAuditHash(row.prevHash, row) !== row.hash) return { ok: false, checked: rows.length, brokenAtSeq: row.seq, reason: 'row content does not match its hash (row edited)' };
+    if (row.prevHash !== prev) return fail(row, 'link to previous row does not match (row deleted, inserted or reordered)');
+    if (computeAuditHash(row.prevHash, row) !== row.hash) return fail(row, 'row content does not match its hash (row edited)');
+    const sig = integrityCheck(signedAuditMessage(row.hash), row.signature);
+    if (sig === 'invalid') return fail(row, 'signature does not match (row rewritten without the integrity key)');
+    if (sig === 'unsigned') {
+      if (signingStarted) return fail(row, 'unsigned row after signing began (signature removed)');
+      counts.unsigned++;
+    } else {
+      signingStarted = true;
+      if (sig === 'valid') counts.signed++;
+      else counts.unverifiable++;
+    }
     prev = row.hash;
   }
-  return { ok: true, checked: rows.length, brokenAtSeq: null };
+  // The server signs every new row once a key exists, so the newest row must be signed;
+  // otherwise an attacker could strip EVERY signature and the "signing began" rule never fires.
+  const last = rows[rows.length - 1];
+  if (last && integrityKeyConfigured() && integrityCheck(signedAuditMessage(last.hash), last.signature) !== 'valid') {
+    return fail(last, 'newest row is not validly signed although an integrity key is configured (signatures stripped)');
+  }
+  return { ok: true, checked: rows.length, brokenAtSeq: null, ...counts };
 }
 
 export async function verifyAuditChain() {
@@ -137,7 +179,10 @@ export async function recordAudit(input: AuditInput): Promise<void> {
         metadata: (redact(input.metadata ?? {}) ?? {}) as Record<string, unknown>,
         ip: input.ip ?? null,
       };
-      await tx.auditEvent.create({ data: { ...row, metadata: row.metadata as object, prevHash, hash: computeAuditHash(prevHash, row) } });
+      const hash = computeAuditHash(prevHash, row);
+      await tx.auditEvent.create({
+        data: { ...row, metadata: row.metadata as object, prevHash, hash, signature: integritySign(signedAuditMessage(hash)) },
+      });
     });
   } catch (err) {
     console.error('[AUDIT] Failed to record audit event', input.action, err instanceof Error ? err.message : err);

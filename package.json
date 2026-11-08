@@ -9,7 +9,8 @@
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
-    "test": "node --import tsx --test --test-reporter=spec --test-concurrency=1 \"tests/*.test.mjs\""
+    "test": "node --import tsx --test --test-reporter=spec --test-concurrency=1 \"tests/*.test.mjs\"",
+    "db:protect": "prisma db execute --file prisma/sql/001_append_only.sql --schema prisma/schema.prisma"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",

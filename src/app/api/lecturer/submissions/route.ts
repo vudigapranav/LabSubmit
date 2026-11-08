@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { verifySnapshot, type SnapshotAnswer, type SnapshotFile } from '@/lib/submissionSnapshot';
+import { checkSnapshot, type SnapshotAnswer, type SnapshotFile } from '@/lib/submissionSnapshot';
 
 export async function GET(req: Request) {
   const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
@@ -161,7 +161,11 @@ export async function GET(req: Request) {
         reason: snap.reason,
         onTime: snap.onTime,
         contentHash: snap.contentHash,
-        verified: verifySnapshot(snap, { labId: sub.labId, studentId: sub.studentId }),
+        ...(() => {
+          const c = checkSnapshot(snap, { labId: sub.labId, studentId: sub.studentId });
+          // verified = content matches its hash AND the keyed signature is not forged.
+          return { verified: c.trustworthy, hashValid: c.hashValid, signature: c.signature };
+        })(),
       })),
       };
     });

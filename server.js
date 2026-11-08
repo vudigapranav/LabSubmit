@@ -35,6 +35,11 @@ const dev = process.env.NODE_ENV !== 'production';
     const jwtModule = require('./src/lib/jwt');
     jwtModule.assertJwtSecretConfigured();
     jwtModule.jwtSecretWarnings().forEach((w) => console.warn(`[STARTUP WARNING] ${w}`));
+    // Not fatal (existing deployments keep working), but without it hand-ins and audit rows are
+    // only hash-protected, which someone with database write access can recompute.
+    if (!process.env.INTEGRITY_KEY || process.env.INTEGRITY_KEY.length < 32) {
+      console.warn('[STARTUP WARNING] INTEGRITY_KEY is not set (32+ chars): submission snapshots and audit rows will be UNSIGNED.');
+    }
   } catch (err) {
     problems.push(err && err.message ? err.message : String(err));
   }

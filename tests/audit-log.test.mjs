@@ -87,13 +87,16 @@ test('the chain verifies; an edited row is detected at exactly that row, and res
   assert.equal(v.json.verification.ok, true, JSON.stringify(v.json));
   const victim = await prisma.auditEvent.findFirst({ where: { action: 'GRADE_SAVED' }, orderBy: { seq: 'desc' } });
   const original = victim.metadata;
-  await prisma.auditEvent.update({ where: { seq: victim.seq }, data: { metadata: { ...original, after: { ...original.after, marks: 100 } } } });
+  // A database owner can disable the append-only trigger; detection must not depend on it.
+  await prisma.$executeRawUnsafe('ALTER TABLE "AuditEvent" DISABLE TRIGGER audit_event_append_only');
   try {
+    await prisma.auditEvent.update({ where: { seq: victim.seq }, data: { metadata: { ...original, after: { ...original.after, marks: 100 } } } });
     v = await api('/api/admin/audit?verify=1', { token: adminToken });
     assert.equal(v.json.verification.ok, false);
     assert.equal(v.json.verification.brokenAtSeq, victim.seq);
   } finally {
     await prisma.auditEvent.update({ where: { seq: victim.seq }, data: { metadata: original } });
+    await prisma.$executeRawUnsafe('ALTER TABLE "AuditEvent" ENABLE TRIGGER audit_event_append_only');
   }
   v = await api('/api/admin/audit?verify=1', { token: adminToken });
   assert.equal(v.json.verification.ok, true);

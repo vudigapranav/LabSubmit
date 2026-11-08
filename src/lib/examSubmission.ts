@@ -2,7 +2,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { severityForType } from './examIntegrity';
 import { getEffectiveDeadline } from './examTiming';
 import { recordAudit } from './audit';
-import { canonicalAnswers, canonicalFiles, snapshotHash, type SnapshotAnswer, type SnapshotFile } from './submissionSnapshot';
+import { canonicalAnswers, canonicalFiles, signSnapshotHash, snapshotHash, type SnapshotAnswer, type SnapshotFile } from './submissionSnapshot';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -81,6 +81,7 @@ export async function finalizeSubmission(
       files: canonicalFiles(files) as unknown as Prisma.InputJsonValue,
       answers: canonicalAnswers(answers) as unknown as Prisma.InputJsonValue,
       contentHash: snapshotHashValue,
+      signature: signSnapshotHash(snapshotHashValue),
       submittedAt: now,
       auto,
       reason: reason ?? null,

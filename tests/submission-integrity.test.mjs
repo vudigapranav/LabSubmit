@@ -117,7 +117,12 @@ test('an edited snapshot no longer verifies', async () => {
   const a = await attempt(await student('05'));
   await act(a, { action: 'submit_lab' });
   const [snap] = await snapshotsOf(a.lab.id);
-  await prisma.submissionSnapshot.update({ where: { id: snap.id }, data: { files: [{ filename: 'main.py', language: 'python', content: 'print("forged")' }] } });
+  await prisma.$executeRawUnsafe('ALTER TABLE "SubmissionSnapshot" DISABLE TRIGGER submission_snapshot_immutable');
+  try {
+    await prisma.submissionSnapshot.update({ where: { id: snap.id }, data: { files: [{ filename: 'main.py', language: 'python', content: 'print("forged")' }] } });
+  } finally {
+    await prisma.$executeRawUnsafe('ALTER TABLE "SubmissionSnapshot" ENABLE TRIGGER submission_snapshot_immutable');
+  }
   const r = await api(`/api/lecturer/submissions?labId=${a.lab.id}`, { token: tokenFor(fx.lecturer) });
   assert.equal(r.json.submissions[0].snapshots[0].verified, false);
 });

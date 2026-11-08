@@ -231,6 +231,8 @@ model SubmissionSnapshot {
   // SHA-256 over the canonical JSON of files + answers + identifiers + timestamp, so any
   // later edit to the stored copy is detectable (src/lib/submissionSnapshot.ts).
   contentHash  String
+  // HMAC-SHA256 of the hash with INTEGRITY_KEY (server env only). Null = written without a key.
+  signature    String?
   submittedAt  DateTime @default(now()) // server clock only
   auto         Boolean  @default(false)
   reason       String? // TIMEOUT | FULLSCREEN_THRESHOLD | null (manual)
@@ -433,6 +435,7 @@ model AuditEvent {
   ip         String?
   prevHash   String
   hash       String   @unique
+  signature  String? // HMAC-SHA256 of hash with INTEGRITY_KEY; see src/lib/integrityKey.ts
 
   @@index([action])
   @@index([actorId])

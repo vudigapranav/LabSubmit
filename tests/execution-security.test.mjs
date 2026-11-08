@@ -17,7 +17,7 @@ test('S1: student program cannot see JWT_SECRET or DATABASE_URL in its environme
   const { lab, token } = await lecturerWithLab('python');
   const code = [
     'import os',
-    "leaked = [k for k in ('JWT_SECRET', 'DATABASE_URL') if k in os.environ]",
+    "leaked = [k for k in ('JWT_SECRET', 'DATABASE_URL', 'INTEGRITY_KEY') if k in os.environ]",
     "print('LEAKED:' + ','.join(leaked) if leaked else 'ENV_CLEAN')",
   ].join('\n');
   const r = await runOnEngine({ token, labId: lab.id, filename: 'main.py', code });

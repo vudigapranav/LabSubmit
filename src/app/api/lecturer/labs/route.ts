@@ -470,6 +470,8 @@ export async function DELETE(req: Request) {
         { status: 409 }
       );
     }
+    // (Student work is protected by the activity guard above — any submission counts as
+    // activity, for every role — so no separate submission check is needed here.)
 
     // No student has touched it, so nothing of theirs is lost. Record the deletion before
     // performing it: ExamAdminAction.labId is SetNull, so the row survives the exam and the

@@ -1,0 +1,12 @@
+# Never send local secrets or build output into a Docker build context. Without this file,
+# `COPY . .` in the Dockerfile baked a developer's .env (JWT_SECRET, DATABASE_URL) into an
+# image layer whenever the image was built locally (SECURITY_AUDIT.md S26). The image installs
+# and builds its own dependencies, so node_modules and .next are not needed either.
+.env
+.env.*
+node_modules
+.next
+.git
+tsconfig.tsbuildinfo
+prisma/dev.db
+Proposal

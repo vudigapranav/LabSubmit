@@ -13,6 +13,7 @@ import { useViolationLogger } from '@/lib/useViolationLogger';
 import { getOrCreateExamSessionId } from '@/lib/examSession';
 import { detectClientDeviceClass, useDeviceClass } from '@/lib/useDeviceClass';
 import { ArrowLeft, BookOpen, AlertCircle, ShieldAlert, Maximize, Clock, CheckCircle2, Hourglass, Laptop, FileText, Code2 } from 'lucide-react';
+import { estimateClockOffset } from '@/lib/serverClock';
 import Link from 'next/link';
 
 // Switches between the two halves of one attempt: the written record and the code
@@ -62,6 +63,8 @@ export default function StudentLabWorkspacePage() {
   const [labData, setLabData] = useState<any | null>(null);
   const [workspace, setWorkspace] = useState<any | null>(null);
   const [effectiveDeadline, setEffectiveDeadline] = useState<string | null>(null);
+  // Local clock → server clock correction, measured on every exam API round trip.
+  const [clockOffsetMs, setClockOffsetMs] = useState(0);
   // Server-issued confirmation of the stored hand-in (version, server time, hash prefix).
   const [receipt, setReceipt] = useState<{ version: number; submittedAt: string; reference: string; onTime: boolean } | null>(null);
   const [sections, setSections] = useState<AnswerSheetSection[]>([]);
@@ -88,11 +91,14 @@ export default function StudentLabWorkspacePage() {
 
   const fetchWorkspace = useCallback(async () => {
     try {
+      const sentAt = Date.now();
       const res = await fetch(`/api/student/workspace?labId=${labId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
+        const offset = estimateClockOffset(data.serverNow, sentAt, Date.now());
+        if (offset !== null) setClockOffsetMs(offset);
         setLabData(data.lab);
         setWorkspace(data.workspace);
         setEffectiveDeadline(data.effectiveDeadline);
@@ -129,6 +135,7 @@ export default function StudentLabWorkspacePage() {
     el.requestFullscreen?.().catch(() => {});
 
     try {
+      const startSentAt = Date.now();
       const res = await fetch('/api/student/workspace', {
         method: 'POST',
         headers: {
@@ -145,6 +152,8 @@ export default function StudentLabWorkspacePage() {
       });
       const data = await res.json();
       if (res.ok) {
+        const startOffset = estimateClockOffset(data.serverNow, startSentAt, Date.now());
+        if (startOffset !== null) setClockOffsetMs(startOffset);
         setWorkspace(data.workspace);
         setEffectiveDeadline(data.effectiveDeadline);
         // The assigned question set's statement replaces the exam's own. Which set it is
@@ -381,6 +390,7 @@ export default function StudentLabWorkspacePage() {
             fullscreenExitThreshold={labData.fullscreenExitThreshold}
             initialFullscreenExitCount={workspace.fullscreenExitCount || 0}
             effectiveDeadline={effectiveDeadline}
+            serverClockOffsetMs={clockOffsetMs}
             isSubmitted={isSubmitted}
             onAutoSubmit={handleAutoSubmit}
           >

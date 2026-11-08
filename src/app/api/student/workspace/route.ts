@@ -169,6 +169,8 @@ export async function GET(req: Request) {
       questions: withholdExamContent ? [] : paper,
       answerSheetSections: withholdExamContent ? [] : answerSheetSections,
       examContentWithheld: withholdExamContent,
+      // The server's clock; the exam page counts down against this, not the browser's clock.
+      serverNow: new Date().toISOString(),
       receipt: latestSnapshot
         ? { version: latestSnapshot.version, submittedAt: latestSnapshot.submittedAt, reference: latestSnapshot.contentHash.slice(0, 12), onTime: latestSnapshot.onTime }
         : null,
@@ -308,6 +310,7 @@ export async function POST(req: Request) {
         questions: startedPaper,
         problemStatement: questionSet ? paperToPlainText(startedPaper) : lab.problemStatement,
         effectiveDeadline: getEffectiveDeadline(lab, updated),
+        serverNow: new Date().toISOString(),
       });
     }
 

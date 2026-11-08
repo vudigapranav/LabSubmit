@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ShieldAlert, Maximize, Clock, AlertTriangle } from 'lucide-react';
+import { estimateClockOffset, serverRemainingMs } from '@/lib/serverClock';
 import { useViolationLogger } from '@/lib/useViolationLogger';
 
 type ViolationType =
@@ -21,6 +22,8 @@ interface ExamGuardProps {
   fullscreenExitThreshold: number;
   initialFullscreenExitCount: number;
   effectiveDeadline: string | null; // ISO timestamp from the server
+  /** Add to Date.now() to get the server's time (see src/lib/serverClock.ts). */
+  serverClockOffsetMs?: number;
   isSubmitted: boolean;
   onAutoSubmit: () => void; // parent performs the actual submit_lab call + UI lock
   children: React.ReactNode;
@@ -43,6 +46,7 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
   fullscreenExitThreshold,
   initialFullscreenExitCount,
   effectiveDeadline,
+  serverClockOffsetMs = 0,
   isSubmitted,
   onAutoSubmit,
   children,
@@ -159,14 +163,21 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examModeEnabled, isSubmitted, logViolation]);
 
-  // Countdown timer — ticks from the server-provided deadline, not an independently
-  // tracked duration, so it self-corrects for background-tab throttling.
+  // Latest local→server clock correction: seeded by the page, refreshed by every heartbeat.
+  const clockOffsetRef = useRef(serverClockOffsetMs);
+  useEffect(() => {
+    clockOffsetRef.current = serverClockOffsetMs;
+  }, [serverClockOffsetMs]);
+
+  // Countdown timer — ticks from the server-provided deadline on the SERVER's clock. Using
+  // the browser's own clock auto-submitted a student whose laptop ran 15 minutes fast with
+  // 10 real minutes left (reproduced). Re-reading the clock each tick also self-corrects for
+  // background-tab throttling.
   useEffect(() => {
     if (!effectiveDeadline || isSubmitted) return;
-    const deadline = new Date(effectiveDeadline).getTime();
 
     const tick = () => {
-      const remaining = deadline - Date.now();
+      const remaining = serverRemainingMs(effectiveDeadline, clockOffsetRef.current);
       setRemainingMs(remaining);
       if (remaining <= 0) {
         triggerAutoSubmit();
@@ -191,6 +202,7 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
 
     const sendHeartbeat = async () => {
       try {
+        const sentAt = Date.now();
         const res = await fetch('/api/student/heartbeat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -198,6 +210,8 @@ export const ExamGuard: React.FC<ExamGuardProps> = ({
         });
         if (!res.ok) return;
         const data = await res.json();
+        const offset = estimateClockOffset(data.serverNow, sentAt, Date.now());
+        if (offset !== null) clockOffsetRef.current = offset;
         if (data.duplicateSession) {
           setToast('This exam is open in another tab or browser. This has been recorded.');
         }

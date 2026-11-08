@@ -17,18 +17,21 @@ export async function POST(req: Request) {
     const { labId, sessionId } = body;
 
     if (!labId || !sessionId) {
-      return NextResponse.json({ error: 'labId and sessionId are required' }, { status: 400 });
+      return NextResponse.json({
+      serverNow: new Date().toISOString(), error: 'labId and sessionId are required' }, { status: 400 });
     }
 
     const workspace = await prisma.labWorkspace.findFirst({
       where: { labId, studentId: session!.userId },
     });
     if (!workspace) {
-      return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+      return NextResponse.json({
+      serverNow: new Date().toISOString(), error: 'Workspace not found' }, { status: 404 });
     }
 
     if (workspace.isSubmitted) {
-      return NextResponse.json({ ok: true, isSubmitted: true });
+      return NextResponse.json({
+      serverNow: new Date().toISOString(), ok: true, isSubmitted: true });
     }
 
     let duplicateSession = false;
@@ -55,9 +58,11 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true, duplicateSession });
+    return NextResponse.json({
+      serverNow: new Date().toISOString(), ok: true, duplicateSession });
   } catch (error: any) {
     console.error('[/api/student/heartbeat]', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return NextResponse.json({
+      serverNow: new Date().toISOString(), error: 'Server error' }, { status: 500 });
   }
 }

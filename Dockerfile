@@ -1,6 +1,9 @@
 # Production Dockerfile
 FROM node:20-alpine AS base
 
+# openssl: Prisma picks its query engine by the OpenSSL it finds at `prisma generate`. Without
+# the package, current Alpine (OpenSSL 3) made Prisma assume 1.1 and the server crashed at
+# start with "libssl.so.1.1: No such file" (found in staging, 2026-11-08).
 # Build toolchain (node-pty needs to compile a native addon) + the language
 # toolchains the execution engine shells out to at runtime (gcc, g++, javac/java).
 RUN apk add --no-cache \
@@ -8,7 +11,8 @@ RUN apk add --no-cache \
     python3 \
     bash \
     openjdk17-jdk \
-    tini
+    tini \
+    openssl
 
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 ENV PATH="${JAVA_HOME}/bin:${PATH}"

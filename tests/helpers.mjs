@@ -30,10 +30,21 @@ export function tokenFor(user) {
 // A lecturer and one of their own labs that allows the given language. The lecturer path
 // in authorizeRun() is used for engine tests because it does not depend on an exam being
 // inside its time window — the engine behaviour under test is identical for both roles.
+// Tests must not depend on data that happens to exist: when no lab allows the language (a
+// freshly seeded database has only C and Java labs), create one dedicated, unpublished fixture
+// lab once and reuse it. Found when the suite ran against a fresh staging database.
+const ENGINE_FIXTURE_TITLE = '[test] execution engine fixture';
 export async function lecturerWithLab(language) {
   const labs = await prisma.lab.findMany({ include: { lecturer: true } });
-  const lab = labs.find((l) => (l.allowedLanguages || '').split(',').map((s) => s.trim()).includes(language));
-  if (!lab) throw new Error(`No seeded lab allows "${language}". Run npm run db:seed or create one.`);
+  let lab = labs.find((l) => (l.allowedLanguages || '').split(',').map((s) => s.trim()).includes(language));
+  if (!lab) {
+    const lecturer = await prisma.user.findFirst({ where: { role: 'LECTURER' }, orderBy: { createdAt: 'asc' } });
+    if (!lecturer) throw new Error('No lecturer in the database. Run npm run db:seed.');
+    lab = await prisma.lab.create({
+      data: { title: ENGINE_FIXTURE_TITLE, description: 'Created by tests/helpers.mjs', problemStatement: 'test fixture', year: 2, lecturerId: lecturer.id, isPublished: false, allowedLanguages: 'c,cpp,java,python' },
+      include: { lecturer: true },
+    });
+  }
   return { lab, token: tokenFor(lab.lecturer) };
 }
 

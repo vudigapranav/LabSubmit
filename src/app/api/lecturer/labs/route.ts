@@ -570,6 +570,12 @@ export async function PATCH(req: Request) {
           details: `Released results for "${existing!.title}" — ${published.count} result(s) made visible to students`,
         },
       });
+      // Also in the hash-chained audit log: releasing marks is the single most consequential
+      // grading action, and ExamAdminAction is not tamper-evident.
+      await recordAudit({
+        action: 'RESULTS_RELEASED', category: 'GRADING', actorId: session!.userId, actorRole: session!.role,
+        targetType: 'Lab', targetId: id, metadata: { title: existing!.title, releasedAt, publishedCount: published.count },
+      });
 
       return NextResponse.json({
         message: `Results released — ${published.count} student${published.count === 1 ? '' : 's'} can now see their marks`,
@@ -607,12 +613,18 @@ export async function PATCH(req: Request) {
           : `Restored "${existing!.title}" to active examinations`,
       },
     });
+    await recordAudit({
+      action: archived ? 'EXAM_ARCHIVED' : 'EXAM_UNARCHIVED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role,
+      targetType: 'Lab', targetId: id, metadata: { title: existing!.title, activity },
+    });
 
     return NextResponse.json({
       message: archived ? 'Exam archived' : 'Exam restored',
       lab: { id: updated.id, archivedAt: updated.archivedAt, status: getExamStatus(updated) },
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    // Generic message; details stay in the server log (SECURITY_AUDIT.md S11).
+    console.error('[/api/lecturer/labs PATCH]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

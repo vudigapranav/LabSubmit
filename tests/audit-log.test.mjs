@@ -59,12 +59,21 @@ test('exam creation, publishing, grading and result publication are recorded wit
   const st = await prisma.user.create({ data: { name: `${tag} st`, role: 'STUDENT', rollNumber: roll, password: 'x', studentProfile: { create: { rollNumber: roll, year: subject.year, branchId: subject.branchId } } } });
   const ws = await prisma.labWorkspace.create({ data: { labId, studentId: st.id, isSubmitted: true, startedAt: new Date() } });
   const sub = await prisma.submission.create({ data: { labId, studentId: st.id, workspaceId: ws.id } });
+  // A forged isPublished is ignored: before release, saving a grade never publishes it.
   const g = await api('/api/lecturer/evaluate', { token: lectToken, method: 'POST', body: { submissionId: sub.id, status: 'APPROVED', marks: 73, isPublished: true } });
   assert.equal(g.status, 200, JSON.stringify(g.json));
-  const grading = await eventsFor({ targetId: sub.id });
-  assert.deepEqual(grading.map((e) => e.action), ['GRADE_SAVED', 'RESULT_PUBLISHED']);
+  let grading = await eventsFor({ targetId: sub.id });
+  assert.deepEqual(grading.map((e) => e.action), ['GRADE_SAVED'], 'no publication on save before release');
   assert.equal(grading[0].actorId, subject.lecturer.id);
   assert.deepEqual([grading[0].metadata.before.marks, grading[0].metadata.after.marks], [null, 73]);
+  assert.equal(grading[0].metadata.after.isPublished, false);
+
+  // Publication happens by releasing the exam's results, and that is what gets audited.
+  const rel = await api('/api/lecturer/labs', { token: lectToken, method: 'PATCH', body: { id: labId, releaseResults: true } });
+  assert.equal(rel.status, 200, JSON.stringify(rel.json));
+  const [released] = await eventsFor({ targetId: labId, action: 'RESULTS_RELEASED' });
+  assert.equal(released.actorId, subject.lecturer.id);
+  assert.equal(released.metadata.publishedCount, 1);
 });
 
 test('a finalized submission is recorded with the snapshot hash', async () => {

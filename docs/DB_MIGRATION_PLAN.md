@@ -8,11 +8,18 @@ graded, published submission and an in-progress attempt (2026-11-08).
 
 Generated with `prisma migrate diff --from-schema-datamodel <85240d1 schema> --to-schema-datamodel prisma/schema.prisma --script`:
 
-| Change | Kind |
-|---|---|
-| `CREATE TABLE "SubmissionSnapshot"` (+ 2 indexes, FK → `Submission` ON DELETE CASCADE) | additive |
-| `CREATE TABLE "AuditEvent"` (+ 5 indexes) | additive |
-| No existing table or column is altered, renamed or dropped | — |
+| Change | Kind | Origin |
+|---|---|---|
+| `CREATE TABLE "SubmissionSnapshot"` (+ 2 indexes, FK → `Submission` ON DELETE CASCADE) | additive | security work |
+| `CREATE TABLE "AuditEvent"` (+ 5 indexes; `signature` column) | additive | security work |
+| `Lab.archivedAt`, `Lab.resultsReleasedAt` (nullable) | additive | remote `1bbd83b`, `ac9c535` |
+| `ExamAdminAction.labTitle` added; `labId` made nullable; its FK becomes `ON DELETE SET NULL` | widening | remote `1bbd83b` |
+| No existing column is renamed or dropped; no data is rewritten by the schema push | — | — |
+
+**Remote commits rebased in (2026-11-09).** The diff was regenerated after rebasing onto
+`origin/claude/labsubmit-development-y605fv` (`ac9c535`). The rehearsal below covered the security
+tables; the remote's columns were applied to the local dev database with `prisma db push`
+("in sync", no data-loss warning).
 
 Plus, outside Prisma: `prisma/sql/001_append_only.sql` (one function, two triggers on the new tables).
 
@@ -39,8 +46,14 @@ Plus, outside Prisma: `prisma/sql/001_append_only.sql` (one function, two trigge
 4. **Deploy** the image from this branch.
 5. **Schema**: from the Railway shell, `npx prisma db push` — **stop if it prints any data-loss
    warning**; do not add `--accept-data-loss`.
-6. **Protect**: `npm run db:protect`.
-7. **Verify**: log in as admin → `GET /api/admin/audit?verify=1` returns `ok: true`; a test submission
+6. **Backfill result release** (required here: production has grades published under the old
+   save-publishes behaviour): run `prisma/backfill/2026-09-result-release.sql` once
+   (`npx prisma db execute --file prisma/backfill/2026-09-result-release.sql --schema prisma/schema.prisma`).
+   It is UPDATE-only and marks exams whose marks students can already see as released, so the
+   exam-level switch and the visible rows agree. Without it those exams read "Results not
+   released" while students can still see marks.
+7. **Protect**: `npm run db:protect`.
+8. **Verify**: log in as admin → `GET /api/admin/audit?verify=1` returns `ok: true`; a test submission
    shows "integrity verified" in the inspector.
 
 ## Rollback

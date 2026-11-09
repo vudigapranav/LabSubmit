@@ -111,7 +111,7 @@ test('publishing with a weighted section unmarked is refused', async () => {
   assert.equal(sub.sectionEvaluations.length, 1, 'refused request wrote nothing');
 });
 
-test('completing the remaining sections rolls up the total and publishes; earlier marks are kept', async () => {
+test('completing the remaining sections rolls up the total (kept private until release); earlier marks are kept', async () => {
   const r = await evaluate(fx.ownerToken, {
     submissionId: fx.wSub.id, status: 'APPROVED', isPublished: true, remarks: 'Well done',
     marks: 99, // must be ignored in section mode
@@ -124,7 +124,7 @@ test('completing the remaining sections rolls up the total and publishes; earlie
   const sub = await prisma.submission.findUnique({ where: { id: fx.wSub.id }, include: { sectionEvaluations: true } });
   assert.equal(sub.marks, 41.5, '24 (kept) + 8 + 9.5');
   assert.equal(sub.maxMarks, 50);
-  assert.equal(sub.isPublished, true);
+  assert.equal(sub.isPublished, false, 'publication follows the exam release, not the save (a sent isPublished is ignored)');
   assert.equal(sub.sectionEvaluations.length, 3);
 });
 
@@ -189,16 +189,18 @@ test('faculty submissions payload carries saved section evaluations for prefill'
   assert.equal(s.answerSheet.find((x) => x.key === 'AIM').evaluation, null);
 });
 
-test('student sees the section breakdown for published results only', async () => {
+test('student sees the section breakdown only after the exam\'s results are released', async () => {
   let r = await api('/api/student/grades', { token: fx.studentToken });
   assert.equal(r.status, 200);
+  assert.ok(!r.json.grades.some((x) => x.id === fx.wSub.id), 'nothing visible before release');
+
+  const rel = await api('/api/lecturer/labs', { token: fx.ownerToken, method: 'PATCH', body: { id: fx.weighted.id, releaseResults: true } });
+  assert.equal(rel.status, 200, JSON.stringify(rel.json));
+
+  r = await api('/api/student/grades', { token: fx.studentToken });
   const g = r.json.grades.find((x) => x.id === fx.wSub.id);
   assert.equal(g.marks, 47.5);
   assert.equal(g.maxMarks, 50);
   assert.deepEqual(g.sections.map((s) => [s.label, s.marks, s.maxMarks]), [['Algorithm', 8, 10], ['Code', 30, 30], ['Output', 9.5, 10]]);
-  assert.ok(!r.json.grades.some((x) => x.id === fx.fSub.id), 'unpublished flat result hidden');
-  // Unpublish → disappears entirely.
-  await evaluate(fx.ownerToken, { submissionId: fx.wSub.id, status: 'APPROVED', isPublished: false });
-  r = await api('/api/student/grades', { token: fx.studentToken });
-  assert.ok(!r.json.grades.some((x) => x.id === fx.wSub.id));
+  assert.ok(!r.json.grades.some((x) => x.id === fx.fSub.id), 'a different, unreleased exam stays hidden');
 });

@@ -131,18 +131,24 @@ test('a forged snapshot with a recomputed hash is detected; so is a stripped sig
   assert.equal((await inspectorView(lab.id)).verified, true, 'restored snapshot verifies');
 });
 
-test('a lecturer cannot delete an exam that has hand-ins; an admin can, and it is audited', async () => {
+test('nobody can permanently delete an exam that has hand-ins; it can be archived, and both are audited', async () => {
   const { lab } = await submittedSnapshot();
   const owner = await prisma.user.findUnique({ where: { id: lab.lecturerId } });
-  const refused = await api(`/api/lecturer/labs?id=${lab.id}`, { token: tokenFor(owner), method: 'DELETE' });
-  assert.equal(refused.status, 409, JSON.stringify(refused.json));
+  // The exam-lifecycle rule (archive instead of delete) applies to every role.
+  for (const who of [owner, fx.admin]) {
+    const refused = await api(`/api/lecturer/labs?id=${lab.id}`, { token: tokenFor(who), method: 'DELETE' });
+    assert.equal(refused.status, 409, `${who.role}: ${JSON.stringify(refused.json)}`);
+    assert.equal(refused.json.canArchive, true);
+  }
   assert.equal(await prisma.submissionSnapshot.count({ where: { submission: { labId: lab.id } } }), 1, 'hand-in kept');
 
-  const empty = await prisma.lab.create({ data: { title: `${tag} empty`, description: 'd', problemStatement: 'p', year: 2, lecturerId: owner.id } });
-  assert.equal((await api(`/api/lecturer/labs?id=${empty.id}`, { token: tokenFor(owner), method: 'DELETE' })).status, 200, 'exam without submissions can still be deleted');
+  const archived = await api('/api/lecturer/labs', { token: tokenFor(owner), method: 'PATCH', body: { id: lab.id, archived: true } });
+  assert.equal(archived.status, 200, JSON.stringify(archived.json));
+  const [ev] = await prisma.auditEvent.findMany({ where: { action: 'EXAM_ARCHIVED', targetId: lab.id } });
+  assert.ok(ev, 'archive recorded in the hash-chained audit log');
+  assert.equal(await prisma.submissionSnapshot.count({ where: { submission: { labId: lab.id } } }), 1, 'archive preserves hand-ins');
 
-  const byAdmin = await api(`/api/lecturer/labs?id=${lab.id}`, { token: tokenFor(fx.admin), method: 'DELETE' });
-  assert.equal(byAdmin.status, 200, JSON.stringify(byAdmin.json));
-  const [ev] = await prisma.auditEvent.findMany({ where: { action: 'EXAM_DELETED', targetId: lab.id } });
-  assert.equal(ev.metadata.submissionsDeleted, 1);
+  const empty = await prisma.lab.create({ data: { title: `${tag} empty`, description: 'd', problemStatement: 'p', year: 2, lecturerId: owner.id } });
+  assert.equal((await api(`/api/lecturer/labs?id=${empty.id}`, { token: tokenFor(owner), method: 'DELETE' })).status, 200, 'an exam with no student activity can still be deleted');
+  assert.equal((await prisma.auditEvent.findMany({ where: { action: 'EXAM_DELETED', targetId: empty.id } })).length, 1);
 });

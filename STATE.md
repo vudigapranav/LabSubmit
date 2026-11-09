@@ -410,9 +410,8 @@ delete-protection suites (52 API + 20 browser + 3 WebSocket) all still pass.
 - `Submission.isPublished` is still writable by a direct database edit, but the double gate
   on the grades API means such a row cannot surface while its exam is unreleased.
 - The `RELEASE_RESULTS` audit rows, like the others, have no UI.
-- Out of scope and still open: `GET /api/lecturer/labs` accepts the STUDENT role. It returns
-  only cohort-level aggregate counts, no per-student marks, so it is not a publication leak —
-  but it remains the separate audit finding it was.
+- ~~`GET /api/lecturer/labs` accepts the STUDENT role~~ — resolved by the security work
+  (SECURITY_AUDIT.md S6): the route is faculty-only and students receive 403.
 
 ### Security hardening — *2026-11-08, iterations 1–4*
 Each item was reproduced as a live attack before the fix and is covered by `npm test`.

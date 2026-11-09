@@ -473,20 +473,35 @@ export async function DELETE(req: Request) {
     // (Student work is protected by the activity guard above — any submission counts as
     // activity, for every role — so no separate submission check is needed here.)
 
-    // No student has touched it, so nothing of theirs is lost. Record the deletion before
-    // performing it: ExamAdminAction.labId is SetNull, so the row survives the exam and the
-    // title snapshot keeps it meaningful.
-    await prisma.examAdminAction.create({
-      data: {
-        labId: id,
-        labTitle: existing!.title,
-        actorId: session!.userId,
-        action: EXAM_ADMIN_ACTIONS.DELETE,
-        details: `Permanently deleted "${existing!.title}" — no student attempts, submissions, files or integrity events existed`,
-      },
+    // No student has touched it, so nothing of theirs is lost. The deletion record and the
+    // delete happen in ONE transaction: a failed delete must not leave a "permanently deleted"
+    // record behind, and the activity re-check inside it narrows the window in which a student
+    // could start the exam between the check above and the cascade below.
+    // ExamAdminAction.labId is SetNull, so the record survives the exam it documents.
+    const deleted = await prisma.$transaction(async (tx) => {
+      const [started, submitted] = await Promise.all([
+        tx.labWorkspace.count({ where: { labId: id, startedAt: { not: null } } }),
+        tx.submission.count({ where: { labId: id } }),
+      ]);
+      if (started > 0 || submitted > 0) return false;
+      await tx.examAdminAction.create({
+        data: {
+          labId: id,
+          labTitle: existing!.title,
+          actorId: session!.userId,
+          action: EXAM_ADMIN_ACTIONS.DELETE,
+          details: `Permanently deleted "${existing!.title}" — no student attempts, submissions, files or integrity events existed`,
+        },
+      });
+      await tx.lab.delete({ where: { id } });
+      return true;
     });
-
-    await prisma.lab.delete({ where: { id } });
+    if (!deleted) {
+      return NextResponse.json(
+        { error: 'A student started this exam while it was being deleted. Archive it instead.', code: 'EXAM_HAS_STUDENT_ACTIVITY', canArchive: true },
+        { status: 409 }
+      );
+    }
     await recordAudit({ action: 'EXAM_DELETED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role, targetType: 'Lab', targetId: id, metadata: { title: existing!.title } });
 
     return NextResponse.json({ message: 'Exam deleted successfully' });

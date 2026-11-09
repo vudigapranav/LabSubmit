@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { severityForType } from './examIntegrity';
-import { getEffectiveDeadline } from './examTiming';
+import { getEffectiveDeadline, isPastDeadline } from './examTiming';
 import { recordAudit } from './audit';
 import { canonicalAnswers, canonicalFiles, signSnapshotHash, snapshotHash, type SnapshotAnswer, type SnapshotFile } from './submissionSnapshot';
 
@@ -71,7 +71,7 @@ export async function finalizeSubmission(
   // latest. onTime records whether the hand-in itself happened by then; the deadline
   // auto-submit is on time by definition (it captures the deadline state).
   const deadline = lab && workspace ? getEffectiveDeadline(lab, workspace) : null;
-  const onTime = reason === 'TIMEOUT' || !deadline || now.getTime() <= deadline.getTime();
+  const onTime = reason === 'TIMEOUT' || !isPastDeadline(deadline, now);
 
   const snapshotHashValue = snapshotHash({ submissionId: submission.id, labId, studentId, version, submittedAt: now }, files, answers);
   await db.submissionSnapshot.create({

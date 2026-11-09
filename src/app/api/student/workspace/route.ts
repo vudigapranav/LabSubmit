@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { detectLanguage } from '@/lib/compiler';
-import { getExamStatus, getEffectiveDeadline, parseAllowedLanguages, isLanguageAllowed } from '@/lib/examTiming';
+import { getExamStatus, getEffectiveDeadline, parseAllowedLanguages, isLanguageAllowed, isPastDeadline } from '@/lib/examTiming';
 import { finalizeSubmission } from '@/lib/examSubmission';
 import { checkExamDevice } from '@/lib/deviceEligibility';
 import { findIncompleteRequiredSections, MAX_SECTION_CONTENT_BYTES } from '@/lib/answerSheet';
@@ -365,7 +365,7 @@ export async function POST(req: Request) {
     // Lazy deadline enforcement: self-heals workspace state on every touch, independent of
     // whether any client-side timer/violation call ever fires.
     const deadline = getEffectiveDeadline(lab, workspace);
-    if (deadline && new Date() > deadline && action !== 'submit_lab') {
+    if (isPastDeadline(deadline) && action !== 'submit_lab') {
       await finalizeSubmission(prisma, {
         workspaceId: workspace.id,
         labId,

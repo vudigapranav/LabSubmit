@@ -22,7 +22,7 @@ import { acquireRunIdentity, sandboxRefusal } from './sandbox';
 // used everywhere else in the app, so path-alias resolution here is unverified.
 import { verifyToken } from '../jwt';
 import { prisma } from '../db';
-import { getExamStatus, getEffectiveDeadline, isLanguageAllowed } from '../examTiming';
+import { getExamStatus, getEffectiveDeadline, isLanguageAllowed, isPastDeadline } from '../examTiming';
 import { finalizeSubmission } from '../examSubmission';
 import {
   evaluateDeviceEligibility,
@@ -395,7 +395,7 @@ export class ExecutionController {
     }
 
     const deadline = getEffectiveDeadline(lab, workspace);
-    if (deadline && new Date() > deadline) {
+    if (isPastDeadline(deadline)) {
       await finalizeSubmission(prisma, { workspaceId: workspace.id, labId, studentId: payload.userId, auto: true, reason: 'TIMEOUT' });
       return { code: 'TIME_EXPIRED', message: 'Exam time has expired. Your work has been auto-submitted.' };
     }

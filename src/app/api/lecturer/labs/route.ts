@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { getExamStatus, serializeAllowedLanguages } from '@/lib/examTiming';
+import { getExamStatus, serializeAllowedLanguages, validateExamSchedule, scheduleProblem } from '@/lib/examTiming';
 import { recordAudit, requestIp } from '@/lib/audit';
 import { defaultSectionConfig, normalizeSectionConfig, NormalizedSection } from '@/lib/answerSheet';
 import {
@@ -212,6 +212,8 @@ export async function GET(req: Request) {
         return {
           ...lab,
           status: getExamStatus(lab),
+          // Non-null when the stored schedule is inconsistent (e.g. end before start).
+          scheduleProblem: scheduleProblem(lab),
           appearedCount: activity.startedAttempts,
           submittedCount,
           pendingCount: Math.max(activity.startedAttempts - submittedCount, 0),
@@ -274,8 +276,12 @@ export async function POST(req: Request) {
     const placementProblem = await checkSubjectPlacement(session!, subjectId, parseInt(year), branchId);
     if (placementProblem) return placementProblem;
 
-    if (examModeEnabled && !endTime) {
-      return NextResponse.json({ error: 'An end time is required for exam-mode exams' }, { status: 400 });
+    // One schedule rule, shared with the lecturer form (examTiming.validateExamSchedule). Before
+    // this, an end time at or before the start was stored as-is and the exam completed the
+    // moment it began (EXAM_LIFECYCLE_BUG_REPORT.md).
+    const scheduleErrors = validateExamSchedule({ startTime, endTime, durationMinutes, examModeEnabled: examModeEnabled !== false });
+    if (scheduleErrors.length > 0) {
+      return NextResponse.json({ error: scheduleErrors.join(' '), errors: scheduleErrors }, { status: 400 });
     }
 
     const lab = await prisma.lab.create({
@@ -372,8 +378,19 @@ export async function PUT(req: Request) {
     }
 
     const effectiveExamModeEnabled = examModeEnabled !== undefined ? Boolean(examModeEnabled) : undefined;
-    if (effectiveExamModeEnabled && endTime === undefined && !existing.endTime) {
-      return NextResponse.json({ error: 'An end time is required for exam-mode exams' }, { status: 400 });
+    // Validate the MERGED schedule whenever this request touches it. Requests that change
+    // nothing about the schedule (rename, publish) still work on an exam whose stored schedule
+    // is broken, so a lecturer can always reach it to fix it.
+    if (startTime !== undefined || endTime !== undefined || durationMinutes !== undefined || examModeEnabled !== undefined) {
+      const scheduleErrors = validateExamSchedule({
+        startTime: startTime !== undefined ? startTime : existing!.startTime,
+        endTime: endTime !== undefined ? endTime : existing!.endTime,
+        durationMinutes: durationMinutes !== undefined ? durationMinutes : existing!.durationMinutes,
+        examModeEnabled: effectiveExamModeEnabled ?? existing!.examModeEnabled,
+      });
+      if (scheduleErrors.length > 0) {
+        return NextResponse.json({ error: scheduleErrors.join(' '), errors: scheduleErrors }, { status: 400 });
+      }
     }
 
     const lab = await prisma.lab.update({

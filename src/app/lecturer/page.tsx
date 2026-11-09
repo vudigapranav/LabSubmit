@@ -42,6 +42,7 @@ import { ExamRetirementDialog } from '@/components/ExamRetirementDialog';
 import { ResultReleaseDialog } from '@/components/ResultReleaseDialog';
 import { NO_SUBMISSIONS, RELEASE_STATE_LABEL, releaseState } from '@/lib/resultRelease';
 import { deriveIntegrityStatus, type IntegrityStatus, type Severity } from '@/lib/examIntegrity';
+import { validateExamSchedule, getExamWindowEnd } from '@/lib/examTiming';
 import {
   GraduationCap,
   Plus,
@@ -327,8 +328,16 @@ export default function LecturerDashboard() {
     e.preventDefault();
     if (!selectedSubject) return;
 
-    if (examModeEnabled && !endTimeInput) {
-      showToast('error', 'End time is required when exam mode is enabled');
+    // Same rule the server enforces (examTiming.validateExamSchedule). An end time at or before
+    // the start used to be saved and made the exam complete the moment it began.
+    const scheduleErrors = validateExamSchedule({
+      startTime: combineDateTime(examDateInput, startTimeInput),
+      endTime: combineDateTime(examDateInput, endTimeInput),
+      durationMinutes: durationMinutesInput,
+      examModeEnabled,
+    });
+    if (scheduleErrors.length > 0) {
+      showToast('error', scheduleErrors[0]);
       return;
     }
     if (selectedLanguages.length === 0) {
@@ -816,6 +825,9 @@ export default function LecturerDashboard() {
                   labs.map((lab) => (
                     <Card key={lab.id} interactive className="p-5 flex flex-col justify-between gap-4">
                       <div className="space-y-2">
+                        {lab.scheduleProblem && (
+                          <Alert tone="warning">{lab.scheduleProblem}</Alert>
+                        )}
                         <div className="flex items-center justify-between">
                           <StatusBadge tone={EXAM_STATUS_TONE[lab.status] || 'neutral'}>{lab.status}</StatusBadge>
                           {/* Every action is labelled and sits in a 36px target. Delete is
@@ -1142,10 +1154,29 @@ export default function LecturerDashboard() {
                     <input type="time" value={startTimeInput} onChange={(e) => setStartTimeInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">End Time</label>
+                    <label className="text-[10px] text-slate-500 block mb-0.5">End Time <span className="text-slate-400">(optional if a duration is set)</span></label>
                     <input type="time" value={endTimeInput} onChange={(e) => setEndTimeInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                 </div>
+                {(() => {
+                  // Live summary of what will actually be stored, so an AM/PM slip is visible
+                  // before saving instead of when the exam closes at its start time.
+                  const startIso = combineDateTime(examDateInput, startTimeInput);
+                  const endIso = combineDateTime(examDateInput, endTimeInput);
+                  if (!startIso) return null;
+                  const problems = validateExamSchedule({ startTime: startIso, endTime: endIso, durationMinutes: durationMinutesInput, examModeEnabled });
+                  const windowEnd = getExamWindowEnd({ startTime: startIso, endTime: endIso, durationMinutes: durationMinutesInput ? Number(durationMinutesInput) : null });
+                  const fmt = (d: Date) => d.toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                  return problems.length > 0 ? (
+                    <p role="alert" className="text-[11px] text-rose-600 dark:text-rose-400">{problems[0]}</p>
+                  ) : windowEnd ? (
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400" aria-live="polite">
+                      Open from <strong>{fmt(new Date(startIso))}</strong> to <strong>{fmt(windowEnd)}</strong>
+                      {` (${Math.round((windowEnd.getTime() - new Date(startIso).getTime()) / 60000)} min window`}
+                      {durationMinutesInput ? `; each student gets ${durationMinutesInput} min from when they start)` : ')'}
+                    </p>
+                  ) : null;
+                })()}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="text-[10px] text-slate-500 block mb-0.5">Duration (minutes)</label>

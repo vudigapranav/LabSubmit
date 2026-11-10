@@ -5,6 +5,7 @@ An enterprise-grade, full-stack **College Programming Laboratory Management & Co
 Built with **Next.js (App Router, TypeScript)**, **Tailwind CSS**, **Prisma ORM**, **Monaco Editor**, and a **Native Multi-Language Compiler Engine (C, C++, Java, JavaScript)**.
 
 ---
+[![OctoCounts](https://api.octocounts.com/api/reports/2adc53ea887bc991768cbf97ada7a0cd64071ce4ee209f9c1f073d8b48d09d37/badge.svg)](https://octocounts.com/github/vudigapranav/LabSubmit/commit/91b95bb7217c1ca800db575f0c223d9a9874f9ff?analysis=%7B%22profile%22%3A%22default%22%2C%22ignoredDirs%22%3A%5B%5D%2C%22includeDocs%22%3Atrue%2C%22includeTests%22%3Atrue%2C%22ignoredLanguages%22%3A%5B%5D%2C%22includeGenerated%22%3Atrue%7D&reportId=2adc53ea887bc991768cbf97ada7a0cd64071ce4ee209f9c1f073d8b48d09d37)
 
 ## 📋 Table of Contents
 1. [Project Overview](#1-project-overview)

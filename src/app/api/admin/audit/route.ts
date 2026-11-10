@@ -9,7 +9,7 @@ import { recordAudit, verifyAuditChain } from '@/lib/audit';
 //   ?format=csv                                                   — export (itself audited)
 //   ?verify=1                                                     — walk and verify the whole hash chain
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

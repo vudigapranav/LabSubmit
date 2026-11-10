@@ -4,6 +4,8 @@ import { AppProvider } from '@/context/AppContext';
 
 export const metadata: Metadata = {
   title: 'CBIT LabSubmit - College Programming Laboratory Management Platform',
+  // There is no favicon.ico; without this every page load logged a 404.
+  icons: { icon: '/cbit-logo.png' },
   description: 'Chaitanya Bharathi Institute of Technology Official Laboratory Management & Online Code Execution Portal',
 };
 

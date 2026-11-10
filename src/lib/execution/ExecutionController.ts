@@ -9,7 +9,7 @@ import {
   detectLanguage,
 } from './types';
 import { SessionManager } from './SessionManager';
-import { CompilerService } from './CompilerService';
+import { CompilerService, stripTempDir } from './CompilerService';
 import { RuntimeSandbox } from './RuntimeSandbox';
 import { PtyService } from './PtyService';
 import { ExecutionLogger } from './ExecutionLogger';
@@ -276,7 +276,11 @@ export class ExecutionController {
         tempDir,
         cols,
         rows,
-        onData: (data) => {
+        onData: (raw) => {
+          // Runtimes print absolute paths in errors (Python makes __main__'s path absolute even
+          // when given a relative one). Strip the run's temp dir so students see `main.py`.
+          // A path split across two PTY chunks would slip through; harmless, just noisier.
+          const data = stripTempDir(raw, tempDir);
           const exceeded = RuntimeSandbox.checkOutputLimit(session, data.length, async (limitMessage) => {
             this.finalizeRun(sessionId, { exitCode: 137 });
             this.sendWs({ type: 'output', data: limitMessage, system: true });

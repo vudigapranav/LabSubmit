@@ -7,7 +7,7 @@ import bcrypt from 'bcryptjs';
 
 // GET all lecturers
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
 // POST create lecturer
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
 
 // PUT edit lecturer
 export async function PUT(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -162,7 +162,7 @@ export async function PUT(req: Request) {
 
 // DELETE lecturer
 export async function DELETE(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -171,6 +171,31 @@ export async function DELETE(req: Request) {
 
     if (!id) {
       return NextResponse.json({ error: 'Lecturer ID is required' }, { status: 400 });
+    }
+
+    // This endpoint deletes LECTURERS. Without the role check it deleted any account by id —
+    // an administrator, a student, or the caller's own account.
+    const lecturer = await prisma.user.findUnique({ where: { id } });
+    if (!lecturer || lecturer.role !== 'LECTURER') {
+      return NextResponse.json({ error: 'Lecturer not found' }, { status: 404 });
+    }
+
+    // Lab.lecturer is onDelete: Cascade, so deleting a lecturer deleted every exam they wrote
+    // and with it every student's submission, marks and integrity log; ExamAdminAction.actor
+    // cascades too, erasing the record of what they did. Refuse while either exists.
+    const [exams, adminActions] = await Promise.all([
+      prisma.lab.count({ where: { lecturerId: id } }),
+      prisma.examAdminAction.count({ where: { actorId: id } }),
+    ]);
+    if (exams + adminActions > 0) {
+      return NextResponse.json(
+        {
+          error: `${lecturer.name} authored ${exams} examination(s)${adminActions ? ` and has ${adminActions} recorded exam action(s)` : ''}. Deleting the account would permanently delete those examinations and every student submission and mark in them. Reassign their subjects to another lecturer instead; the account can stay.`,
+          code: 'LECTURER_HAS_EXAMS',
+          counts: { exams, adminActions },
+        },
+        { status: 409 }
+      );
     }
 
     await prisma.user.delete({

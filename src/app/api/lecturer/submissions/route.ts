@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { checkSnapshot, type SnapshotAnswer, type SnapshotFile } from '@/lib/submissionSnapshot';
 
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

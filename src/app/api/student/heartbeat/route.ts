@@ -9,7 +9,7 @@ import { severityForType } from '@/lib/examIntegrity';
 // ordinary same-tab refresh reuses the same sessionId (see ExamGuard/sessionStorage), so
 // this never misfires on a plain reload.
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['STUDENT']);
+  const { errorResponse, session } = await requireAuth(req, ['STUDENT']);
   if (errorResponse) return errorResponse;
 
   try {

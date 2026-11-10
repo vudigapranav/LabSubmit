@@ -42,7 +42,7 @@ async function pickQuestionSetId(labId: string): Promise<string | null> {
 
 // GET workspace for lab
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['STUDENT']);
+  const { errorResponse, session } = await requireAuth(req, ['STUDENT']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -226,7 +226,7 @@ function toStudentSubmission(
 
 // POST actions: start_exam, create_file, save_file, rename_file, delete_file, submit_lab
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['STUDENT']);
+  const { errorResponse, session } = await requireAuth(req, ['STUDENT']);
   if (errorResponse) return errorResponse;
 
   try {

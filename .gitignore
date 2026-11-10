@@ -39,3 +39,6 @@ Thumbs.db
 # misc
 coverage/
 .turbo/
+
+# Monaco editor, copied from node_modules at build time (scripts/copy-monaco.mjs)
+public/monaco/

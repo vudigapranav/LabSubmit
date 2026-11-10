@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { recordAudit } from '@/lib/audit';
 
 export async function GET(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN', 'LECTURER']);
+  const { errorResponse } = await requireAuth(req, ['ADMIN', 'LECTURER']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -33,7 +34,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -102,7 +103,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -113,7 +114,26 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Subject ID is required' }, { status: 400 });
     }
 
+    const subject = await prisma.subject.findUnique({ where: { id } });
+    if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+
+    // Students find their exams through their subjects, so deleting a subject (Lab.subjectId
+    // is SetNull) makes every one of its exams invisible to students — including results they
+    // were waiting for. A subject with exams is never deleted.
+    const exams = await prisma.lab.count({ where: { subjectId: id } });
+    if (exams > 0) {
+      return NextResponse.json(
+        {
+          error: `${subject.name} has ${exams} examination(s). Deleting it would hide them from students. Delete or archive its examinations first, or edit the subject instead.`,
+          code: 'SUBJECT_IN_USE',
+          counts: { exams },
+        },
+        { status: 409 }
+      );
+    }
+
     await prisma.subject.delete({ where: { id } });
+    await recordAudit({ action: 'ADMIN_SUBJECT_DELETED', category: 'ADMIN', actorId: session!.userId, actorRole: session!.role, targetType: 'Subject', targetId: id, metadata: { name: subject.name, code: subject.code } });
 
     return NextResponse.json({ message: 'Subject deleted successfully' });
   } catch (error: any) {

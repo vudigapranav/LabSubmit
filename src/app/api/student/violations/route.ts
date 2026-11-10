@@ -28,7 +28,7 @@ const DEDUPE_WINDOW_MS = 2000;
 // since this endpoint is inherently client-driven and can be skipped by a
 // tampered/offline client.
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['STUDENT']);
+  const { errorResponse, session } = await requireAuth(req, ['STUDENT']);
   if (errorResponse) return errorResponse;
 
   try {

@@ -21,7 +21,7 @@ async function assertLabAccess(labId: string, session: { role: string; userId: s
 // the student-to-set mapping faculty need for evaluation and for investigating
 // irregularities.
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -82,7 +82,7 @@ export async function GET(req: Request) {
 
 // POST — create a set for an exam.
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
 
 // PUT — update a set's label, active flag and full question list.
 export async function PUT(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -202,7 +202,7 @@ export async function PUT(req: Request) {
 
 // DELETE — remove a set entirely.
 export async function DELETE(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

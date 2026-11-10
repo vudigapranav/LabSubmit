@@ -40,7 +40,7 @@ async function assertLabAccess(labId: string, session: { role: string; userId: s
 
 // GET — the assignment picture for an exam: who is eligible, who holds a set, who does not.
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -84,7 +84,7 @@ export async function GET(req: Request) {
 
 // POST — action: 'generate' | 'reassign'
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

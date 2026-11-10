@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { AppShell, LECTURER_NAV } from '@/components/AppShell';
@@ -67,11 +67,14 @@ import {
   TerminalSquare,
 } from 'lucide-react';
 
+const LECTURER_VIEW_KEY = 'labsubmit.lecturer.view';
+
 const LANGUAGE_OPTIONS = [
   { value: 'c', label: 'C' },
   { value: 'cpp', label: 'C++' },
   { value: 'java', label: 'Java' },
   { value: 'python', label: 'Python' },
+  { value: 'javascript', label: 'JavaScript' },
 ];
 
 const STATUS_STYLES: Record<string, string> = {
@@ -208,6 +211,21 @@ export default function LecturerDashboard() {
     }
   }, [token, selectedSubject]);
 
+  // Remember where the lecturer is, so a refresh does not drop them back to the subject list.
+  // Nothing is written until the restore attempt in fetchAssignedSubjects has run; otherwise
+  // the initial 'assignments' render would erase the saved view before it could be read.
+  const viewRestoredRef = useRef(false);
+  useEffect(() => {
+    if (!viewRestoredRef.current) return;
+    try {
+      if (viewMode === 'workspace' && selectedSubject) {
+        sessionStorage.setItem(LECTURER_VIEW_KEY, JSON.stringify({ subjectId: selectedSubject.id, tab: activeMainTab }));
+      } else if (viewMode === 'assignments') {
+        sessionStorage.removeItem(LECTURER_VIEW_KEY);
+      }
+    } catch { /* ignore */ }
+  }, [viewMode, selectedSubject, activeMainTab]);
+
   const showToast = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
@@ -220,7 +238,20 @@ export default function LecturerDashboard() {
       });
       if (res.ok) {
         const data = await res.json();
-        setAssignedSubjects(data.subjects || []);
+        const subjects = data.subjects || [];
+        setAssignedSubjects(subjects);
+        // Reopen the subject and tab the lecturer was on before a refresh. Only a subject that
+        // is still assigned to them is restored; anything else falls back to the subject list.
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(LECTURER_VIEW_KEY) || 'null');
+          const sub = saved && subjects.find((x: any) => x.id === saved.subjectId);
+          if (sub) {
+            setSelectedSubject(sub);
+            setViewMode('workspace');
+            if (['labs', 'students', 'submissions', 'violations'].includes(saved.tab)) setActiveMainTab(saved.tab);
+          }
+        } catch { /* storage unavailable: start on the subject list */ }
+        viewRestoredRef.current = true;
       }
     } catch (e) { console.error(e); }
   };
@@ -616,9 +647,20 @@ export default function LecturerDashboard() {
   // other tabs have no meaning until a subject is open.
   const navActive = viewMode === 'assignments' ? 'assignments' : activeMainTab;
   const handleNavigate = (id: string) => {
-    if (id === 'assignments' || !selectedSubject) {
+    if (id === 'assignments') {
       setViewMode('assignments');
       return;
+    }
+    if (!selectedSubject) {
+      // Without this the sidebar item silently did nothing. One subject: open it. Several:
+      // say what is needed rather than ignoring the click.
+      if (assignedSubjects.length === 1) {
+        setSelectedSubject(assignedSubjects[0]);
+      } else {
+        setViewMode('assignments');
+        showToast('error', assignedSubjects.length === 0 ? 'No subject is assigned to you yet. Ask the administrator to assign one.' : 'Open a subject first — examinations, students and evaluations are kept per subject.');
+        return;
+      }
     }
     setViewMode('workspace');
     setActiveMainTab(id as typeof activeMainTab);

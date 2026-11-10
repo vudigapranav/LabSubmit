@@ -49,6 +49,10 @@ export const RESOURCE_LIMITS = {
 
 export const JAVA_HEAP_FLAGS = ['-Xmx256m', '-Xss8m', '-XX:+UseSerialGC'];
 
+// Node, like the JVM, reserves far more address space than it uses and will not start under
+// `ulimit -v`, so its heap is bounded with V8's own flag instead.
+export const NODE_HEAP_FLAGS = ['--max-old-space-size=256'];
+
 const LIMITED_MEMORY_LANGUAGES: SupportedLanguage[] = ['c', 'cpp', 'python'];
 
 export function withResourceLimits(

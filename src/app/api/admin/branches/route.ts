@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { recordAudit } from '@/lib/audit';
 
 async function validateBranchRange(year: number, rollStart: string | null, rollEnd: string | null, excludeBranchId?: string) {
   if (!rollStart || !rollEnd) return null;
@@ -47,7 +48,7 @@ async function validateBranchRange(year: number, rollStart: string | null, rollE
 }
 
 export async function GET(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN', 'LECTURER']);
+  const { errorResponse } = await requireAuth(req, ['ADMIN', 'LECTURER']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -75,7 +76,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -109,7 +110,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -153,7 +154,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -164,7 +165,31 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Branch ID is required' }, { status: 400 });
     }
 
+    const branch = await prisma.branch.findUnique({ where: { id } });
+    if (!branch) return NextResponse.json({ error: 'Branch not found' }, { status: 404 });
+
+    // Deleting a branch cascades its subjects and orphans (SetNull) its exams and students: the
+    // exams disappear from every student dashboard and the students start matching every
+    // branch's exams in their year. So a branch that anything refers to is never deleted;
+    // closing it (isActive=false) stops new registrations and destroys nothing.
+    const [subjects, exams, students] = await Promise.all([
+      prisma.subject.count({ where: { branchId: id } }),
+      prisma.lab.count({ where: { branchId: id } }),
+      prisma.studentProfile.count({ where: { branchId: id } }),
+    ]);
+    if (subjects + exams + students > 0) {
+      return NextResponse.json(
+        {
+          error: `${branch.name} (Year ${branch.year}) still has ${subjects} subject(s), ${exams} examination(s) and ${students} student(s). Deleting it would detach them all. Deactivate the branch instead to stop new registrations.`,
+          code: 'BRANCH_IN_USE',
+          counts: { subjects, exams, students },
+        },
+        { status: 409 }
+      );
+    }
+
     await prisma.branch.delete({ where: { id } });
+    await recordAudit({ action: 'ADMIN_BRANCH_DELETED', category: 'ADMIN', actorId: session!.userId, actorRole: session!.role, targetType: 'Branch', targetId: id, metadata: { name: branch.name, year: branch.year } });
 
     return NextResponse.json({ message: 'Branch deleted successfully' });
   } catch (error: any) {

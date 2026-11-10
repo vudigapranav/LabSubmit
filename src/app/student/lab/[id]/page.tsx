@@ -273,7 +273,7 @@ export default function StudentLabWorkspacePage() {
                       <li>
                         Exceeding {labData.fullscreenExitThreshold} fullscreen exits auto-submits your exam.
                       </li>
-                      <li>Copy, paste, and right-click are restricted per your instructor's settings.</li>
+                      <li>Copy, paste, and right-click are restricted per your instructor&apos;s settings.</li>
                       <li>This is your one and only submission attempt.</li>
                       <li>The examination can only be taken on a laptop or desktop computer.</li>
                     </ul>

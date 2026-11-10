@@ -1,7 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Editor from '@monaco-editor/react';
+import Editor, { loader } from '@monaco-editor/react';
+
+// Serve Monaco from this app (public/monaco, copied at build time) instead of the default
+// jsdelivr CDN, so the exam editor works on a lab network without that CDN.
+loader.config({ paths: { vs: '/monaco/vs' } });
 import { useApp } from '@/context/AppContext';
 import { AntiCheatWrapper } from './AntiCheatWrapper';
 import { detectClientDeviceClass } from '@/lib/useDeviceClass';
@@ -38,6 +42,7 @@ const NEW_FILE_LANGUAGE_OPTIONS: { value: string; label: string; ext: string; de
   { value: 'cpp', label: 'C++', ext: 'cpp', defaultBaseName: 'main' },
   { value: 'java', label: 'Java', ext: 'java', defaultBaseName: 'Main' },
   { value: 'python', label: 'Python', ext: 'py', defaultBaseName: 'main' },
+  { value: 'javascript', label: 'JavaScript (Node.js)', ext: 'js', defaultBaseName: 'main' },
 ];
 
 interface OnlineIDEProps {
@@ -348,6 +353,9 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
         return 'cpp';
       case 'java':
         return 'java';
+      // Python files used to fall through to 'plaintext' — no syntax highlighting at all.
+      case 'python':
+        return 'python';
       case 'javascript':
         return 'javascript';
       default:

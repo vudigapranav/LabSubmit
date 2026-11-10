@@ -163,7 +163,7 @@ export async function GET(req: Request) {
   // Faculty only. This returns full problem statements for every exam including drafts;
   // students read papers solely through /api/student/workspace, which withholds them until
   // the attempt is live (SECURITY_AUDIT.md S6).
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -240,7 +240,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -324,7 +324,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -452,7 +452,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -536,7 +536,7 @@ export async function DELETE(req: Request) {
 // because both the workspace route and the execution engine already refuse anything that
 // is not RUNNING, every attempt entry point closes without a new check in either of them.
 export async function PATCH(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

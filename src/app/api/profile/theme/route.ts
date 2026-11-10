@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export async function POST(req: Request) {
-  const { session } = requireAuth(req);
+  const { session } = await requireAuth(req);
   try {
     const body = await req.json();
     const { theme } = body;

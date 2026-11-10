@@ -7,12 +7,22 @@ import { isSafeSourceFilename, SOURCE_FILENAME_RULE } from '../sourceFilename';
 import {
   buildSandboxEnv,
   JAVA_HEAP_FLAGS,
+  NODE_HEAP_FLAGS,
   prepareTempDirOwnership,
   resolveInsideTempDir,
   runIdentity,
   withResourceLimits,
   type RunIdentity,
 } from './sandbox';
+
+/** Removes the run's temp directory from tool output, leaving bare file names. */
+export function stripTempDir(text: string, tempDir: string): string {
+  if (!text || !tempDir) return text;
+  const dir = tempDir.endsWith(path.sep) ? tempDir : tempDir + path.sep;
+  // macOS reports /var/folders/... as /private/var/folders/...; strip both spellings.
+  // The longer spelling must go first, or stripping the shorter one leaves a stray '/private'.
+  return text.split('/private' + dir).join('').split(dir).join('');
+}
 
 // One compiler invocation: an executable and its argument list. Never a shell string —
 // the old `exec("gcc \"${file}\" ...")` let a filename containing $(...) run shell (S3).
@@ -126,10 +136,12 @@ export class CompilerService {
       runArgs = [...JAVA_HEAP_FLAGS, '-Dfile.encoding=UTF-8', '-cp', tempDir, className];
     } else if (lang === 'python') {
       runCmd = 'python3';
-      runArgs = ['-u', mainFilePath];
+      // Relative to the run's cwd (the temp dir), so a traceback says `File "main.py"` rather
+      // than printing the server's temp path to the student.
+      runArgs = ['-u', filename];
     } else if (lang === 'javascript') {
       runCmd = 'node';
-      runArgs = [mainFilePath];
+      runArgs = [...NODE_HEAP_FLAGS, `./${filename}`];
     } else {
       return {
         success: false,
@@ -159,7 +171,9 @@ export class CompilerService {
       const compilationTimeMs = Date.now() - startTime;
 
       if (compileResult.err) {
-        const fullErr = compileResult.stderr || compileResult.stdout || compileResult.err?.message || compileResult.err.message;
+        // Compilers print the absolute path of every file; the student needs `main.c:3:5`, not
+        // the server's temp directory.
+        const fullErr = stripTempDir(compileResult.stderr || compileResult.stdout || compileResult.err?.message || compileResult.err.message, tempDir);
         console.error(`[STAGE: 6. COMPILER FINISHED - FAILED] Error:\n${fullErr}`);
         ExecutionLogger.logCompileError(sessionId, fullErr);
         return {
@@ -181,7 +195,7 @@ export class CompilerService {
         success: true,
         compileCmd,
         stdout: compileResult.stdout || '',
-        stderr: compileResult.stderr || '',
+        stderr: stripTempDir(compileResult.stderr || '', tempDir),
         compilationTimeMs,
         mainFilePath,
         executablePath,

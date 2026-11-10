@@ -159,13 +159,8 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
         const { Terminal: XTerminal } = await import('xterm');
         const { FitAddon } = await import('xterm-addon-fit');
 
-        if (!document.getElementById('xterm-css')) {
-          const link = document.createElement('link');
-          link.id = 'xterm-css';
-          link.rel = 'stylesheet';
-          link.href = 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css';
-          document.head.appendChild(link);
-        }
+        // xterm's stylesheet is bundled through globals.css. It used to be injected again from
+        // cdn.jsdelivr.net here, which made the exam terminal depend on a public CDN.
 
         term = new XTerminal({
           cursorBlink: true,

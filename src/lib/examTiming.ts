@@ -156,10 +156,14 @@ export function getEffectiveDeadline(lab: ExamTimingLab, workspace: ExamTimingWo
   return lab.examModeEnabled ? null : null;
 }
 
-export const SUPPORTED_LANGUAGES = ['c', 'cpp', 'java', 'python'] as const;
+export const SUPPORTED_LANGUAGES = ['c', 'cpp', 'java', 'python', 'javascript'] as const;
+
+// What an exam allows when nothing was configured. JavaScript is opt-in, so every exam that
+// existed before it was added — and every unconfigured one — behaves exactly as before.
+export const DEFAULT_LANGUAGES = ['c', 'cpp', 'java', 'python'] as const;
 
 export function parseAllowedLanguages(csv: string | null | undefined): string[] {
-  if (!csv) return [...SUPPORTED_LANGUAGES];
+  if (!csv) return [...DEFAULT_LANGUAGES];
   return csv
     .split(',')
     .map((s) => s.trim().toLowerCase())
@@ -168,7 +172,7 @@ export function parseAllowedLanguages(csv: string | null | undefined): string[] 
 
 export function serializeAllowedLanguages(langs: string[]): string {
   const cleaned = langs.map((l) => l.trim().toLowerCase()).filter((l) => (SUPPORTED_LANGUAGES as readonly string[]).includes(l));
-  return cleaned.length > 0 ? cleaned.join(',') : SUPPORTED_LANGUAGES.join(',');
+  return cleaned.length > 0 ? cleaned.join(',') : DEFAULT_LANGUAGES.join(',');
 }
 
 export function isLanguageAllowed(lab: ExamTimingLab, language: string): boolean {

@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export async function GET(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN']);
+  const { errorResponse } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

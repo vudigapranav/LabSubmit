@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/auth';
 // Was public, and served every lecturer's name and email to anyone (SECURITY_AUDIT.md S10).
 // No page in the app calls it; kept for faculty/admin use rather than deleted.
 export async function GET(req: Request) {
-  const { errorResponse } = requireAuth(req, ['ADMIN', 'LECTURER']);
+  const { errorResponse } = await requireAuth(req, ['ADMIN', 'LECTURER']);
   if (errorResponse) return errorResponse;
 
   try {

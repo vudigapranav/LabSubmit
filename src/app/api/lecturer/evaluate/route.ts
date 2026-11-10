@@ -5,7 +5,7 @@ import { recordAudit } from '@/lib/audit';
 import { evaluateSectionMarks, gradableSections, validateFlatMarks, MAX_REMARK_LENGTH } from '@/lib/answerSheet';
 
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

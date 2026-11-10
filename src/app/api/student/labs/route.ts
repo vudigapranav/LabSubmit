@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { getExamStatus, getEffectiveDeadline, parseAllowedLanguages } from '@/lib/examTiming';
 
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['STUDENT']);
+  const { errorResponse, session } = await requireAuth(req, ['STUDENT']);
   if (errorResponse) return errorResponse;
 
   try {

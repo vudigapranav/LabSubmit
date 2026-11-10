@@ -6,7 +6,7 @@ import { prisma } from '@/lib/db';
 // evaluator see what the student actually executed during the attempt, and check the
 // Output section against it. Students have no access — this is evaluation evidence.
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

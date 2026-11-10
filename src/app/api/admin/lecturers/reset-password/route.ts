@@ -6,7 +6,7 @@ import { recordAudit, requestIp } from '@/lib/audit';
 import bcrypt from 'bcryptjs';
 
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {

@@ -4,7 +4,7 @@ import { recordAudit, requestIp } from '@/lib/audit';
 import { prisma } from '@/lib/db';
 
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -59,7 +59,7 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -114,7 +114,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -131,6 +131,24 @@ export async function DELETE(req: Request) {
 
     if (!studentUser || studentUser.role !== 'STUDENT') {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+    }
+
+    // Workspaces, submissions and integrity events all cascade from the student. Once the
+    // student has sat any exam, their account is a record of that work and is not deleted.
+    const [attempts, submissions, violations] = await Promise.all([
+      prisma.labWorkspace.count({ where: { studentId: userId, startedAt: { not: null } } }),
+      prisma.submission.count({ where: { studentId: userId } }),
+      prisma.examViolation.count({ where: { studentId: userId } }),
+    ]);
+    if (attempts + submissions + violations > 0) {
+      return NextResponse.json(
+        {
+          error: `${studentUser.name} has ${attempts} exam attempt(s), ${submissions} submission(s) and ${violations} integrity event(s). Deleting the account would permanently delete that work and its marks. Reset the password instead if access is the problem.`,
+          code: 'STUDENT_HAS_WORK',
+          counts: { attempts, submissions, violations },
+        },
+        { status: 409 }
+      );
     }
 
     await prisma.user.delete({

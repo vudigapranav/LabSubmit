@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import WebSocket from 'ws';
 import bcrypt from 'bcryptjs';
-import { api, prisma, tokenFor, WS_URL, BASE_URL } from './helpers.mjs';
+import { api, prisma, tokenFor, WS_URL, BASE_URL, runOnEngine } from './helpers.mjs';
 import { checkPasswordPolicy } from '../src/lib/passwordPolicy.ts';
 
 const tag = `secmod_${Date.now()}`;
@@ -186,15 +186,20 @@ test('S16: a hangup-immune child process left running by a program is killed whe
   const pid = Number((out.match(/CHILD (\d+)/) || [])[1]);
   assert.ok(pid > 0, out);
   await new Promise((r) => setTimeout(r, 800));
-  let alive = true;
-  try {
-    process.kill(pid, 0);
-  } catch {
-    alive = false;
-  }
-  if (alive) process.kill(pid, 'SIGKILL'); // never leave the sleeper behind
+  // The liveness probe runs INSIDE the engine (a second run), because the PID belongs to the
+  // engine's process namespace. This used to call process.kill(pid, 0) — and SIGKILL on a
+  // match — on the machine running the tests: against Docker that signalled whichever
+  // unrelated host process had the same number. Nothing here ever signals a host process.
+  // Signal 0 only checks existence: ESRCH = gone; EPERM = alive under another pooled uid.
+  const probe = await runOnEngine({
+    token,
+    labId: fx.running.id,
+    filename: 'main.py',
+    code: `import os\ntry:\n    os.kill(${pid}, 0)\n    print("STATE alive")\nexcept ProcessLookupError:\n    print("STATE gone")\nexcept PermissionError:\n    print("STATE alive")\n`,
+  });
   fs.rmSync(pidFile, { force: true });
-  assert.equal(alive, false, `child ${pid} survived the run`);
+  const state = (probe.programOutput.match(/STATE (\w+)/) || [])[1];
+  assert.equal(state, 'gone', `child ${pid} survived the run (probe said: ${probe.output})`);
 });
 
 // ── S17: security headers ───────────────────────────────────────────────────────────────

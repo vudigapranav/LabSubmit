@@ -5,7 +5,7 @@ import { checkPasswordPolicy } from '@/lib/passwordPolicy';
 import bcrypt from 'bcryptjs';
 
 export async function PUT(req: Request) {
-  const { errorResponse, session } = requireAuth(req);
+  const { errorResponse, session } = await requireAuth(req);
   if (errorResponse) return errorResponse;
 
   try {

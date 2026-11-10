@@ -22,6 +22,7 @@ import {
   THead,
   Tr,
 } from '@/components/ui';
+import { RESULTS_WITHHELD_MESSAGE } from '@/lib/resultRelease';
 import {
   GraduationCap,
   BookOpen,
@@ -127,6 +128,8 @@ export default function StudentDashboard() {
 
   const submittedCount = allExams.filter((e) => e.isSubmitted).length;
   const publishedGrades = grades.filter((g) => g.marks !== null);
+  // Submitted attempts whose exam has not had its results released yet.
+  const awaitingRelease = allExams.filter((e) => e.isSubmitted && !e.resultsReleased);
   const averageScore =
     publishedGrades.length > 0
       ? Math.round(publishedGrades.reduce((sum, g) => sum + (g.marks / (g.maxMarks || 100)) * 100, 0) / publishedGrades.length)
@@ -178,6 +181,10 @@ export default function StudentDashboard() {
             <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular">
               {lab.marks}/{lab.maxMarks}
             </span>
+          ) : lab.isSubmitted && !lab.resultsReleased ? (
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              {RESULTS_WITHHELD_MESSAGE}
+            </span>
           ) : (
             <span className="text-[11px] text-slate-500 dark:text-slate-400">
               {lab.isSubmitted ? 'Submitted' : lab.hasStarted ? 'In progress' : 'Not started'}
@@ -224,8 +231,9 @@ export default function StudentDashboard() {
     results: {
       title: 'Results',
       description: 'Marks and remarks your faculty has published.',
-      emptyTitle: 'No published results yet',
-      emptyBody: 'Results appear once your faculty has evaluated and published them.',
+      emptyTitle: 'No results released yet',
+      emptyBody:
+        'Results appear here once your faculty has evaluated every submission for an examination and released the results.',
     },
   };
 
@@ -271,12 +279,40 @@ export default function StudentDashboard() {
               <LoadingState label="Loading your examinations…" />
             </Card>
           ) : activeTab === 'results' ? (
-            grades.length === 0 ? (
+            grades.length === 0 && awaitingRelease.length === 0 ? (
               <Card>
                 <EmptyState icon={<Award className="w-5 h-5" />} title={copy.emptyTitle} description={copy.emptyBody} />
               </Card>
             ) : (
               <>
+                {awaitingRelease.length > 0 && (
+                  <Card className="p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                        {RESULTS_WITHHELD_MESSAGE}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      You have submitted these examinations. Their marks appear here once your
+                      faculty has evaluated every submission and released the results.
+                    </p>
+                    <ul className="space-y-2">
+                      {awaitingRelease.map((e) => (
+                        <li
+                          key={e.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-slate-200 dark:border-slate-800 px-3 py-2"
+                        >
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 min-w-0">
+                            {e.title}
+                          </span>
+                          <StatusBadge tone="amber">{RESULTS_WITHHELD_MESSAGE}</StatusBadge>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+
                 {/* Cards below md, table above — a five-column table is unusable on a phone,
                     and results are the screen students check most from one. */}
                 <div className="md:hidden space-y-3">
@@ -292,6 +328,7 @@ export default function StudentDashboard() {
                         </span>
                         <span className="text-[11px] text-slate-500 dark:text-slate-400">{new Date(g.submittedAt).toLocaleDateString()}</span>
                       </div>
+                      <SectionBreakdown sections={g.sections} />
                       {g.remarks && (
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-2">{g.remarks}</p>
                       )}
@@ -312,7 +349,8 @@ export default function StudentDashboard() {
                     </THead>
                     <TBody>
                       {grades.map((g) => (
-                        <Tr key={g.id}>
+                        <React.Fragment key={g.id}>
+                        <Tr>
                           <Td className="font-semibold text-slate-900 dark:text-white">{g.labTitle}</Td>
                           <Td className="text-slate-500 tabular">{new Date(g.submittedAt).toLocaleDateString()}</Td>
                           <Td>
@@ -323,6 +361,14 @@ export default function StudentDashboard() {
                           </Td>
                           <Td className="text-slate-500 max-w-xs truncate">{g.remarks || '—'}</Td>
                         </Tr>
+                        {(g.sections?.length || 0) > 0 && (
+                          <tr>
+                            <td colSpan={5} className="px-4 pb-3 pt-0">
+                              <SectionBreakdown sections={g.sections} />
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       ))}
                     </TBody>
                   </TableWrap>
@@ -341,5 +387,26 @@ export default function StudentDashboard() {
 
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
     </>
+  );
+}
+
+// Per-section marks for a published result, when the lecturer marked the answer sheet by
+// section. Each mark is labelled with its maximum and an explicit "Not marked" text, so the
+// state is readable without relying on colour.
+function SectionBreakdown({ sections }: { sections?: { label: string; marks: number | null; maxMarks: number | null; remarks: string | null }[] }) {
+  if (!sections || sections.length === 0) return null;
+  return (
+    <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-2" aria-label="Marks by section">
+      {sections.map((sec) => (
+        // dt/dd must be direct children of the grouping div for the list to be valid.
+        <div key={sec.label} className="min-w-0 flex flex-wrap items-baseline justify-between gap-x-2 text-[11px]">
+          <dt className="text-slate-600 dark:text-slate-400 truncate">{sec.label}</dt>
+          <dd className="font-semibold tabular text-slate-900 dark:text-white">
+            {sec.marks !== null ? `${sec.marks}/${sec.maxMarks}` : 'Not marked'}
+          </dd>
+          {sec.remarks && <dd className="w-full text-[10px] text-slate-500 dark:text-slate-400 leading-snug">{sec.remarks}</dd>}
+        </div>
+      ))}
+    </dl>
   );
 }

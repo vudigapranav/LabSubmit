@@ -1,6 +1,37 @@
-version: '3.8'
+# Local, production-like stack: the production image + its own PostgreSQL, with execution
+# isolation configured the way production should run it. Railway does NOT use this file — it
+# builds the Dockerfile directly — so nothing here changes the deployed service.
+#
+# First run:
+#   docker compose up -d --build db
+#   docker compose run --rm app npx prisma db push
+#   docker compose run --rm -e SEED_ADMIN_PASSWORD='<12+ chars>' app npm run db:seed
+#   docker compose run --rm app npm run db:protect
+#   docker compose up -d app
+#
+# Secrets (JWT_SECRET, INTEGRITY_KEY) come from .env; DATABASE_URL is overridden below so the
+# app talks to the `db` service, never to a database on the host.
+#
+# (The obsolete top-level `version:` key and the SQLite-era `db_data:/app/prisma` volume were
+# removed: that volume hid every rebuilt image's prisma/ directory behind a stale copy.)
 
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: labsubmit-local-only
+      POSTGRES_DB: labsubmit
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    # Loopback only, for running the test suite from the host against this stack.
+    ports:
+      - "127.0.0.1:5545:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d labsubmit"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   app:
     build:
       context: .
@@ -10,10 +41,24 @@ services:
     env_file:
       - .env
     environment:
-      - NODE_ENV=production
-    volumes:
-      - db_data:/app/prisma
-    restart: always
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://postgres:labsubmit-local-only@db:5432/labsubmit
+      # Execution isolation, as production should run it (SECURITY_BLOCKER_CLOSURE_REPORT.md).
+      EXEC_RUN_UID_RANGE: 20000-20099
+      EXEC_SANDBOX_LAUNCHER: /usr/local/bin/labsubmit-sandbox
+      EXEC_REQUIRE_SANDBOX: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # A route that reads the database, so "healthy" means the app AND its database work.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/public/branches >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
 
 volumes:
-  db_data:
+  pg_data:

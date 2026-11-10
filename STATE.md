@@ -3,8 +3,10 @@
 A factual snapshot of what exists in this repository. Companion to `CLAUDE.md`
 (product direction and engineering rules).
 
-**Last updated:** 2026-09-01, after the landing-page layout pass on
-`claude/labsubmit-development-y605fv`.
+**Last updated:** 2026-11-08, reconciled against the code after security iterations 1–4
+on `claude/labsubmit-development-y605fv` (includes the 2026-09-03 result-release and
+exam-archive work). Iteration-level detail and evidence: `docs/ENGINEERING_CHANGELOG.md`;
+security findings: `docs/SECURITY_AUDIT.md`.
 
 **Rule for maintaining this file:** nothing is listed as Completed unless the code for it
 exists in the repository. A database model with no code reading or writing it is *schema
@@ -37,8 +39,9 @@ only* and belongs under In Progress, not Completed.
   lecturer password reset; system statistics.
 
 ### Examination configuration (lecturer)
-- Create / edit / delete / publish examinations, scoped to the lecturer's assigned
-  subjects; drafts stay hidden from students.
+- Create / edit / publish examinations, scoped to the lecturer's assigned subjects; drafts
+  stay hidden from students. **Permanent deletion is restricted** — see
+  "Exam deletion protection & archive" below.
 - Scheduling: exam date, start time, end time, per-student duration.
 - Allowed programming languages per exam (C, C++, Java, Python).
 - Secure exam mode toggle, fullscreen-exit threshold, and copy / paste / cut / right-click
@@ -79,9 +82,10 @@ only* and belongs under In Progress, not Completed.
 ### Evaluation & results
 - Submission inspector: student's files rendered read-only, with the integrity timeline.
 - Manual evaluation: marks, remarks, status (APPROVED / REJECTED / NEEDS_CORRECTION /
-  PENDING), and a publish toggle controlling student visibility.
+  PENDING). Saving an evaluation never publishes it — visibility is controlled by an
+  explicit exam-level release (see "Result release / publication control" below).
 - `NEEDS_CORRECTION` reopens the student's workspace for resubmission.
-- Student results view showing only published marks and remarks.
+- Student results view showing only released marks and remarks.
 
 ### Unified customizable answer sheet — *added this session*
 - Nine-section catalogue (Aim, Description, Algorithm, Procedure, Code, Input, Output,
@@ -249,25 +253,256 @@ only* and belongs under In Progress, not Completed.
 - **A real leak was found and fixed by this testing:** the student's workspace object still
   carried `questionSetId`. It is now stripped alongside the joined set.
 
+### Exam deletion protection & archive — *completed this session*
+
+Closes the P0 finding from the lecturer UX audit: `DELETE /api/lecturer/labs` previously had
+**no guard of any kind**, and `Lab` carries six `onDelete: Cascade` relations, so one click on
+an unlabelled trash icon behind a generic `confirm()` destroyed every workspace, submission,
+awarded mark, integrity event, question set and answer-sheet section under that exam.
+
+**Permanent deletion policy.** An examination is permanently deletable **only** when no
+student has touched it. "Touched" is deliberately broad — any one of these refuses the
+delete: a started attempt (`LabWorkspace.startedAt` not null), any `Submission`, any
+`ExamViolation`, any `LabFile`, or any `AnswerSheetResponse`. A bare workspace row does *not*
+count, because one is created merely by opening the exam page. Counts are re-derived from the
+database on every DELETE request, never read from the client, so calling the endpoint
+directly — with or without a forged override body — cannot get past it. A refused delete
+returns **HTTP 409** carrying `code: "EXAM_HAS_STUDENT_ACTIVITY"`, `canArchive: true`, the
+activity counts, and the preservation/effect lists the dialog renders. The payload contains
+**counts only** — no student names, roll numbers or ids.
+
+**Archive behaviour.** Archiving writes exactly one column, `Lab.archivedAt`, and touches no
+other row — which is why the preservation claims are safe to make. `getExamStatus()` returns
+`ARCHIVED` for such a lab, ahead of every schedule-derived state. Because the student
+workspace route and `ExecutionController.authorizeRun()` both already refuse anything that is
+not `RUNNING`, retiring an exam closes **all three attempt entry points at once** without a
+new check in any of them. `/api/student/labs` additionally filters `archivedAt: null`, so an
+archived exam never appears as active or upcoming work. Published results are unaffected:
+`/api/student/grades` keys off the submission, not the lab, so a student keeps the marks and
+remarks for an exam that has since been archived. Faculty keep full access — archived exams
+stay in the lecturer list (badged `ARCHIVED`), their submissions stay gradeable and their
+question sets stay readable. Archiving is reversible via the same endpoint.
+
+**Server-side protection.** The rule lives in `PATCH`/`DELETE` on
+`src/app/api/lecturer/labs/route.ts` behind the same `assertLabAccess()` ownership check the
+question-set routes use: a LECTURER may act only on their own exams, an ADMIN on any;
+students and unauthenticated callers are rejected. `src/lib/examLifecycle.ts` is a pure module
+(no Prisma import) holding the activity rule, the refusal wording and the
+`ARCHIVE_PRESERVES` / `ARCHIVE_EFFECTS` lists, so the API and the confirmation dialog cannot
+drift — the UI can never promise something the implementation does not do.
+
+**Audit logging.** Uses the existing `ExamAdminAction` model, with two safe widening changes:
+`labId` became nullable with `onDelete: SetNull` (under the previous `Cascade` the one row
+that mattered most — "this exam was permanently deleted" — was destroyed by the very delete
+it documented), and a `labTitle` snapshot was added so an orphaned row still names what went.
+Actions written: `DELETE_EXAM`, `ARCHIVE_EXAM`, `UNARCHIVE_EXAM`, each with the acting user
+and a details string. A no-op archive/unarchive is idempotent and writes no row.
+
+**Frontend.** The native `confirm()` is gone. `src/components/ExamRetirementDialog.tsx` shows
+one of three faces, chosen from what the server reported: *delete* (names the exam, states it
+cannot be undone), *archive* (leads with "Exam cannot be deleted because student attempts
+exist", then lists precisely what is preserved and what changes), or *restore*. Backdrop
+dismissal is disabled. Exam-card actions are now labelled (`aria-label` + `title`) in 36 px
+targets, with delete/archive separated from edit by a divider and a destructive hover state;
+the icon shown is the action the server will actually permit.
+
+**Tests performed** — `scratchpad/archive.test.sh`, **52 assertions, all passing** against the
+running server and the real database, plus 21 browser assertions (`ui-archive.js`) and a
+WebSocket test (`ws-archive.js`). Covers: zero-attempt draft deletes and is audited; the audit
+row survives the cascade; exam with one and with several attempts refuses deletion; direct API
+DELETE with a forged override body still refused; no student identity in the refusal; archived
+exam remains listed, gradeable and set-readable for its lecturer; archived exam disappears
+from the student lab list; `start_exam` on an archived exam refused with `status: ARCHIVED`;
+the execution WebSocket compiled and ran code before archiving and returned
+`EXAM_NOT_ACTIVE (status: ARCHIVED)` after; submissions, workspaces, files, marks + status,
+question sets, questions, student-to-set assignment, answer-sheet sections and answer-sheet
+responses all byte-identical across an archive; foreign lecturer, student and unauthenticated
+callers refused 403 on both delete and archive; existing assigned-question-set deletion
+protection still returns its original 409. Typecheck and `npm run build` both clean.
+
+**Limitations.**
+- Archive is a lecturer/admin action; there is no bulk archive and no automatic archiving of
+  long-finished exams.
+- Deleting a zero-attempt exam still deletes its question sets and answer-sheet configuration.
+  That is intended — no student work exists — but it is not recoverable.
+- The audit trail is written but has **no UI**: `ExamAdminAction` rows are only readable from
+  the database or through `/api/lecturer/assignments`, which surfaces assignment actions only.
+- `archivedAt` records *when* an exam was archived; the actor is recorded on the
+  `ExamAdminAction` row rather than denormalised onto `Lab`.
+
+### Result release / publication control — *completed this session*
+
+Closes the second P0 finding. **What the audit got right and wrong:** `evalPublish` was indeed
+a client `useState(true)` that was never changed and was sent as `isPublished` on every grade
+save, so saving a mark published it instantly. But `Submission.isPublished` already defaulted
+to `false` in the schema, and `/api/student/grades` already filtered on it — a partial
+workflow existed and has been completed rather than duplicated.
+
+**Three leaks the audit did not find,** all now closed:
+- `GET /api/student/workspace` returned the raw Prisma `Submission` row — marks, remarks,
+  status, `evaluatorId` — to the student with no publication check at all.
+- `POST /api/student/workspace` (`submit_lab`) returned the same row; after a
+  `NEEDS_CORRECTION` reopen it still carried the previous marks and remarks.
+- `GET /api/student/labs` returned `submission.status` unguarded, so `APPROVED`/`REJECTED`
+  revealed the evaluation outcome before release.
+
+**Publication model.** `Submission.isPublished` stays the authoritative per-record gate that
+student APIs filter on. `Lab.resultsReleasedAt` (new, nullable, additive) is the exam-level
+switch the lecturer operates. These are not competing models: the timestamp is the switch,
+`isPublished` is how it is materialised onto rows, and release sets both in one
+`prisma.$transaction` so they cannot disagree. Scope is per-exam/cohort, which is what the
+existing schema supports cleanly — `Submission` already had the per-row flag, so no grading
+model redesign was needed.
+
+**Default unpublished.** `resultsReleasedAt` is nullable with no default, so every existing
+and new exam reads "not released". `prisma/backfill/2026-09-result-release.sql` is an
+UPDATE-only, re-runnable script for environments that predate this change and carry rows
+published by the old behaviour; it marks those exams as already-released so the switch and
+the rows agree. It was a no-op on this database (no such rows existed).
+
+**Server-side enforcement.** `POST /api/lecturer/evaluate` no longer reads `isPublished` from
+the request body at all — publication is derived from `lab.resultsReleasedAt`. Sending
+`isPublished: true` is ignored (tested). `/api/student/grades` requires **both** gates
+(`isPublished: true` AND `lab.resultsReleasedAt` not null), so a stale flag from a legacy row
+or a direct database edit still cannot surface. The workspace route builds the student's view
+of their own submission with `toStudentSubmission()` — constructed from what a student may
+know rather than by deleting fields, so a column added to `Submission` later cannot silently
+start leaking. Before release a student sees that they submitted and when, and nothing else;
+`status` reads `SUBMITTED`. Checked and clean: the execution WebSocket carries no submission
+data, and `SectionEvaluation` has no code references anywhere, so there is no section-marks
+path to leak through.
+
+**Lecturer release.** `PATCH /api/lecturer/labs` with `{ id, releaseResults: true }` — the
+same lifecycle endpoint archive uses, behind the same `assertLabAccess()` ownership check.
+Exam cards show a `Results released` / `Results not released` badge with graded/pending
+counts and a labelled **Release results** button; `ResultReleaseDialog` (built on the shared
+`Modal`, `dismissOnBackdrop={false}`) shows the counts, states that students will see their
+marks and that release cannot be undone, and lists the effects from `RELEASE_EFFECTS`.
+
+**Incomplete grading.** Release is refused with **409** and
+`code: "RELEASE_BLOCKED_INCOMPLETE_GRADING"` unless every submitted attempt is evaluated,
+enforced server-side and re-derived per request. Chosen over partial release so a lecturer
+can never believe the cohort has results when only some do. The dialog shows the blocking
+reason and does not offer the action.
+
+**After release.** Grades saved afterwards publish immediately, because withholding one
+student's mark once their classmates have theirs is the confusing case. Editing a released
+mark updates only that row. There is deliberately **no un-release action** — it is not needed
+for the workflow and would let a student see a mark and then lose it.
+
+**Audit logging.** `RELEASE_RESULTS` on the existing `ExamAdminAction`, with actor, exam,
+title snapshot and the number of results made visible. A repeat release is idempotent and
+writes no second row.
+
+**Tests** — `scratchpad/release.test.sh`, **52 assertions, all passing**, plus 18 browser
+assertions (`ui-release.js`). Covers cases A–K: default unpublished; saving a grade does not
+publish; a forged `isPublished: true` is ignored; the student cannot obtain marks, remarks or
+the evaluation outcome from the grades, labs or workspace APIs before release; release
+blocked at 409 with incomplete grading; foreign lecturer, student and unauthenticated callers
+refused; release succeeds, publishes and audits; the student then sees marks and remarks
+through every route; idempotent re-release writes no duplicate audit row; state survives a
+fresh login; post-release grading publishes immediately. Regression: the 1bbd83b archive and
+delete-protection suites (52 API + 20 browser + 3 WebSocket) all still pass.
+
+**Limitations.**
+- No un-release. Deliberate, as above.
+- Release is per exam; there is no cross-subject bulk release.
+- `Submission.isPublished` is still writable by a direct database edit, but the double gate
+  on the grades API means such a row cannot surface while its exam is unreleased.
+- The `RELEASE_RESULTS` audit rows, like the others, have no UI.
+- ~~`GET /api/lecturer/labs` accepts the STUDENT role~~ — resolved by the security work
+  (SECURITY_AUDIT.md S6): the route is faculty-only and students receive 403.
+
+### Security hardening — *2026-11-08, iterations 1–4*
+Each item was reproduced as a live attack before the fix and is covered by `npm test`.
+- Execution engine: student programs get an allow-listed environment (no `JWT_SECRET` /
+  `DATABASE_URL`); filenames validated by one shared rule (`src/lib/sourceFilename.ts`);
+  compilers invoked with `execFile` (no shell); CPU/file-size/memory `ulimit`s; optional
+  privilege drop via `EXEC_RUN_UID/GID` (`src/lib/execution/sandbox.ts`).
+- Auth: no hardcoded JWT fallback; the server refuses to start without a usable
+  `JWT_SECRET`/`DATABASE_URL`; HS256 pinned; login has one generic failure message, timing
+  equalisation and a failure limiter (`src/lib/rateLimit.ts`).
+- Authorisation: students can no longer list all exam papers via `/api/lecturer/labs`; file
+  save/rename/delete restricted to the caller's own workspace.
+
+### Execution records — *2026-11-08, iteration 6*
+- Every **student** run is persisted as an `ExecutionRecord` by `ExecutionController`, however
+  it ends (exit, compile failure, timeout, output limit, manual stop, disconnect, replaced by a
+  new run). Faculty runs in the inspector are not recorded.
+- Captured with the same rules as the browser terminal (`src/lib/runTranscript.ts`, shared by
+  both): ANSI stripped, platform banners excluded, stdin reconstructed from keystrokes. A
+  compile failure stores the compiler diagnostics.
+- Bounded: 64 KB per field (marked when truncated), 200 records per workspace (oldest pruned).
+  A failed write is logged and never interrupts the run.
+- `GET /api/lecturer/executions?submissionId=` — owning lecturer and admin only; students 403;
+  another lecturer's submission 404.
+- Submission Inspector **Runs** tab (`src/components/RunHistory.tsx`): run list with outcome,
+  input and transcript, and an explicit verdict on whether the Output section exactly matches
+  a recorded run (trailing whitespace / line endings ignored). Verified in Chrome, light and dark.
+
+### Section-wise evaluation — *2026-11-08, iteration 7*
+- Sections the lecturer weighted (`maxMarks`, enabled) are marked individually in the grading
+  panel, each with an optional remark, and **roll up** into `Submission.marks` (out of the sum
+  of the weights). Exams with no weighted sections keep the single flat mark unchanged.
+- Rules shared by server and panel (`evaluateSectionMarks` / `validateFlatMarks` in
+  `src/lib/answerSheet.ts`): 0..max, numbers only, no duplicates, only this exam's weighted
+  sections. Flat marks are now range-checked too (previously written through unvalidated).
+- Partial marks can be saved unpublished (total left empty); **publishing requires every
+  weighted section marked**. Section rows and the total are written in one transaction.
+- Grading panel rebuilt on the shared primitives: prefills the saved status, marks, remarks,
+  section marks and publish state (it used to reopen blank as APPROVED + publish), live total,
+  inline range errors, and a **Publish to student** checkbox — previously absent, so every
+  grade was published immediately despite this file claiming a publish toggle.
+- Students see the per-section breakdown with remarks on published results (cards on phones,
+  under the row on desktop).
+
+### Security assessment — *2026-11-08, iterations 8–10*
+- Full assessment documented in `docs/` (audit S1–S28, threat model, API matrix, compiler review,
+  remediation log, test results). Final status: **NOT READY FOR PRODUCTION**, **SECURE FOR TESTING**.
+- Exam papers are released only after the student's own Start, and only within the exam's cohort
+  (`src/lib/examAccess.ts`); size limits on files and answers; one password policy
+  (`src/lib/passwordPolicy.ts`); lecturers can only place exams under subjects they teach; security headers;
+  generic 500 messages; WebSocket ≤2 runs per user and 2 MB frames; run process groups are killed.
+- Execution engine: optional per-run uid pool (`EXEC_RUN_UID_RANGE`) — verified on Linux to block secret
+  theft via `/proc`, signalling the server, cross-run reads, fork bombs and `setsid` escapes. **Not
+  enabled on Railway yet.** Student programs can still reach the network in every mode.
+- Seed refuses to run in production without `SEED_ADMIN_PASSWORD`, or against a non-empty database
+  without `SEED_RESET=yes`. `.dockerignore` keeps `.env` out of images.
+
+### Exam-integrity foundations — *2026-11-08, iterations 11–14*
+- **Immutable hand-ins:** every finalisation writes a versioned `SubmissionSnapshot` (files,
+  answers, server time, on-time flag, SHA-256); the submit is an atomic claim (8 concurrent submits
+  → 1 record; old code made up to 7); repeat submits return the same receipt; evaluators grade the
+  latest snapshot with each version's hash re-verified; "needs correction" keeps version 1.
+- **Server-clock countdown:** the exam timer counts on server time; a student clock ±15 min no
+  longer auto-submits early or shows the wrong time (reproduced, fixed, Chrome-verified).
+- **Hash-chained audit log** of auth, admin, exam, submission and grading events; admin-only
+  search, CSV export and chain verification (`docs/AUDIT_LOGGING_DESIGN.md`).
+- **Code autosave and safe recovery:** debounced save of every edited file, visible status, retry
+  when offline, local draft restored only onto the server version it was based on, versioned saves
+  (409 on stale), flush before any auto-submit. Previously code was saved only on Run/Submit.
+- **Exam editor visible:** fixed a pre-existing layout bug — the editor rendered ~5 px tall at every
+  screen size.
+- Status of everything else requested in that brief: `docs/SCOPE_STATUS.md`.
+
+### Automated tests
+`npm test` — Node's built-in runner against a running server, local PostgreSQL and real
+compilers (`tests/`). 113 tests at last run: 113/113 in production mode (109 + 4 production-only
+skips in dev). Browser checks (playwright-core in the session scratchpad, not committed): 73/73.
+
 ## 2. In progress
 
 These have **database schema and, where noted, partial runtime support**, but are not
 usable end to end.
 
-### Input/output capture — client-side capture done, persistence not
+### Input/output capture — *persistence completed in iteration 6; see Completed*
 - Runs **are** captured client-side and can be inserted into the Input/Output sections of
   the answer sheet (see Completed). Once inserted, the text persists as an ordinary answer.
-- `ExecutionRecord` model exists but **zero code reads or writes it**. Nothing about a run
-  is stored as a run: there is no server-side execution history, no record of runs the
-  student chose not to insert, and no way for an evaluator to see what else was executed.
-- Because insertion is student-initiated, Input/Output remain *attested* rather than
-  *proven*. A student can still type something a program never produced. Closing that gap
-  needs the `ExecutionRecord` write path.
+- Resolved: runs are now recorded server-side and the evaluator sees whether the Output
+  section matches one. Remaining gap: the record stores the transcript, not the source code
+  that ran, so it cannot show *which version* of the code produced a run.
 
-### Section-wise evaluation
-- `SectionEvaluation` model exists. **Zero code reads or writes it.**
-- Per-section `maxMarks` is configurable and displayed, but evaluation still records a
-  single flat total on `Submission`. No breakdown is captured.
+### Section-wise evaluation — *completed in iteration 7; see Completed*
 
 ## 3. Newly planned (agreed requirements)
 
@@ -282,8 +517,8 @@ Recorded so intent is not lost. Items marked ✅ are delivered; the rest are out
 | 5 | Mobile-compatible general application | ✅ Audited and fixed at phone width (exam page remains desktop-only by policy) |
 | 6 | Desktop/laptop-only active exams | ✅ Complete, enforced server-side at all entry points |
 | 7 | Digital record containing configurable sections | ✅ Complete |
-| 8 | Code execution with input/output capture | ⏳ Execution complete; capture wired into the answer sheet; server-side persistence outstanding |
-| 9 | Lecturer manual evaluation workflow | ⏳ Works at submission level; section-wise marking not started |
+| 8 | Code execution with input/output capture | ✅ Execution, capture into the sheet, server-side run records with Output matching |
+| 9 | Lecturer manual evaluation workflow | ✅ Submission-level and section-wise marking, roll-up, publish control |
 
 ---
 
@@ -419,6 +654,19 @@ without a second navigation component.
 - The shell renders navigation from a static per-role list; it does not reflect permissions
   beyond role.
 
+**Found during iteration 6 browser verification (pre-existing, not yet fixed):**
+- Submission Inspector, light theme: the "Integrity Timeline" heading is near-invisible, and
+  inactive inspector tab buttons render near-black. (The "Grading Panel" heading was fixed in
+  iteration 7.)
+- `cn()` in `ui/index.tsx` joins classes without de-conflicting them, so a width/colour passed
+  to a primitive can lose to the primitive's own class (hit in iteration 7; worked around with a
+  wrapper). Adopting `tailwind-merge` (already a dependency) inside `cn` would fix it globally.
+- No `favicon.ico` (404 on every page load).
+- The lecturer sidebar highlights "Evaluations" while still showing the subject list when no
+  subject is open.
+- `OnlineIDE` in the inspector's Code tab makes a 403 request to the student workspace
+  endpoint (already listed under Technical debt).
+
 ### Next UI/UX tasks
 1. Rebuild `QuestionSetManager` and `AnswerSheetConfigurator` bodies on the primitives (their
    dialog shells are now shared; their internals still compose their own layout).
@@ -443,12 +691,11 @@ without a second navigation component.
   lecturer may need to fix a broken question mid-exam, and it is audited — but a student who
   already answered against the old wording is not notified, and their existing answers are
   not migrated.
-- **Input/Output sections remain student-attested.** "Use last run" fills them from a real
-  execution, but a student may still edit the text afterwards or type it by hand, and runs
-  are not persisted server-side. The captured content is a convenience and an accuracy aid,
-  not proof of what executed.
-- **Run capture is in-memory and per-session.** Only the most recent run is offered, and it
-  is lost on reload. Nothing is stored.
+- **Input/Output sections are checkable, not locked.** A student may still edit them; the
+  evaluator's Runs tab now states whether the Output text matches a recorded run. Only the
+  Output section is compared (not Input). Records store the transcript, not the source.
+- **"Use last run" in the student UI is still in-memory.** The server keeps every run, but the
+  student's insert control only offers the latest run of the current session.
 - **Devtools detection is shortcut-only.** F12 and Ctrl+Shift+I/J/C are intercepted; an
   already-open panel, or one opened via the browser menu, is not detected. There is no
   reliable cross-browser API for this.
@@ -474,7 +721,8 @@ without a second navigation component.
   across a device matrix.** Faculty data tables still scroll horizontally on a phone by
   design; that is appropriate for dense multi-column data but is not the same as a
   purpose-built mobile faculty view.
-- **Grading remains a single flat mark** despite per-section weighting being configurable.
+- **Section weights do not have to sum to 100.** The submission is out of the sum of the
+  weighted sections; there is no separate "viva/other" component.
 - **No notices module exists**, though notices are named in the product direction as
   mobile-accessible content.
 - **Auto-submit depends on a reachable server.** The lazy deadline check self-heals on the
@@ -485,13 +733,14 @@ without a second navigation component.
 
 ## 5. Technical debt
 
-- **`README.md` is stale.** It documents an `/api/compile/run` route that no longer exists,
+- **`README.md` is stale** (environment-variable section corrected 2026-11-08; the rest is
+  not). It documents an `/api/compile/run` route that no longer exists,
   describes SQLite as the default database (the project is PostgreSQL-only), and lists a
   folder structure predating the execution engine and exam layers. It should not be trusted
   as documentation.
-- **No automated test suite in the repository.** The verification described above was run
-  as throwaway scripts against a temporary database and a headless browser, not committed as
-  tests. There is no `npm test`, no CI, and no regression safety net.
+- **Test suite has no CI and no browser tests.** `npm test` exists (see Completed) but needs
+  a running server and is not run automatically; the earlier browser verification was never
+  committed.
 - **`npm run lint` is not usable.** The script exists but no ESLint config does, so
   `next lint` drops into interactive first-time setup instead of linting. Either configure
   it or remove the script.
@@ -508,9 +757,6 @@ without a second navigation component.
   parent — two sources of truth for the same data. In the faculty inspector that fetch
   fails silently (a lecturer token cannot call the student endpoint) and the component
   falls back to props, which works by accident rather than design.
-- **The JWT secret has a hardcoded development fallback** in `src/lib/jwt.ts`. If
-  `JWT_SECRET` is ever unset in production, tokens become forgeable with a value that is in
-  the repository.
 - **Violation type strings are duplicated** across the schema comment, `examIntegrity.ts`,
   the violations route allowlist and `ExamGuard`. A shared enum would prevent drift.
 - **Next.js 14.2.10 has a known security advisory** (flagged at install). An upgrade should
@@ -520,38 +766,11 @@ without a second navigation component.
 
 ## 6. Next implementation steps
 
-Ordered by dependency. Steps 1 and 2 finish work whose schema already exists.
+The prioritised, owner-assigned plan now lives in `docs/MVP_ROADMAP.md`; current position in
+`docs/ENGINEERING_STATE.md`. Earlier entries here for question-set authoring and the mobile
+audit were removed on 2026-11-08 because both are complete (see §1). Still outstanding from
+this list:
 
-1. **Question-set authoring and multi-question sets.**
-   Extend `QuestionSet` from a single statement to an ordered collection of questions
-   (a `Question` child model), add lecturer CRUD for sets and their questions in the exam
-   modal, and surface the assigned set's questions to the student. The random-assignment
-   path already exists and should be reused unchanged. Keep the identity-stripping rule
-   intact as the payload grows — a question list must not leak set size or ordering.
-
-2. **Per-exam enrolment (optional).** Assignment eligibility is currently year plus branch.
-   An explicit enrolment list per exam would let a lecturer sit a subset of a cohort.
-
-3. **Persist execution records.**
-   Client-side capture and answer-sheet insertion are done; the server still stores nothing.
-   Persist an `ExecutionRecord` per run in `ExecutionController` (the `system` output flag
-   already separates program output from platform banners), surface a student's run history
-   in the evaluator view, and mark whether an Output section matches a real recorded run.
-   Mind the 5 MB output cap and truncate before persisting.
-
-4. **Section-wise evaluation.**
-   Write `SectionEvaluation` rows from the inspector, roll them up into
-   `Submission.marks`, and show the breakdown to the student alongside published results.
-
-5. **Mobile audit of the general UI.**
-   Verify and fix dashboards, results, login and registration at phone widths. The exam
-   page is deliberately out of scope — it is desktop-only by policy.
-
-6. **Notices module.**
-   A lecturer/admin-authored notice feed visible to students, mobile-first, outside the
-   exam flow.
-
-7. **Debt reduction, ongoing.**
-   Rewrite `README.md`; commit the verification scripts as a real test suite; introduce
-   shared API types; extract dashboard tabs into components; remove the JWT fallback
-   secret.
+1. **Per-exam enrolment (optional).**
+2. **Notices module.**
+5. **Debt reduction** — README rewrite, shared API types, dashboard tab extraction, lint config.

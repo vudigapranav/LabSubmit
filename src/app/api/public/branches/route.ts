@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
+// Reads query parameters, so it can never be pre-rendered. Saying so stops `next build`
+// attempting a static render whose internal signal the catch below would log as an error.
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -18,6 +22,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ branches });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/public/branches]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

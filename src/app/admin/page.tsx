@@ -61,6 +61,9 @@ export default function AdminDashboard() {
   const [branchYear, setBranchYear] = useState('1');
   const [rollStart, setRollStart] = useState('');
   const [rollEnd, setRollEnd] = useState('');
+  // Whether the branch accepts new student registrations. Closing a branch is the
+  // non-destructive alternative to deleting one that still has subjects, exams or students.
+  const [branchActive, setBranchActive] = useState(true);
   const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
 
   // Form fields: Subject
@@ -231,6 +234,7 @@ export default function AdminDashboard() {
           year: branchYear,
           rollStart,
           rollEnd,
+          isActive: branchActive,
         }),
       });
       const data = await res.json();
@@ -260,6 +264,10 @@ export default function AdminDashboard() {
         showToast('success', 'Branch deleted');
         fetchBranches();
         if (studentFilterYear) fetchStudentFilterBranches(studentFilterYear);
+      } else {
+        // A refusal used to be swallowed silently; the server explains what still depends on it.
+        const data = await res.json().catch(() => ({}));
+        showToast('error', data.error || 'Could not delete the branch');
       }
     } catch (e) { showToast('error', 'Server error'); }
   };
@@ -308,6 +316,9 @@ export default function AdminDashboard() {
       if (res.ok) {
         showToast('success', 'Subject deleted');
         fetchSubjects();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast('error', data.error || 'Could not delete the subject');
       }
     } catch (e) { showToast('error', 'Server error'); }
   };
@@ -470,6 +481,7 @@ export default function AdminDashboard() {
             <button
               onClick={() => {
                 setEditingBranchId(null);
+                setBranchActive(true);
                 setBranchName('');
                 setRollStart('');
                 setRollEnd('');
@@ -580,13 +592,15 @@ export default function AdminDashboard() {
                         setBranchYear(String(b.year));
                         setRollStart(b.rollStart || '');
                         setRollEnd(b.rollEnd || '');
+                        setBranchActive(b.isActive !== false);
                         setShowBranchModal(true);
                       }}
+                      aria-label={`Edit branch ${b.name}`}
                       className="p-1 rounded text-slate-400 hover:text-brand-blue-500"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleDeleteBranch(b.id)} className="p-1 rounded text-slate-400 hover:text-red-600">
+                    <button onClick={() => handleDeleteBranch(b.id)} aria-label={`Delete branch ${b.name}`} className="p-1 rounded text-slate-400 hover:text-red-600">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -594,6 +608,9 @@ export default function AdminDashboard() {
 
                 <div>
                   <h3 className="font-bold text-base text-slate-900 dark:text-white">{b.name}</h3>
+                  {b.isActive === false && (
+                    <p className="mt-1 inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50">Registration closed</p>
+                  )}
                   <p className="text-xs text-slate-500 font-mono mt-1">
                     Configured Roll Range: {b.rollStart || 'N/A'} &rarr; {b.rollEnd || 'N/A'}
                   </p>
@@ -1082,6 +1099,13 @@ export default function AdminDashboard() {
                   <input type="text" placeholder="160125733060" value={rollEnd} onChange={(e) => setRollEnd(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
                 </div>
               </div>
+              <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
+                <input type="checkbox" checked={branchActive} onChange={(e) => setBranchActive(e.target.checked)} className="mt-0.5" />
+                <span>
+                  Open for student registration
+                  <span className="block text-[11px] text-slate-500">Untick to close a branch without deleting it. Existing students, subjects and examinations are unaffected.</span>
+                </span>
+              </label>
               <div className="flex justify-end space-x-2 pt-2">
                 <button type="button" onClick={() => setShowBranchModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
                 <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors">Save Branch</button>

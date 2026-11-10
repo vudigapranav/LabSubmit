@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAuth } from '@/lib/auth';
 
-export async function GET() {
+// Was public, and served every lecturer's name and email to anyone (SECURITY_AUDIT.md S10).
+// No page in the app calls it; kept for faculty/admin use rather than deleted.
+export async function GET(req: Request) {
+  const { errorResponse } = await requireAuth(req, ['ADMIN', 'LECTURER']);
+  if (errorResponse) return errorResponse;
+
   try {
     const lecturers = await prisma.user.findMany({
       where: { role: 'LECTURER' },
@@ -22,6 +28,7 @@ export async function GET() {
 
     return NextResponse.json({ lecturers: formattedLecturers });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    console.error('[/api/auth/lecturers-available]', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

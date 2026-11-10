@@ -31,6 +31,10 @@ export const DEFAULT_BOILERPLATE: Record<string, Boilerplate> = {
     filename: 'main.py',
     content: `print("Welcome to CBIT Programming Exam!")\n`,
   },
+  javascript: {
+    filename: 'main.js',
+    content: `console.log("Welcome to CBIT Programming Exam!");\n`,
+  },
 };
 
 /** The starter file for an exam, matching its first allowed language. */

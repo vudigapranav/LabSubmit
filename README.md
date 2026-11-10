@@ -144,17 +144,16 @@ npm install
 Create a file named `.env` in the root directory of the project (same directory as `package.json`).
 
 ```env
-DATABASE_URL="file:./dev.db"
-JWT_SECRET="cbit-labsubmit-super-secret-jwt-key-2026"
+DATABASE_URL="postgresql://username:password@localhost:5432/labsubmit_dev?schema=public"
+JWT_SECRET="<paste the output of: openssl rand -base64 48>"
 NODE_ENV="development"
 PORT=3000
 ```
 
 ### Explanation of Environment Variables
 
-- `DATABASE_URL`: Connection string for Prisma ORM. Defaults to SQLite (`file:./dev.db`) for zero-configuration local execution. For PostgreSQL production, set:
-  `DATABASE_URL="postgresql://username:password@localhost:5432/cbit_labsubmit?schema=public"`
-- `JWT_SECRET`: Secret key used to sign and verify JSON Web Tokens for authentication.
+- `DATABASE_URL`: PostgreSQL connection string for Prisma. **Required** — the project is PostgreSQL-only (SQLite is not supported).
+- `JWT_SECRET`: Secret used to sign and verify login tokens. **Required.** Generate a random value (`openssl rand -base64 48`); never reuse an example value. The server refuses to start if it is missing or set to the old published default, and warns if it is shorter than 32 characters. Must be identical on the Vercel and Railway hosts.
 - `NODE_ENV`: Application environment state (`development` or `production`).
 - `PORT`: Network port on which the Next.js server listens (default: `3000`).
 
@@ -283,9 +282,9 @@ rm -rf node_modules package-lock.json
 npm install
 ```
 
-### Issue 5: `JWT_SECRET is undefined` or Authentication Failure
-**Cause**: `.env` file is missing or not placed in the root directory.  
-**Solution**: Ensure `.env` exists in the same folder as `package.json` with `JWT_SECRET` defined.
+### Issue 5: `[STARTUP ERROR] JWT_SECRET ...` or Authentication Failure
+**Cause**: `.env` is missing, not in the project root, has no `JWT_SECRET`, or uses the old published example secret.  
+**Solution**: Ensure `.env` exists next to `package.json` with `JWT_SECRET` set to a fresh random value (`openssl rand -base64 48`). Changing the secret logs every user out once; it does not change any password.
 
 ---
 

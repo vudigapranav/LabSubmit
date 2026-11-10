@@ -4,7 +4,31 @@ import { defaultSectionConfig } from '../src/lib/answerSheet';
 
 const prisma = new PrismaClient();
 
+// Production guard (SECURITY_AUDIT.md S27). This script DELETES EVERY TABLE before seeding,
+// and its demo passwords are public on GitHub. Both are fine for a development database and
+// dangerous for a live one, so in production it requires an explicit admin password and
+// refuses to wipe a database that already has users unless told to. Runs before any write.
+async function productionGuard(): Promise<{ adminPassword: string }> {
+  if (process.env.NODE_ENV !== 'production') return { adminPassword: 'admin@123' };
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || '';
+  if (adminPassword.length < 12) {
+    throw new Error(
+      'Refusing to seed in production without SEED_ADMIN_PASSWORD (12+ characters). ' +
+        'The default admin password is published in this repository.'
+    );
+  }
+  const users = await prisma.user.count();
+  if (users > 0 && process.env.SEED_RESET !== 'yes') {
+    throw new Error(
+      `Refusing to seed: this production database already has ${users} user(s), and seeding deletes ALL data ` +
+        '(submissions, marks, run records). Set SEED_RESET=yes only if you really mean to wipe it.'
+    );
+  }
+  return { adminPassword };
+}
+
 async function main() {
+  const guard = await productionGuard();
   console.log('Seeding CBIT LabSubmit database with Academic Hierarchy & Branch Ranges...');
 
   // Clean all existing data
@@ -25,7 +49,7 @@ async function main() {
   await prisma.user.deleteMany();
 
   const defaultPassword = await bcrypt.hash('password123', 10);
-  const adminPassword = await bcrypt.hash('admin@123', 10);
+  const adminPassword = await bcrypt.hash(guard.adminPassword, 10);
 
   // 1. Admin Account
   const admin = await prisma.user.create({

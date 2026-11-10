@@ -2,6 +2,7 @@ import * as ptyModule from 'node-pty';
 import { IPty } from 'node-pty';
 import { ExecutionSession } from './types';
 import { ExecutionLogger } from './ExecutionLogger';
+import { buildSandboxEnv, runIdentity, warnIfRunningWithoutIdentity, withResourceLimits } from './sandbox';
 
 const pty = (ptyModule as any).default || ptyModule || require('node-pty');
 
@@ -20,30 +21,25 @@ export class PtyService {
     const cols = options.cols || 80;
     const rows = options.rows || 24;
 
-    console.log('[DEBUG PTY IMPORT] typeof pty:', typeof pty);
-    console.log('[DEBUG PTY IMPORT] Object.keys(pty):', Object.keys(pty || {}));
-    console.log('[DEBUG PTY IMPORT] typeof pty.spawn:', typeof pty?.spawn);
-    console.log('[DEBUG PTY SPAWN ARGS]', {
-      executable: options.runCmd,
-      args: options.runArgs,
-      cwd: options.tempDir,
-      env: 'process.env',
-      cols,
-      rows,
-      terminalName: 'xterm-256color',
-    });
 
     if (typeof pty?.spawn !== 'function') {
       throw new Error(`node-pty spawn is not a function. typeof pty: ${typeof pty}, keys: ${JSON.stringify(Object.keys(pty || {}))}`);
     }
 
     try {
-      const ptyProcess = pty.spawn(options.runCmd, options.runArgs, {
+      // Minimal environment, resource limits and (when configured) an unprivileged uid —
+      // see sandbox.ts. Spreading process.env here used to hand the program JWT_SECRET
+      // and DATABASE_URL (SECURITY_AUDIT.md S1).
+      warnIfRunningWithoutIdentity();
+      const id = session.identity === undefined ? runIdentity() : session.identity;
+      const limited = withResourceLimits(options.runCmd, options.runArgs, session.language, session.identity);
+      const ptyProcess = pty.spawn(limited.cmd, limited.args, {
         name: 'xterm-256color',
         cols: cols,
         rows: rows,
         cwd: options.tempDir,
-        env: { ...process.env, PYTHONUNBUFFERED: '1' },
+        env: buildSandboxEnv(options.tempDir),
+        ...(id ? { uid: id.uid, gid: id.gid } : {}),
       });
 
       session.ptyProcess = ptyProcess;

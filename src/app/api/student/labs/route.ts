@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { getExamStatus, getEffectiveDeadline, parseAllowedLanguages } from '@/lib/examTiming';
 
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['STUDENT']);
+  const { errorResponse, session } = await requireAuth(req, ['STUDENT']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -33,7 +33,12 @@ export async function GET(req: Request) {
         lecturer: { select: { name: true, email: true } },
         branch: true,
         labs: {
-          where: { isPublished: true }, // drafts stay hidden from students
+          // Drafts stay hidden from students, and so do archived examinations: an archived
+          // exam must never be offered as active or upcoming work. Already-published
+          // results are unaffected — those are served from /api/student/grades, which keys
+          // off the submission rather than the lab, so a student keeps their marks and
+          // remarks for an exam that has since been archived.
+          where: { isPublished: true, archivedAt: null },
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -55,6 +60,7 @@ export async function GET(req: Request) {
             });
 
             const status = getExamStatus(lab);
+            const resultsReleased = lab.resultsReleasedAt !== null;
             const effectiveDeadline = workspace ? getEffectiveDeadline(lab, workspace) : lab.endTime;
 
             return {
@@ -80,11 +86,22 @@ export async function GET(req: Request) {
               effectiveDeadline,
               hasStarted: Boolean(workspace?.startedAt),
               isSubmitted: workspace ? workspace.isSubmitted : false,
-              submissionStatus: submission ? submission.status : 'NOT_STARTED',
-              marks: submission && submission.isPublished ? submission.marks : null,
+              // Results are withheld until the exam's results are released AND this row was
+              // published by that release. `submissionStatus` is withheld along with the
+              // marks: APPROVED or REJECTED reveals the evaluation outcome just as surely
+              // as the number does, so before release a submitted attempt reads SUBMITTED.
+              submissionStatus: !submission
+                ? 'NOT_STARTED'
+                : resultsReleased && submission.isPublished
+                  ? submission.status
+                  : submission.status === 'NEEDS_CORRECTION'
+                    ? 'NEEDS_CORRECTION' // the student must act on this, so it is never withheld
+                    : 'SUBMITTED',
+              marks: submission && resultsReleased && submission.isPublished ? submission.marks : null,
               maxMarks: submission ? submission.maxMarks : 100,
-              remarks: submission && submission.isPublished ? submission.remarks : null,
-              isPublished: submission ? submission.isPublished : false,
+              remarks: submission && resultsReleased && submission.isPublished ? submission.remarks : null,
+              isPublished: Boolean(submission && resultsReleased && submission.isPublished),
+              resultsReleased,
             };
           })
         );
@@ -111,6 +128,7 @@ export async function GET(req: Request) {
       subjects: subjectsWithLabs,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/student/labs]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

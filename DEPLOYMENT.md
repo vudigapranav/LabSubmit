@@ -104,10 +104,13 @@ Check `git status` before committing — `.env` and `prisma/dev.db` must **not**
 
    ```bash
    npx prisma db push
-   npm run db:seed
+   SEED_ADMIN_PASSWORD='<a long password only you know>' npm run db:seed
    ```
 
-   Run this **once**. `db:seed` creates the admin account and demo data; running it twice may create duplicates.
+   Run this **once**. `db:seed` **deletes every table** and then creates the admin account and demo
+   data. In production it refuses to run without `SEED_ADMIN_PASSWORD` (12+ characters), and refuses to
+   run against a database that already has users unless you also set `SEED_RESET=yes` — which wipes all
+   submissions and marks. Never set that on a database students have used.
 
 You do **not** need a Railway volume any more — Postgres holds all the data, and the container only writes throwaway compile artifacts to `/tmp`.
 
@@ -141,8 +144,9 @@ Vercel **Settings → Domains** lets you rename the project subdomain for free. 
 Work through this in order — each step depends on the one above it.
 
 1. Open the Vercel URL. The login page renders → Vercel build is good.
-2. Log in as `admin@cbit.in` / `admin@123` → Vercel can reach Postgres.
-3. **Change that password immediately.** It is in the seed script, which is in a public GitHub repo.
+2. Log in as `admin@cbit.in` with the `SEED_ADMIN_PASSWORD` you chose → Vercel can reach Postgres.
+3. Delete or change the passwords of the seeded demo lecturers and students (`password123`, published in
+   this repository) before real students use the system.
 4. Admin dashboard shows the seeded students → database reads work.
 5. Log in as a student, open a lab, press **Run** on the boilerplate `main.c`.
    - Terminal prints `Welcome to CBIT Programming Exam!` → the whole chain works. **You're done.**

@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { detectLanguage } from '@/lib/compiler';
-import { getExamStatus, getEffectiveDeadline, parseAllowedLanguages, isLanguageAllowed } from '@/lib/examTiming';
+import { getExamStatus, getEffectiveDeadline, parseAllowedLanguages, isLanguageAllowed, isPastDeadline } from '@/lib/examTiming';
 import { finalizeSubmission } from '@/lib/examSubmission';
 import { checkExamDevice } from '@/lib/deviceEligibility';
-import { findIncompleteRequiredSections } from '@/lib/answerSheet';
+import { findIncompleteRequiredSections, MAX_SECTION_CONTENT_BYTES } from '@/lib/answerSheet';
 import { assignableSets, chooseSetId, toStudentPaper, paperToPlainText } from '@/lib/questionSets';
 import { initialFileForLab } from '@/lib/workspaceBootstrap';
+import { RESULTS_WITHHELD_MESSAGE } from '@/lib/resultRelease';
+import { isSafeSourceFilename, SOURCE_FILENAME_RULE, MAX_SOURCE_FILE_BYTES, MAX_FILES_PER_WORKSPACE } from '@/lib/sourceFilename';
+import { recordAudit, requestIp } from '@/lib/audit';
+import { studentInExamCohort, examPaperReleased } from '@/lib/examAccess';
 
 
 /**
@@ -38,7 +42,7 @@ async function pickQuestionSetId(labId: string): Promise<string | null> {
 
 // GET workspace for lab
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['STUDENT']);
+  const { errorResponse, session } = await requireAuth(req, ['STUDENT']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -68,6 +72,15 @@ export async function GET(req: Request) {
     });
 
     if (!workspace) {
+      // Only a student in the exam's cohort may open it. Same 404 as a missing or draft exam,
+      // so the response does not confirm that an exam exists for another cohort (S13).
+      // An EXISTING workspace is not re-checked here: continuation fails open (CLAUDE.md §6);
+      // start_exam still checks the cohort, so such a workspace can never reach the paper.
+      const profile = await prisma.studentProfile.findUnique({ where: { userId: session!.userId } });
+      if (!studentInExamCohort(lab, profile)) {
+        return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
+      }
+
       // Create initial workspace with a default file matching the exam's first allowed language.
       // Note: this does NOT start the exam clock — that only happens via the start_exam action.
       const boilerplate = initialFileForLab(lab.allowedLanguages);
@@ -98,6 +111,11 @@ export async function GET(req: Request) {
       where: { labId, studentId: session!.userId },
       orderBy: { submittedAt: 'desc' },
     });
+    // The student's lasting receipt for a submitted attempt (shown in the exam page banner).
+    const latestSnapshot =
+      submission && workspace.isSubmitted
+        ? await prisma.submissionSnapshot.findFirst({ where: { submissionId: submission.id }, orderBy: { version: 'desc' } })
+        : null;
 
     const answerSheetSections = await prisma.answerSheetSection.findMany({
       where: { labId, enabled: true },
@@ -111,12 +129,17 @@ export async function GET(req: Request) {
     const assignableCount = await prisma.questionSet.count({
       where: { labId, isActive: true, questions: { some: {} } },
     });
-    const paper = toStudentPaper(workspace.questionSet);
-    const problemStatement = workspace.questionSet
-      ? paperToPlainText(paper)
-      : assignableCount > 0
-        ? '' // sets exist but none assigned yet — withheld until the attempt starts
-        : lab.problemStatement;
+    // The paper is released only once this student's attempt has started (or was submitted)
+    // — never for an UPCOMING exam, never before Start. start_exam delivers it (S13).
+    const paperReleased = examPaperReleased(workspace);
+    const paper = paperReleased ? toStudentPaper(workspace.questionSet) : [];
+    const problemStatement = !paperReleased
+      ? ''
+      : workspace.questionSet
+        ? paperToPlainText(paper)
+        : assignableCount > 0
+          ? '' // sets exist but none assigned yet — withheld until the attempt starts
+          : lab.problemStatement;
 
     // BOTH the joined set and the raw foreign key are stripped. questionSetId is not a
     // label, but it is a stable identifier two students could compare to discover they hold
@@ -147,25 +170,68 @@ export async function GET(req: Request) {
       questions: withholdExamContent ? [] : paper,
       answerSheetSections: withholdExamContent ? [] : answerSheetSections,
       examContentWithheld: withholdExamContent,
-      submission,
+      // The server's clock; the exam page counts down against this, not the browser's clock.
+      serverNow: new Date().toISOString(),
+      receipt: latestSnapshot
+        ? { version: latestSnapshot.version, submittedAt: latestSnapshot.submittedAt, reference: latestSnapshot.contentHash.slice(0, 12), onTime: latestSnapshot.onTime }
+        : null,
+      // True until the student presses Start; the UI shows the start gate, not an empty paper.
+      paperWithheldUntilStart: !paperReleased,
+      // Built from what a student may know: no marks or remarks before release.
+      submission: toStudentSubmission(submission, lab.resultsReleasedAt),
       effectiveDeadline: getEffectiveDeadline(lab, workspace),
       // The gate the UI renders. The binding decision is re-made server-side on start_exam
       // and on every action inside the attempt; this response has already acted on it.
       deviceEligibility: device,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/student/workspace]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
+}
+
+/**
+ * The student's view of their own submission. Built from what a student may know rather
+ * than by deleting fields off the Prisma row, so a column added to Submission later cannot
+ * silently start leaking.
+ *
+ * Until the exam's results are released, a student may know THAT they submitted and when —
+ * never the mark, the lecturer's remarks, the evaluation outcome, or who evaluated it. The
+ * raw row was previously returned whole from both of this route's exits, which handed a
+ * student their unpublished marks and their lecturer's private remarks for the asking.
+ */
+function toStudentSubmission(
+  submission: { id: string; submittedAt: Date; status: string; marks: number | null; maxMarks: number; remarks: string | null; isPublished: boolean } | null,
+  resultsReleasedAt: Date | null
+) {
+  if (!submission) return null;
+
+  // Both gates must agree: the cohort has been released AND this row was published by that
+  // release. Either alone is not enough.
+  const released = resultsReleasedAt !== null && submission.isPublished;
+
+  return {
+    id: submission.id,
+    submittedAt: submission.submittedAt,
+    resultsReleased: released,
+    // Withheld until release. `status` is included in the withholding because APPROVED or
+    // REJECTED reveals the evaluation outcome just as surely as the number does.
+    status: released ? submission.status : 'SUBMITTED',
+    marks: released ? submission.marks : null,
+    maxMarks: submission.maxMarks,
+    remarks: released ? submission.remarks : null,
+    resultsMessage: released ? null : RESULTS_WITHHELD_MESSAGE,
+  };
 }
 
 // POST actions: start_exam, create_file, save_file, rename_file, delete_file, submit_lab
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['STUDENT']);
+  const { errorResponse, session } = await requireAuth(req, ['STUDENT']);
   if (errorResponse) return errorResponse;
 
   try {
     const body = await req.json();
-    const { action, labId, fileId, filename, content, newFilename, sessionId, sectionId, deviceClass } = body;
+    const { action, labId, fileId, filename, content, newFilename, sessionId, sectionId, deviceClass, baseUpdatedAt } = body;
 
     if (!labId || !action) {
       return NextResponse.json({ error: 'Exam ID and action are required' }, { status: 400 });
@@ -188,6 +254,12 @@ export async function POST(req: Request) {
     if (action === 'start_exam') {
       if (!lab.isPublished) {
         return NextResponse.json({ error: 'Exam is not currently available.' }, { status: 403 });
+      }
+      // Fail closed on START: a workspace alone (e.g. one predating the cohort check) is not
+      // permission to sit an exam for another cohort (S13).
+      const startProfile = await prisma.studentProfile.findUnique({ where: { userId: session!.userId } });
+      if (!studentInExamCohort(lab, startProfile)) {
+        return NextResponse.json({ error: 'This exam is not available to you.' }, { status: 403 });
       }
       if (workspace.isSubmitted) {
         return NextResponse.json({ error: 'This exam has already been submitted.' }, { status: 403 });
@@ -229,6 +301,16 @@ export async function POST(req: Request) {
         },
       });
 
+      if (!workspace.startedAt) {
+        // First start only — resuming an attempt is not a new start.
+        await recordAudit({
+          action: 'EXAM_ATTEMPT_STARTED', category: 'EXAM', actorId: session!.userId, actorRole: 'STUDENT',
+          targetType: 'LabWorkspace', targetId: workspace.id,
+          metadata: { labId, deviceClass: startDevice.deviceClass, deadline: getEffectiveDeadline(lab, updated) },
+          ip: requestIp(req),
+        });
+      }
+
       const { questionSet, questionSetId: _assignedSetId, ...startedWorkspace } = updated;
       const startedPaper = toStudentPaper(questionSet);
 
@@ -239,6 +321,7 @@ export async function POST(req: Request) {
         questions: startedPaper,
         problemStatement: questionSet ? paperToPlainText(startedPaper) : lab.problemStatement,
         effectiveDeadline: getEffectiveDeadline(lab, updated),
+        serverNow: new Date().toISOString(),
       });
     }
 
@@ -253,6 +336,24 @@ export async function POST(req: Request) {
       );
     }
 
+    // A repeated submit (e.g. the client retrying after a lost response) is confirmed, not
+    // refused: it returns the receipt of what was already stored, and changes nothing.
+    if (workspace.isSubmitted && action === 'submit_lab') {
+      const prior = await prisma.submission.findFirst({ where: { labId, studentId: session!.userId } });
+      const latest = prior
+        ? await prisma.submissionSnapshot.findFirst({ where: { submissionId: prior.id }, orderBy: { version: 'desc' } })
+        : null;
+      return NextResponse.json({
+        message: 'This exam was already submitted.',
+        alreadySubmitted: true,
+        // Same withholding as every other student view: no marks or outcome before release.
+        submission: toStudentSubmission(prior, lab.resultsReleasedAt),
+        receipt: latest
+          ? { version: latest.version, submittedAt: latest.submittedAt, reference: latest.contentHash.slice(0, 12), onTime: latest.onTime }
+          : null,
+      });
+    }
+
     // Every other action requires an already-submitted lock check and a live deadline check.
     if (workspace.isSubmitted && action !== 'view') {
       return NextResponse.json(
@@ -264,7 +365,7 @@ export async function POST(req: Request) {
     // Lazy deadline enforcement: self-heals workspace state on every touch, independent of
     // whether any client-side timer/violation call ever fires.
     const deadline = getEffectiveDeadline(lab, workspace);
-    if (deadline && new Date() > deadline && action !== 'submit_lab') {
+    if (isPastDeadline(deadline) && action !== 'submit_lab') {
       await finalizeSubmission(prisma, {
         workspaceId: workspace.id,
         labId,
@@ -275,9 +376,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Exam time has expired. Your work has been auto-submitted.' }, { status: 403 });
     }
 
+    // Size limits (S14): without them a student could store arbitrarily large files or
+    // answers. 413 so the client can tell "too big" from "invalid".
+    const tooLarge = (text: unknown, limit: number) => typeof text === 'string' && Buffer.byteLength(text) > limit;
+    if ((action === 'save_file' || action === 'create_file') && tooLarge(content, MAX_SOURCE_FILE_BYTES)) {
+      return NextResponse.json({ error: `File is too large (limit ${MAX_SOURCE_FILE_BYTES / 1024} KB).` }, { status: 413 });
+    }
+    if (action === 'save_section' && tooLarge(content, MAX_SECTION_CONTENT_BYTES)) {
+      return NextResponse.json({ error: `Answer is too long (limit ${MAX_SECTION_CONTENT_BYTES / 1024} KB).` }, { status: 413 });
+    }
+    if (action === 'create_file' && workspace.files.length >= MAX_FILES_PER_WORKSPACE) {
+      return NextResponse.json({ error: `An attempt can hold at most ${MAX_FILES_PER_WORKSPACE} files.` }, { status: 400 });
+    }
+
+    // File actions must target a file in the caller's OWN workspace. Prisma updates below
+    // are keyed by file id alone, so without this a student could edit, rename or delete
+    // another student's files by id (SECURITY_AUDIT.md S12).
+    if (['save_file', 'rename_file', 'delete_file'].includes(action) && fileId && !workspace.files.some((f) => f.id === fileId)) {
+      return NextResponse.json({ error: 'File not found in your workspace.' }, { status: 404 });
+    }
+
     if (action === 'create_file') {
       if (!filename) {
         return NextResponse.json({ error: 'Filename is required' }, { status: 400 });
+      }
+      // Same rule the execution engine enforces, applied at creation so a student is never
+      // left holding a file the engine will refuse to run.
+      if (!isSafeSourceFilename(String(filename).trim())) {
+        return NextResponse.json({ error: SOURCE_FILENAME_RULE }, { status: 400 });
       }
       const existing = workspace.files.find((f) => f.filename.toLowerCase() === filename.trim().toLowerCase());
       if (existing) {
@@ -302,6 +428,31 @@ export async function POST(req: Request) {
       if (!fileId || content === undefined) {
         return NextResponse.json({ error: 'File ID and content are required' }, { status: 400 });
       }
+      // Optimistic concurrency: a save says which version it was based on, and is refused if
+      // the file changed since (another tab, a delayed retry). Without this a late save
+      // silently overwrote newer work — reproduced with a delayed unload save. The update is
+      // conditional in one statement, so two racing saves cannot both pass the check.
+      // Clients that send no base (older ones) keep last-write-wins.
+      if (typeof baseUpdatedAt === 'string') {
+        const base = new Date(baseUpdatedAt);
+        const result = await prisma.labFile.updateMany({
+          where: { id: fileId, workspaceId: workspace.id, updatedAt: base },
+          data: { content },
+        });
+        if (result.count === 0) {
+          const current = await prisma.labFile.findUnique({ where: { id: fileId } });
+          return NextResponse.json(
+            {
+              error: 'This file was changed elsewhere (another tab or device) after you started editing. Your version is kept in this browser; reload the exam to see the saved version.',
+              conflict: true,
+              serverUpdatedAt: current?.updatedAt ?? null,
+            },
+            { status: 409 }
+          );
+        }
+        const saved = await prisma.labFile.findUnique({ where: { id: fileId } });
+        return NextResponse.json({ message: 'File saved', file: saved });
+      }
       const updatedFile = await prisma.labFile.update({
         where: { id: fileId },
         data: { content },
@@ -312,6 +463,9 @@ export async function POST(req: Request) {
     if (action === 'rename_file') {
       if (!fileId || !newFilename) {
         return NextResponse.json({ error: 'File ID and new filename are required' }, { status: 400 });
+      }
+      if (!isSafeSourceFilename(String(newFilename).trim())) {
+        return NextResponse.json({ error: SOURCE_FILENAME_RULE }, { status: 400 });
       }
       const lang = detectLanguage(newFilename);
       if (!isLanguageAllowed(lab, lang)) {
@@ -397,14 +551,26 @@ export async function POST(req: Request) {
         auto: false,
       });
 
+      // A receipt the student can quote in a dispute: server time, version and a hash prefix
+      // of exactly what was stored. A later repeated submit returns the same receipt (above).
+      const latest = sub
+        ? await prisma.submissionSnapshot.findFirst({ where: { submissionId: sub.id }, orderBy: { version: 'desc' } })
+        : null;
+      const receipt = latest
+        ? { version: latest.version, submittedAt: latest.submittedAt, reference: latest.contentHash.slice(0, 12), onTime: latest.onTime }
+        : null;
       return NextResponse.json({
-        message: 'Exam submitted successfully! Your workspace is now locked.',
-        submission: sub,
+        message: receipt
+          ? `Exam submitted at ${latest!.submittedAt.toISOString()} (server time). Reference ${receipt.reference}. Your workspace is now locked.`
+          : 'Exam submitted successfully! Your workspace is now locked.',
+        submission: toStudentSubmission(sub, lab.resultsReleasedAt),
+        receipt,
       });
     }
 
     return NextResponse.json({ error: 'Invalid action specified' }, { status: 400 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/student/workspace]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

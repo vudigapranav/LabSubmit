@@ -21,7 +21,7 @@ async function assertLabAccess(labId: string, session: { role: string; userId: s
 // the student-to-set mapping faculty need for evaluation and for investigating
 // irregularities.
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -75,13 +75,14 @@ export async function GET(req: Request) {
       })),
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/question-sets]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
 // POST — create a set for an exam.
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -107,13 +108,14 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: 'Question set created', set });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/question-sets]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
 // PUT — update a set's label, active flag and full question list.
 export async function PUT(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -193,13 +195,14 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ message: 'Question set updated', set });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/question-sets]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
 // DELETE — remove a set entirely.
 export async function DELETE(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -230,6 +233,7 @@ export async function DELETE(req: Request) {
     await prisma.questionSet.delete({ where: { id } });
     return NextResponse.json({ message: 'Question set deleted' });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/question-sets]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

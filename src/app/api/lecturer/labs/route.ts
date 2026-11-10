@@ -1,8 +1,70 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { getExamStatus, serializeAllowedLanguages } from '@/lib/examTiming';
+import { getExamStatus, serializeAllowedLanguages, validateExamSchedule, scheduleProblem } from '@/lib/examTiming';
+import { recordAudit, requestIp } from '@/lib/audit';
 import { defaultSectionConfig, normalizeSectionConfig, NormalizedSection } from '@/lib/answerSheet';
+import {
+  ARCHIVE_EFFECTS,
+  ARCHIVE_PRESERVES,
+  EXAM_ADMIN_ACTIONS,
+  ExamActivity,
+  deletionRefusalMessage,
+  describeActivity,
+  hasStudentActivity,
+} from '@/lib/examLifecycle';
+import { ReleaseReadiness, canRelease, releaseBlockedReason } from '@/lib/resultRelease';
+
+/**
+ * Everything a student could have created under this exam, counted in one place so the
+ * DELETE guard and the lecturer's dialog agree. Counts only — never a name or a roll
+ * number: the lecturer needs to know work exists, not whose it is, to choose between
+ * deleting and archiving.
+ */
+async function loadExamActivity(labId: string): Promise<ExamActivity> {
+  const [startedAttempts, submissions, gradedSubmissions, violations, files, answerSheetResponses] =
+    await Promise.all([
+      prisma.labWorkspace.count({ where: { labId, startedAt: { not: null } } }),
+      prisma.submission.count({ where: { labId } }),
+      prisma.submission.count({ where: { labId, marks: { not: null } } }),
+      prisma.examViolation.count({ where: { labId } }),
+      prisma.labFile.count({ where: { workspace: { labId } } }),
+      prisma.answerSheetResponse.count({ where: { workspace: { labId } } }),
+    ]);
+
+  return { startedAttempts, submissions, gradedSubmissions, violations, files, answerSheetResponses };
+}
+
+/**
+ * How far along grading is for one exam, in the terms the release rule cares about.
+ * Counts only — the lecturer needs to know how many remain, not who they are.
+ */
+async function loadReleaseReadiness(labId: string): Promise<ReleaseReadiness> {
+  // "Graded" means a completed evaluation: it has been evaluated and is no longer sitting
+  // in the PENDING bucket the submission is created in.
+  const gradedWhere = { labId, evaluatedAt: { not: null }, status: { not: 'PENDING' } } as const;
+
+  const [totalSubmissions, graded, published] = await Promise.all([
+    prisma.submission.count({ where: { labId } }),
+    prisma.submission.count({ where: gradedWhere }),
+    prisma.submission.count({ where: { labId, isPublished: true } }),
+  ]);
+
+  return { totalSubmissions, graded, ungraded: Math.max(totalSubmissions - graded, 0), published };
+}
+
+/**
+ * Ownership guard, matching the convention already used by the question-set routes: a
+ * LECTURER may only act on their own exams; an ADMIN may act on any.
+ */
+async function assertLabAccess(labId: string, session: { role: string; userId: string }) {
+  const lab = await prisma.lab.findUnique({ where: { id: labId } });
+  if (!lab) return { error: NextResponse.json({ error: 'Exam not found' }, { status: 404 }), lab: null };
+  if (session.role === 'LECTURER' && lab.lecturerId !== session.userId) {
+    return { error: NextResponse.json({ error: 'You do not have access to this exam.' }, { status: 403 }), lab: null };
+  }
+  return { error: null, lab };
+}
 
 // The lecturer's answer-sheet format, resolved for a brand-new exam. An empty or absent
 // payload falls back to the standard unified format rather than to no sheet at all, so an
@@ -73,8 +135,35 @@ async function syncAnswerSheetSections(labId: string, input: unknown) {
   ]);
 }
 
+// An exam must sit under a subject the lecturer actually teaches, and in that subject's
+// cohort. Without this a lecturer could publish an exam into another lecturer's subject —
+// visible to that subject's students — or file it under a year/branch the subject does not
+// belong to (SECURITY_AUDIT.md S23). Admins may use any subject but the cohort must still match.
+async function checkSubjectPlacement(
+  session: { role: string; userId: string },
+  subjectId: string | null,
+  year: number,
+  branchId: string | null
+): Promise<NextResponse | null> {
+  if (!subjectId) return null; // legacy exams with no subject: nothing to place against
+  const subject = await prisma.subject.findUnique({ where: { id: subjectId } });
+  if (!subject) {
+    return NextResponse.json({ error: 'Subject not found.' }, { status: 400 });
+  }
+  if (session.role === 'LECTURER' && subject.lecturerId !== session.userId) {
+    return NextResponse.json({ error: 'You can only create exams for subjects assigned to you.' }, { status: 403 });
+  }
+  if (subject.year !== year || subject.branchId !== branchId) {
+    return NextResponse.json({ error: "The exam's year and branch must match its subject." }, { status: 400 });
+  }
+  return null;
+}
+
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN', 'STUDENT']);
+  // Faculty only. This returns full problem statements for every exam including drafts;
+  // students read papers solely through /api/student/workspace, which withholds them until
+  // the attempt is live (SECURITY_AUDIT.md S6).
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -114,31 +203,44 @@ export async function GET(req: Request) {
     // Attach computed exam status + appeared/submitted/pending counts for the faculty dashboard.
     const labsWithStats = await Promise.all(
       labs.map(async (lab) => {
-        const [startedCount, submittedCount, violationCount] = await Promise.all([
-          prisma.labWorkspace.count({ where: { labId: lab.id, startedAt: { not: null } } }),
+        const [submittedCount, activity, releaseReadiness] = await Promise.all([
           prisma.labWorkspace.count({ where: { labId: lab.id, isSubmitted: true } }),
-          prisma.examViolation.count({ where: { labId: lab.id } }),
+          loadExamActivity(lab.id),
+          loadReleaseReadiness(lab.id),
         ]);
 
         return {
           ...lab,
           status: getExamStatus(lab),
-          appearedCount: startedCount,
+          // Non-null when the stored schedule is inconsistent (e.g. end before start).
+          scheduleProblem: scheduleProblem(lab),
+          appearedCount: activity.startedAttempts,
           submittedCount,
-          pendingCount: Math.max(startedCount - submittedCount, 0),
-          violationCount,
+          pendingCount: Math.max(activity.startedAttempts - submittedCount, 0),
+          violationCount: activity.violations,
+          // Lets the lecturer's UI open the correct dialog — permanent delete, or archive —
+          // without first attempting a delete. The server re-derives this on every DELETE
+          // regardless, so a stale or forged value here changes nothing.
+          activity,
+          canDelete: !hasStudentActivity(activity),
+          // Result release state for the lecturer's badge and dialog. The server re-derives
+          // both on every release request, so a stale value here cannot release anything.
+          releaseReadiness,
+          canReleaseResults: !lab.resultsReleasedAt && canRelease(releaseReadiness),
+          releaseBlockedReason: lab.resultsReleasedAt ? null : releaseBlockedReason(releaseReadiness),
         };
       })
     );
 
     return NextResponse.json({ labs: labsWithStats });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/labs]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -171,9 +273,15 @@ export async function POST(req: Request) {
     if (!title || !problemStatement || !year || !branchId || !subjectId) {
       return NextResponse.json({ error: 'Title, problem statement, year, branch, and subject are required' }, { status: 400 });
     }
+    const placementProblem = await checkSubjectPlacement(session!, subjectId, parseInt(year), branchId);
+    if (placementProblem) return placementProblem;
 
-    if (examModeEnabled && !endTime) {
-      return NextResponse.json({ error: 'An end time is required for exam-mode exams' }, { status: 400 });
+    // One schedule rule, shared with the lecturer form (examTiming.validateExamSchedule). Before
+    // this, an end time at or before the start was stored as-is and the exam completed the
+    // moment it began (EXAM_LIFECYCLE_BUG_REPORT.md).
+    const scheduleErrors = validateExamSchedule({ startTime, endTime, durationMinutes, examModeEnabled: examModeEnabled !== false });
+    if (scheduleErrors.length > 0) {
+      return NextResponse.json({ error: scheduleErrors.join(' '), errors: scheduleErrors }, { status: 400 });
     }
 
     const lab = await prisma.lab.create({
@@ -207,14 +315,16 @@ export async function POST(req: Request) {
       include: { branch: true, subject: true, answerSheetSections: { orderBy: { order: 'asc' } } },
     });
 
+    await recordAudit({ action: 'EXAM_CREATED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role, targetType: 'Lab', targetId: lab.id, metadata: { title: lab.title, isPublished: lab.isPublished, subjectId: lab.subjectId } });
     return NextResponse.json({ message: 'Exam created successfully', lab });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/labs]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
 export async function PUT(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -256,10 +366,31 @@ export async function PUT(req: Request) {
     if (session!.role === 'LECTURER' && existing.lecturerId !== session!.userId) {
       return NextResponse.json({ error: 'You do not have access to this exam.' }, { status: 403 });
     }
+    // Moving an exam (subject, year or branch) is checked like creating one.
+    if (subjectId !== undefined || year !== undefined || branchId !== undefined) {
+      const placementProblem = await checkSubjectPlacement(
+        session!,
+        subjectId ?? existing.subjectId,
+        year !== undefined ? parseInt(year) : existing.year,
+        branchId ?? existing.branchId
+      );
+      if (placementProblem) return placementProblem;
+    }
 
     const effectiveExamModeEnabled = examModeEnabled !== undefined ? Boolean(examModeEnabled) : undefined;
-    if (effectiveExamModeEnabled && endTime === undefined && !existing.endTime) {
-      return NextResponse.json({ error: 'An end time is required for exam-mode exams' }, { status: 400 });
+    // Validate the MERGED schedule whenever this request touches it. Requests that change
+    // nothing about the schedule (rename, publish) still work on an exam whose stored schedule
+    // is broken, so a lecturer can always reach it to fix it.
+    if (startTime !== undefined || endTime !== undefined || durationMinutes !== undefined || examModeEnabled !== undefined) {
+      const scheduleErrors = validateExamSchedule({
+        startTime: startTime !== undefined ? startTime : existing!.startTime,
+        endTime: endTime !== undefined ? endTime : existing!.endTime,
+        durationMinutes: durationMinutes !== undefined ? durationMinutes : existing!.durationMinutes,
+        examModeEnabled: effectiveExamModeEnabled ?? existing!.examModeEnabled,
+      });
+      if (scheduleErrors.length > 0) {
+        return NextResponse.json({ error: scheduleErrors.join(' '), errors: scheduleErrors }, { status: 400 });
+      }
     }
 
     const lab = await prisma.lab.update({
@@ -301,14 +432,27 @@ export async function PUT(req: Request) {
       include: { branch: true, subject: true, answerSheetSections: { orderBy: { order: 'asc' } } },
     });
 
+    // Before/after for the fields that change what students experience.
+    const watched = ['title', 'isPublished', 'examDate', 'startTime', 'endTime', 'durationMinutes', 'allowedLanguages', 'subjectId', 'year', 'branchId', 'examModeEnabled', 'requireDesktopDevice'] as const;
+    const changes: Record<string, { before: unknown; after: unknown }> = {};
+    for (const k of watched) {
+      const before = (existing as Record<string, unknown>)[k];
+      const after = (lab as Record<string, unknown>)[k];
+      if (JSON.stringify(before) !== JSON.stringify(after)) changes[k] = { before, after };
+    }
+    await recordAudit({ action: 'EXAM_UPDATED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role, targetType: 'Lab', targetId: id, metadata: { changes } });
+    if (changes.isPublished) {
+      await recordAudit({ action: lab.isPublished ? 'EXAM_PUBLISHED' : 'EXAM_UNPUBLISHED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role, targetType: 'Lab', targetId: id });
+    }
     return NextResponse.json({ message: 'Exam updated successfully', lab: labWithSections ?? lab });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/labs]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
 
 export async function DELETE(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -319,20 +463,200 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Exam ID is required' }, { status: 400 });
     }
 
-    const existing = await prisma.lab.findUnique({ where: { id } });
-    if (!existing) {
-      return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
-    }
-    if (session!.role === 'LECTURER' && existing.lecturerId !== session!.userId) {
-      return NextResponse.json({ error: 'You do not have access to this exam.' }, { status: 403 });
-    }
+    const { error, lab: existing } = await assertLabAccess(id, session!);
+    if (error) return error;
 
-    await prisma.lab.delete({
-      where: { id },
+    // THE GUARD. Every relation on Lab cascades, so this delete would take the workspaces,
+    // submissions, awarded marks, integrity log, question sets and answer-sheet format with
+    // it. Re-derived here on every request from the database, never from anything the
+    // client sent, so calling this endpoint directly cannot get past it.
+    const activity = await loadExamActivity(id);
+    if (hasStudentActivity(activity)) {
+      return NextResponse.json(
+        {
+          error: deletionRefusalMessage(activity),
+          code: 'EXAM_HAS_STUDENT_ACTIVITY',
+          canArchive: true,
+          alreadyArchived: existing!.archivedAt !== null,
+          // Counts only. Enough for the lecturer to understand the cost; nothing that
+          // identifies a student.
+          activity,
+          archivePreserves: ARCHIVE_PRESERVES,
+          archiveEffects: ARCHIVE_EFFECTS,
+        },
+        { status: 409 }
+      );
+    }
+    // (Student work is protected by the activity guard above — any submission counts as
+    // activity, for every role — so no separate submission check is needed here.)
+
+    // No student has touched it, so nothing of theirs is lost. The deletion record and the
+    // delete happen in ONE transaction: a failed delete must not leave a "permanently deleted"
+    // record behind, and the activity re-check inside it narrows the window in which a student
+    // could start the exam between the check above and the cascade below.
+    // ExamAdminAction.labId is SetNull, so the record survives the exam it documents.
+    const deleted = await prisma.$transaction(async (tx) => {
+      const [started, submitted] = await Promise.all([
+        tx.labWorkspace.count({ where: { labId: id, startedAt: { not: null } } }),
+        tx.submission.count({ where: { labId: id } }),
+      ]);
+      if (started > 0 || submitted > 0) return false;
+      await tx.examAdminAction.create({
+        data: {
+          labId: id,
+          labTitle: existing!.title,
+          actorId: session!.userId,
+          action: EXAM_ADMIN_ACTIONS.DELETE,
+          details: `Permanently deleted "${existing!.title}" — no student attempts, submissions, files or integrity events existed`,
+        },
+      });
+      await tx.lab.delete({ where: { id } });
+      return true;
     });
+    if (!deleted) {
+      return NextResponse.json(
+        { error: 'A student started this exam while it was being deleted. Archive it instead.', code: 'EXAM_HAS_STUDENT_ACTIVITY', canArchive: true },
+        { status: 409 }
+      );
+    }
+    await recordAudit({ action: 'EXAM_DELETED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role, targetType: 'Lab', targetId: id, metadata: { title: existing!.title } });
 
     return NextResponse.json({ message: 'Exam deleted successfully' });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/labs]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}
+
+// PATCH — archive or restore an examination.
+//
+// Archiving is the answer to "this exam must go away but its student work must not". It
+// writes one timestamp and touches nothing else, which is exactly why the preservation
+// claims in ARCHIVE_PRESERVES are safe to make. getExamStatus then reports ARCHIVED, and
+// because both the workspace route and the execution engine already refuse anything that
+// is not RUNNING, every attempt entry point closes without a new check in either of them.
+export async function PATCH(req: Request) {
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
+  if (errorResponse) return errorResponse;
+
+  try {
+    const { id, archived, releaseResults } = await req.json();
+
+    if (!id) {
+      return NextResponse.json({ error: 'Exam ID is required' }, { status: 400 });
+    }
+    if (typeof archived !== 'boolean' && releaseResults !== true) {
+      return NextResponse.json(
+        { error: 'Provide archived (true/false) or releaseResults: true' },
+        { status: 400 }
+      );
+    }
+
+    const { error, lab: existing } = await assertLabAccess(id, session!);
+    if (error) return error;
+
+    // ---- Result release -----------------------------------------------------------
+    // Releasing is a cohort-level operation: it sets Lab.resultsReleasedAt and publishes
+    // the exam's graded submissions in one transaction, so the exam-level switch and the
+    // per-row isPublished the student APIs read can never disagree.
+    if (releaseResults === true) {
+      if (existing!.resultsReleasedAt) {
+        // Idempotent: already released. Report success without a duplicate audit row.
+        const already = await loadReleaseReadiness(id);
+        return NextResponse.json({
+          message: 'Results for this exam are already released',
+          resultsReleasedAt: existing!.resultsReleasedAt,
+          readiness: already,
+        });
+      }
+
+      const readiness = await loadReleaseReadiness(id);
+      if (!canRelease(readiness)) {
+        // Refused: releasing now would tell the lecturer the cohort has its results while
+        // some students would receive nothing. Counts only — no student is identified.
+        return NextResponse.json(
+          {
+            error: releaseBlockedReason(readiness),
+            code: 'RELEASE_BLOCKED_INCOMPLETE_GRADING',
+            readiness,
+          },
+          { status: 409 }
+        );
+      }
+
+      const releasedAt = new Date();
+      const [, published] = await prisma.$transaction([
+        prisma.lab.update({ where: { id }, data: { resultsReleasedAt: releasedAt } }),
+        prisma.submission.updateMany({
+          where: { labId: id, evaluatedAt: { not: null }, status: { not: 'PENDING' } },
+          data: { isPublished: true },
+        }),
+      ]);
+
+      await prisma.examAdminAction.create({
+        data: {
+          labId: id,
+          labTitle: existing!.title,
+          actorId: session!.userId,
+          action: EXAM_ADMIN_ACTIONS.RELEASE_RESULTS,
+          details: `Released results for "${existing!.title}" — ${published.count} result(s) made visible to students`,
+        },
+      });
+      // Also in the hash-chained audit log: releasing marks is the single most consequential
+      // grading action, and ExamAdminAction is not tamper-evident.
+      await recordAudit({
+        action: 'RESULTS_RELEASED', category: 'GRADING', actorId: session!.userId, actorRole: session!.role,
+        targetType: 'Lab', targetId: id, metadata: { title: existing!.title, releasedAt, publishedCount: published.count },
+      });
+
+      return NextResponse.json({
+        message: `Results released — ${published.count} student${published.count === 1 ? '' : 's'} can now see their marks`,
+        resultsReleasedAt: releasedAt,
+        releasedCount: published.count,
+        readiness: { ...readiness, published: published.count },
+      });
+    }
+
+    const alreadyInState = archived === (existing!.archivedAt !== null);
+    if (alreadyInState) {
+      // Idempotent: the exam is already where the caller wants it. Report success without
+      // writing a second audit row for an action that changed nothing.
+      return NextResponse.json({
+        message: archived ? 'Exam is already archived' : 'Exam is already active',
+        lab: { id: existing!.id, archivedAt: existing!.archivedAt, status: getExamStatus(existing!) },
+      });
+    }
+
+    const activity = await loadExamActivity(id);
+
+    const updated = await prisma.lab.update({
+      where: { id },
+      data: { archivedAt: archived ? new Date() : null },
+    });
+
+    await prisma.examAdminAction.create({
+      data: {
+        labId: id,
+        labTitle: existing!.title,
+        actorId: session!.userId,
+        action: archived ? EXAM_ADMIN_ACTIONS.ARCHIVE : EXAM_ADMIN_ACTIONS.UNARCHIVE,
+        details: archived
+          ? `Archived "${existing!.title}" — preserved ${describeActivity(activity)}`
+          : `Restored "${existing!.title}" to active examinations`,
+      },
+    });
+    await recordAudit({
+      action: archived ? 'EXAM_ARCHIVED' : 'EXAM_UNARCHIVED', category: 'EXAM', actorId: session!.userId, actorRole: session!.role,
+      targetType: 'Lab', targetId: id, metadata: { title: existing!.title, activity },
+    });
+
+    return NextResponse.json({
+      message: archived ? 'Exam archived' : 'Exam restored',
+      lab: { id: updated.id, archivedAt: updated.archivedAt, status: getExamStatus(updated) },
+    });
+  } catch (error: any) {
+    // Generic message; details stay in the server log (SECURITY_AUDIT.md S11).
+    console.error('[/api/lecturer/labs PATCH]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

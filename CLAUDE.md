@@ -163,11 +163,46 @@ Supporting conventions:
   the *manual* submit only.
 - **Idempotent state transitions.** Submission and assignment paths are reachable from
   several places; they must converge on one shared helper rather than diverging.
+- **Student work is never destroyed to tidy something up.** An examination that any student
+  has started, submitted, written a file into, answered a section of, or triggered an
+  integrity event on must never be permanently deletable — every relation on `Lab` cascades,
+  so a delete takes the submissions, awarded marks and integrity log with it. Such an exam is
+  **archived** (`Lab.archivedAt`), which writes one column and destroys nothing. The check is
+  re-derived from the database on the server for every request; a client confirmation is a
+  courtesy, never the guard. Any future destructive operation on student-owned records
+  follows the same shape: refuse with 409, offer the non-destructive alternative, and state
+  in the refusal exactly what exists.
+- **Publication is derived on the server, never supplied by the client.** Whether a saved
+  evaluation is visible to a student is a property of the exam's release state
+  (`Lab.resultsReleasedAt`), not a flag in the request body. Saving a grade never publishes
+  it; an explicit cohort-level release does. Student-facing payloads are built from what a
+  student may know — `toStudentSubmission()`, like `toStudentPaper()` — rather than by
+  deleting fields from an internal row, so a column added later cannot silently start
+  leaking. Marks, remarks and the evaluation outcome are all withheld together: `APPROVED`
+  reveals the result as surely as the number does.
+- **Destructive administrative actions are audited.** Deleting, archiving or restoring an
+  exam, and overriding a live question set or an assignment, write an `ExamAdminAction` row
+  recording the actor, the exam and what happened. That model is the one audit trail — do not
+  add a parallel one. Its `labId` is nullable with `onDelete: SetNull` and it snapshots
+  `labTitle`, because the record of a deletion has to outlive the thing it records.
+- **One lifecycle, extended — never a second status system.** `getExamStatus()` in
+  `examTiming.ts` is the single source of an exam's state (`DRAFT`, `UPCOMING`, `RUNNING`,
+  `COMPLETED`, `ARCHIVED`). New lifecycle states are added there, so every entry point that
+  already gates on `RUNNING` — the workspace route and `ExecutionController.authorizeRun()` —
+  picks them up without a new check of its own.
 - **Pure modules for shared logic.** Rules needed by both server routes and client
   components live in dependency-free modules (no Prisma import) so they can be shared
   without pulling the database client into a browser bundle.
 - **Comment the *why*.** Explain non-obvious decisions and the failure they prevent, not
   what the line does.
+- **Hand-ins are immutable.** Grade the latest `SubmissionSnapshot`, never the live workspace;
+  never update or delete snapshot rows. All finalisation goes through `finalizeSubmission()`.
+- **Audit security-sensitive actions** with `recordAudit()` (auth, account changes, exam
+  changes, submissions, grading, publication). Never put passwords, tokens or secrets in it.
+- **Never use the browser's clock for exam time.** Use the server deadline and `serverClock.ts`.
+- **Never silently discard or overwrite student work.** Saves are versioned (`baseUpdatedAt`);
+  a stale save is refused, not applied.
+- **Tests:** `npm test` (needs `node server.js` on port 3100, PostgreSQL and the compilers).
 
 ---
 
@@ -284,8 +319,15 @@ and hosts Postgres. Both read the same database. See `DEPLOYMENT.md`.
 | Auth / roles | `src/lib/jwt.ts`, `src/lib/auth.ts`, `src/context/AppContext.tsx` |
 | Exam timing & status | `src/lib/examTiming.ts` |
 | Integrity / violations | `src/lib/examIntegrity.ts`, `src/lib/useViolationLogger.ts` |
-| Submission finalization | `src/lib/examSubmission.ts` |
+| Submission finalization | `src/lib/examSubmission.ts` (atomic claim + immutable `SubmissionSnapshot`, `src/lib/submissionSnapshot.ts`) |
+| Exam access (cohort, paper release) | `src/lib/examAccess.ts` |
+| Server clock for the countdown | `src/lib/serverClock.ts` |
+| Code autosave / draft recovery | `src/lib/useFileAutosave.ts` (+ versioned `save_file`) |
+| Audit log (hash-chained) | `src/lib/audit.ts`, `GET /api/admin/audit` |
+| Execution sandbox policy | `src/lib/execution/sandbox.ts` (env allow-list, ulimits, per-run uid pool) |
 | Answer-sheet catalogue & rules | `src/lib/answerSheet.ts` |
+| Exam deletion / archive policy | `src/lib/examLifecycle.ts` (pure), `src/components/ExamRetirementDialog.tsx` |
+| Result release / publication | `src/lib/resultRelease.ts` (pure), `src/components/ResultReleaseDialog.tsx` |
 | Device policy | `src/lib/deviceEligibility.ts` (server), `src/lib/useDeviceClass.ts` (hint) |
 | Execution engine | `src/lib/execution/*`, driven by `server.js` |
 | Student exam UI | `src/app/student/lab/[id]/page.tsx`, `src/components/OnlineIDE.tsx`, `ExamGuard.tsx`, `AnswerSheet.tsx` |

@@ -122,6 +122,23 @@ model Lab {
   // from CSS or client-only checks.
   requireDesktopDevice Boolean @default(true)
 
+  // Archive. An examination that students have actually sat can never be permanently
+  // deleted — every relation below cascades, so a delete would take the workspaces,
+  // submissions, awarded marks, integrity log, question sets and answer-sheet format with
+  // it. Retiring such an exam sets this timestamp instead: nothing is destroyed, the exam
+  // leaves every student-facing and active workflow (getExamStatus returns ARCHIVED, which
+  // is not RUNNING, so no attempt can start or continue), and faculty keep full access for
+  // historical review and evaluation. Null means "live", which is what every existing row
+  // is, so the column is additive and changes no current behaviour.
+  archivedAt DateTime?
+
+  // Result release. Null means results for this examination have not been released, which
+  // is what every existing row is and what every new exam starts as. Releasing sets this
+  // timestamp and publishes the exam's graded submissions in the same transaction, so this
+  // switch and Submission.isPublished can never disagree. Whether a newly saved evaluation
+  // is published is derived from this field on the server — the client never decides it.
+  resultsReleasedAt DateTime?
+
   lecturer            User                 @relation("LecturerLabs", fields: [lecturerId], references: [id], onDelete: Cascade)
   branch              Branch?              @relation(fields: [branchId], references: [id], onDelete: SetNull)
   subject             Subject?             @relation(fields: [subjectId], references: [id], onDelete: SetNull)
@@ -197,6 +214,35 @@ model Submission {
   workspace          LabWorkspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   evaluator          User?               @relation("EvaluatedSubmissions", fields: [evaluatorId], references: [id], onDelete: SetNull)
   sectionEvaluations SectionEvaluation[]
+  snapshots          SubmissionSnapshot[]
+}
+
+// An immutable copy of exactly what was handed in, taken at every finalization (manual
+// submit, timeout, integrity threshold). The workspace itself stays editable — "needs
+// correction" reopens it — so without this the originally submitted code was overwritten
+// by later edits and could never be reviewed again. Rows are only ever inserted.
+model SubmissionSnapshot {
+  id           String   @id @default(uuid())
+  submissionId String
+  version      Int // 1 for the first hand-in, 2 after the first resubmission, ...
+  // [{ filename, language, content }] and [{ sectionKey, label, content }], in a canonical order.
+  files        Json
+  answers      Json
+  // SHA-256 over the canonical JSON of files + answers + identifiers + timestamp, so any
+  // later edit to the stored copy is detectable (src/lib/submissionSnapshot.ts).
+  contentHash  String
+  // HMAC-SHA256 of the hash with INTEGRITY_KEY (server env only). Null = written without a key.
+  signature    String?
+  submittedAt  DateTime @default(now()) // server clock only
+  auto         Boolean  @default(false)
+  reason       String? // TIMEOUT | FULLSCREEN_THRESHOLD | null (manual)
+  onTime       Boolean  @default(true) // decided by the server against the effective deadline
+  sessionId    String?
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, version])
+  @@index([submissionId])
 }
 
 model ExamViolation {
@@ -349,15 +395,50 @@ model SectionEvaluation {
 // override that refusal, the override is recorded here rather than happening silently, so
 // an examiner can later answer "who changed this paper, and when?".
 model ExamAdminAction {
-  id        String   @id @default(uuid())
-  labId     String
+  id String @id @default(uuid())
+
+  // Nullable, and SetNull rather than Cascade: the record of a deletion must outlive the
+  // thing it records. Under the previous Cascade the one audit row that mattered most —
+  // "this exam was permanently deleted" — was destroyed by the very delete it documented.
+  // Widening the column (dropping NOT NULL) leaves every existing row valid.
+  labId String?
+
+  // Snapshot of the exam's title at the time of the action, so a row whose labId has been
+  // nulled by a deletion still names what went.
+  labTitle String?
+
   actorId   String
-  action    String // GENERATE_ASSIGNMENTS, REASSIGN_SET, EDIT_LIVE_QUESTION_SET
+  action    String // GENERATE_ASSIGNMENTS, REASSIGN_SET, EDIT_LIVE_QUESTION_SET, ARCHIVE_EXAM, UNARCHIVE_EXAM, DELETE_EXAM, RELEASE_RESULTS
   details   String
   createdAt DateTime @default(now())
 
-  lab   Lab  @relation(fields: [labId], references: [id], onDelete: Cascade)
+  lab   Lab? @relation(fields: [labId], references: [id], onDelete: SetNull)
   actor User @relation("ExamAdminActions", fields: [actorId], references: [id], onDelete: Cascade)
 
   @@index([labId])
+}
+
+// Centralised, tamper-evident audit trail of security-sensitive actions. Insert-only. Each row
+// hashes its own content together with the previous row's hash, so editing or deleting any row
+// breaks every hash after it — detectable by verifyAuditChain() (src/lib/audit.ts).
+// Never holds passwords, tokens or secrets (metadata is redacted before hashing).
+model AuditEvent {
+  seq        Int      @id @default(autoincrement())
+  at         DateTime // set by the server in code, so the hashed value is exactly the stored one
+  actorId    String?
+  actorRole  String?
+  action     String // e.g. AUTH_LOGIN_FAILED, GRADE_SAVED, RESULT_PUBLISHED
+  category   String // AUTH | ADMIN | EXAM | SUBMISSION | GRADING
+  targetType String?
+  targetId   String?
+  metadata   Json     @default("{}")
+  ip         String?
+  prevHash   String
+  hash       String   @unique
+  signature  String? // HMAC-SHA256 of hash with INTEGRITY_KEY; see src/lib/integrityKey.ts
+
+  @@index([action])
+  @@index([actorId])
+  @@index([targetId])
+  @@index([at])
 }

@@ -28,7 +28,7 @@ const DEDUPE_WINDOW_MS = 2000;
 // since this endpoint is inherently client-driven and can be skipped by a
 // tampered/offline client.
 export async function POST(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['STUDENT']);
+  const { errorResponse, session } = await requireAuth(req, ['STUDENT']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -102,6 +102,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ logged: !result.deduped, fullscreenExitCount: result.fullscreenExitCount, autoSubmit: result.autoSubmit });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/student/violations]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

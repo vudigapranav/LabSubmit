@@ -1,8 +1,56 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import { CompilationResult, detectLanguage, SourceFile } from './types';
 import { ExecutionLogger } from './ExecutionLogger';
+import { isSafeSourceFilename, SOURCE_FILENAME_RULE } from '../sourceFilename';
+import {
+  buildSandboxEnv,
+  JAVA_HEAP_FLAGS,
+  NODE_HEAP_FLAGS,
+  prepareTempDirOwnership,
+  resolveInsideTempDir,
+  runIdentity,
+  withResourceLimits,
+  type RunIdentity,
+} from './sandbox';
+
+/** Removes the run's temp directory from tool output, leaving bare file names. */
+export function stripTempDir(text: string, tempDir: string): string {
+  if (!text || !tempDir) return text;
+  const dir = tempDir.endsWith(path.sep) ? tempDir : tempDir + path.sep;
+  // macOS reports /var/folders/... as /private/var/folders/...; strip both spellings.
+  // The longer spelling must go first, or stripping the shorter one leaves a stray '/private'.
+  return text.split('/private' + dir).join('').split(dir).join('');
+}
+
+// One compiler invocation: an executable and its argument list. Never a shell string —
+// the old `exec("gcc \"${file}\" ...")` let a filename containing $(...) run shell (S3).
+type CompileStep = { cmd: string; args: string[] };
+
+function runCompileStep(
+  step: CompileStep,
+  tempDir: string,
+  identity: RunIdentity | null | undefined
+): Promise<{ err: Error | null; stdout: string; stderr: string }> {
+  const id = identity === undefined ? runIdentity() : identity;
+  const limited = withResourceLimits(step.cmd, step.args, 'compile', identity);
+  return new Promise((resolve) => {
+    execFile(
+      limited.cmd,
+      limited.args,
+      {
+        cwd: tempDir,
+        timeout: 15000,
+        maxBuffer: 1024 * 1024,
+        // Deliberately minimal (no NODE_ENV either); the cast only satisfies Next's ProcessEnv typing.
+        env: buildSandboxEnv(tempDir) as unknown as NodeJS.ProcessEnv,
+        ...(id ? { uid: id.uid, gid: id.gid } : {}),
+      },
+      (err, stdout, stderr) => resolve({ err, stdout: String(stdout), stderr: String(stderr) })
+    );
+  });
+}
 
 export class CompilerService {
   static async prepareAndCompile(
@@ -10,32 +58,48 @@ export class CompilerService {
     tempDir: string,
     filename: string,
     code: string,
-    files: SourceFile[] = []
+    files: SourceFile[] = [],
+    // The run's identity, chosen by the controller. Undefined = legacy single-uid behaviour
+    // (lib/compiler.ts); null = run as the server user.
+    identity?: RunIdentity | null
   ): Promise<CompilationResult> {
     const startTime = Date.now();
     const lang = detectLanguage(filename);
 
+    // The controller validates names before calling us; this re-check keeps the service
+    // safe for any other caller (lib/compiler.ts uses it too).
+    const unsafe = [filename, ...files.map((f) => f.filename)].find((n) => !isSafeSourceFilename(n));
+    if (unsafe !== undefined) {
+      return {
+        success: false,
+        compileCmd: null,
+        stdout: '',
+        stderr: `Invalid file name "${String(unsafe)}". ${SOURCE_FILENAME_RULE}`,
+        compilationTimeMs: Date.now() - startTime,
+        mainFilePath: '',
+        runCmd: '',
+        runArgs: [],
+      };
+    }
+
     console.log(`[STAGE: 3. TEMP WORKSPACE CREATED] TempDir: "${tempDir}"`);
+    await prepareTempDirOwnership(tempDir, identity);
 
     // 1. Write main source file
-    const mainFilePath = path.join(tempDir, filename);
+    const mainFilePath = resolveInsideTempDir(tempDir, filename);
     await fs.writeFile(mainFilePath, code, 'utf-8');
 
-    // 2. Write auxiliary source files
-    if (files && files.length > 0) {
-      for (const f of files) {
-        if (f.filename && f.filename !== filename && f.content !== undefined) {
-          const auxPath = path.join(tempDir, f.filename);
-          await fs.mkdir(path.dirname(auxPath), { recursive: true });
-          await fs.writeFile(auxPath, f.content, 'utf-8');
-        }
+    // 2. Write auxiliary source files (flat: names are single path segments)
+    for (const f of files) {
+      if (f.filename !== filename && typeof f.content === 'string') {
+        await fs.writeFile(resolveInsideTempDir(tempDir, f.filename), f.content, 'utf-8');
       }
     }
 
     console.log(`[STAGE: 4. FILES WRITTEN] Main file: "${filename}"`);
 
     const executablePath = path.join(tempDir, 'a.out');
-    let compileCmd: string | null = null;
+    let compileSteps: CompileStep[] = [];
     let runCmd = '';
     let runArgs: string[] = [];
 
@@ -49,28 +113,35 @@ export class CompilerService {
       await fs.writeFile(unbufferPath, unbufferCode, 'utf-8');
 
       if (lang === 'c') {
-        const cFiles = allDirFiles.filter((f) => f.endsWith('.c')).map((f) => `"${path.join(tempDir, f)}"`);
-        cFiles.push(`"${unbufferPath}"`);
-        compileCmd = `gcc -O2 ${cFiles.join(' ')} -o "${executablePath}" -lm`;
+        const cFiles = allDirFiles.filter((f) => f.endsWith('.c')).map((f) => path.join(tempDir, f));
+        cFiles.push(unbufferPath);
+        compileSteps = [{ cmd: 'gcc', args: ['-O2', ...cFiles, '-o', executablePath, '-lm'] }];
       } else {
-        const cppFiles = allDirFiles.filter((f) => f.endsWith('.cpp') || f.endsWith('.cc') || f.endsWith('.cxx')).map((f) => `"${path.join(tempDir, f)}"`);
+        const cppFiles = allDirFiles
+          .filter((f) => f.endsWith('.cpp') || f.endsWith('.cc') || f.endsWith('.cxx'))
+          .map((f) => path.join(tempDir, f));
         const unbufferObjPath = path.join(tempDir, '__unbuffer.o');
         // Compile unbuffer object file with gcc, then link with g++
-        compileCmd = `gcc -c "${unbufferPath}" -o "${unbufferObjPath}" && g++ -O2 "${unbufferObjPath}" ${cppFiles.join(' ')} -o "${executablePath}" -std=c++17`;
+        compileSteps = [
+          { cmd: 'gcc', args: ['-c', unbufferPath, '-o', unbufferObjPath] },
+          { cmd: 'g++', args: ['-O2', unbufferObjPath, ...cppFiles, '-o', executablePath, '-std=c++17'] },
+        ];
       }
       runCmd = executablePath;
     } else if (lang === 'java') {
-      const javaFiles = allDirFiles.filter((f) => f.endsWith('.java')).map((f) => `"${path.join(tempDir, f)}"`);
+      const javaFiles = allDirFiles.filter((f) => f.endsWith('.java')).map((f) => path.join(tempDir, f));
       const className = path.basename(filename, '.java');
-      compileCmd = `javac ${javaFiles.join(' ')}`;
+      compileSteps = [{ cmd: 'javac', args: ['-J-Xmx256m', ...javaFiles] }];
       runCmd = 'java';
-      runArgs = ['-Dfile.encoding=UTF-8', '-cp', tempDir, className];
+      runArgs = [...JAVA_HEAP_FLAGS, '-Dfile.encoding=UTF-8', '-cp', tempDir, className];
     } else if (lang === 'python') {
       runCmd = 'python3';
-      runArgs = ['-u', mainFilePath];
+      // Relative to the run's cwd (the temp dir), so a traceback says `File "main.py"` rather
+      // than printing the server's temp path to the student.
+      runArgs = ['-u', filename];
     } else if (lang === 'javascript') {
       runCmd = 'node';
-      runArgs = [mainFilePath];
+      runArgs = [...NODE_HEAP_FLAGS, `./${filename}`];
     } else {
       return {
         success: false,
@@ -84,20 +155,25 @@ export class CompilerService {
       };
     }
 
-    if (compileCmd) {
+    if (compileSteps.length > 0) {
+      // Human-readable form for logs and the result object only — never executed as a string.
+      const compileCmd = compileSteps.map((s) => [s.cmd, ...s.args].join(' ')).join(' && ');
       console.log(`[STAGE: 5. COMPILER STARTED] Executing: "${compileCmd}"`);
       ExecutionLogger.logCompileStart(sessionId, compileCmd);
 
-      const compileResult = await new Promise<{ err: Error | null; stdout: string; stderr: string }>((resolve) => {
-        exec(compileCmd!, { cwd: tempDir, timeout: 15000 }, (err, stdout, stderr) => {
-          resolve({ err, stdout, stderr });
-        });
-      });
+      let compileResult = { err: null as Error | null, stdout: '', stderr: '' };
+      for (const step of compileSteps) {
+        const r = await runCompileStep(step, tempDir, identity);
+        compileResult = { err: r.err, stdout: compileResult.stdout + r.stdout, stderr: compileResult.stderr + r.stderr };
+        if (r.err) break;
+      }
 
       const compilationTimeMs = Date.now() - startTime;
 
       if (compileResult.err) {
-        const fullErr = compileResult.stderr || compileResult.stdout || compileResult.err?.message || compileResult.err.message;
+        // Compilers print the absolute path of every file; the student needs `main.c:3:5`, not
+        // the server's temp directory.
+        const fullErr = stripTempDir(compileResult.stderr || compileResult.stdout || compileResult.err?.message || compileResult.err.message, tempDir);
         console.error(`[STAGE: 6. COMPILER FINISHED - FAILED] Error:\n${fullErr}`);
         ExecutionLogger.logCompileError(sessionId, fullErr);
         return {
@@ -119,7 +195,7 @@ export class CompilerService {
         success: true,
         compileCmd,
         stdout: compileResult.stdout || '',
-        stderr: compileResult.stderr || '',
+        stderr: stripTempDir(compileResult.stderr || '', tempDir),
         compilationTimeMs,
         mainFilePath,
         executablePath,

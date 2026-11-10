@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { checkSnapshot, type SnapshotAnswer, type SnapshotFile } from '@/lib/submissionSnapshot';
 
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -52,6 +53,8 @@ export async function GET(req: Request) {
             },
           },
         },
+        sectionEvaluations: true,
+        snapshots: { orderBy: { version: 'desc' } },
         workspace: {
           include: {
             files: true,
@@ -75,7 +78,18 @@ export async function GET(req: Request) {
       violationCounts.map((v) => [`${v.labId}:${v.studentId}`, v._count.id])
     );
 
-    const formattedSubmissions = submissions.map((sub) => ({
+    const formattedSubmissions = submissions.map((sub) => {
+      // Grade what was HANDED IN: the latest immutable snapshot, not the live workspace —
+      // which "needs correction" reopens for editing. Submissions finalized before snapshots
+      // existed have none and fall back to the workspace, as before.
+      const latest = sub.snapshots[0];
+      const snapFiles = latest ? (latest.files as unknown as SnapshotFile[]) : null;
+      const snapAnswers = latest ? (latest.answers as unknown as SnapshotAnswer[]) : null;
+      const answerFor = (section: { id: string; key: string }) =>
+        snapAnswers
+          ? snapAnswers.find((a) => a.sectionKey === section.key)?.content || ''
+          : sub.workspace.answerSheetResponses.find((r: any) => r.sectionId === section.id)?.content || '';
+      return {
       id: sub.id,
       labId: sub.labId,
       studentId: sub.studentId,
@@ -90,6 +104,9 @@ export async function GET(req: Request) {
       maxMarks: sub.maxMarks,
       remarks: sub.remarks,
       isPublished: sub.isPublished,
+      // Release state of the parent exam, so the grading panel can tell the lecturer
+      // whether saving this mark will reach the student now or stay private until release.
+      resultsReleasedAt: sub.lab.resultsReleasedAt,
       submittedAt: sub.submittedAt,
       evaluatedAt: sub.evaluatedAt,
       autoSubmitted: sub.workspace.autoSubmitted,
@@ -118,22 +135,44 @@ export async function GET(req: Request) {
           required: section.required,
           maxMarks: section.maxMarks,
           contentSource: section.contentSource,
-          content:
-            sub.workspace.answerSheetResponses.find((r: any) => r.sectionId === section.id)?.content || '',
+          content: answerFor(section),
+          // Saved section-wise evaluation, so the grading panel reopens with what was awarded.
+          evaluation: (() => {
+            const e = sub.sectionEvaluations.find((ev: any) => ev.sectionId === section.id);
+            return e ? { marks: e.marks, remarks: e.remarks } : null;
+          })(),
         })),
       fullscreenExitCount: sub.workspace.fullscreenExitCount,
       fullscreenExitThreshold: sub.lab.fullscreenExitThreshold,
       violationCount: violationCountMap.get(`${sub.labId}:${sub.studentId}`) || 0,
-      files: sub.workspace.files.map((f: any) => ({
-        id: f.id,
-        filename: f.filename,
-        content: f.content,
-        language: f.language,
+      files: snapFiles
+        ? snapFiles.map((f, i) => ({ id: `snapshot-${latest!.version}-${i}`, filename: f.filename, content: f.content, language: f.language }))
+        : sub.workspace.files.map((f: any) => ({
+            id: f.id,
+            filename: f.filename,
+            content: f.content,
+            language: f.language,
+          })),
+      // Version history of what was handed in, each re-verified against its stored hash.
+      snapshots: sub.snapshots.map((snap) => ({
+        version: snap.version,
+        submittedAt: snap.submittedAt,
+        auto: snap.auto,
+        reason: snap.reason,
+        onTime: snap.onTime,
+        contentHash: snap.contentHash,
+        ...(() => {
+          const c = checkSnapshot(snap, { labId: sub.labId, studentId: sub.studentId });
+          // verified = content matches its hash AND the keyed signature is not forged.
+          return { verified: c.trustworthy, hashValid: c.hashValid, signature: c.signature };
+        })(),
       })),
-    }));
+      };
+    });
 
     return NextResponse.json({ submissions: formattedSubmissions });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+  } catch (error) {
+    console.error('[submissions] GET failed:', error);
+    return NextResponse.json({ error: 'Could not load submissions.' }, { status: 500 });
   }
 }

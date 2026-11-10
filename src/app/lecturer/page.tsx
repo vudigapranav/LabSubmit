@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { AppShell, LECTURER_NAV } from '@/components/AppShell';
@@ -21,9 +21,16 @@ import {
   StatCard,
   StatusBadge,
   Toast as UiToast,
+  Alert,
+  Field,
+  Input,
+  Select,
+  Textarea,
 } from '@/components/ui';
+import { evaluateSectionMarks, gradableSections } from '@/lib/answerSheet';
 import { ProfileModal } from '@/components/ProfileModal';
 import { OnlineIDE } from '@/components/OnlineIDE';
+import { RunHistory } from '@/components/RunHistory';
 import {
   AnswerSheetConfigurator,
   SectionDraft,
@@ -31,12 +38,18 @@ import {
   draftsFromSections,
 } from '@/components/AnswerSheetConfigurator';
 import { QuestionSetManager } from '@/components/QuestionSetManager';
+import { ExamRetirementDialog } from '@/components/ExamRetirementDialog';
+import { ResultReleaseDialog } from '@/components/ResultReleaseDialog';
+import { NO_SUBMISSIONS, RELEASE_STATE_LABEL, releaseState } from '@/lib/resultRelease';
 import { deriveIntegrityStatus, type IntegrityStatus, type Severity } from '@/lib/examIntegrity';
+import { validateExamSchedule, getExamWindowEnd } from '@/lib/examTiming';
 import {
   GraduationCap,
   Plus,
   Edit2,
   Trash2,
+  Archive,
+  ArchiveRestore,
   BookOpen,
   CheckCircle,
   AlertCircle,
@@ -50,13 +63,18 @@ import {
   Code,
   Layers,
   ClipboardCheck,
+  Send,
+  TerminalSquare,
 } from 'lucide-react';
+
+const LECTURER_VIEW_KEY = 'labsubmit.lecturer.view';
 
 const LANGUAGE_OPTIONS = [
   { value: 'c', label: 'C' },
   { value: 'cpp', label: 'C++' },
   { value: 'java', label: 'Java' },
   { value: 'python', label: 'Python' },
+  { value: 'javascript', label: 'JavaScript' },
 ];
 
 const STATUS_STYLES: Record<string, string> = {
@@ -128,6 +146,16 @@ export default function LecturerDashboard() {
   const [editingLabAttempts, setEditingLabAttempts] = useState(0);
   const [questionSetsLab, setQuestionSetsLab] = useState<any | null>(null);
 
+  // Result release. One dialog, server-decided outcome.
+  const [releasingLab, setReleasingLab] = useState<any | null>(null);
+  const [releasing, setReleasing] = useState(false);
+  const [releaseRefusal, setReleaseRefusal] = useState<string | null>(null);
+
+  // Exam retirement (delete / archive / restore). One dialog, server-decided outcome.
+  const [retiringLab, setRetiringLab] = useState<any | null>(null);
+  const [retiring, setRetiring] = useState(false);
+  const [retireRefusal, setRetireRefusal] = useState<string | null>(null);
+
   // Anti-Cheat Permissions
   const [allowCopy, setAllowCopy] = useState(false);
   const [allowPaste, setAllowPaste] = useState(false);
@@ -137,8 +165,31 @@ export default function LecturerDashboard() {
   const [evalMarks, setEvalMarks] = useState('');
   const [evalRemarks, setEvalRemarks] = useState('');
   const [evalStatus, setEvalStatus] = useState('APPROVED');
-  const [evalPublish, setEvalPublish] = useState(true);
-  const [inspectorPane, setInspectorPane] = useState<'sheet' | 'code'>('sheet');
+  // Per-section marks for exams whose answer sheet has weighted sections, keyed by section id.
+  const [evalSectionMarks, setEvalSectionMarks] = useState<Record<string, { marks: string; remarks: string }>>({});
+
+  // Open the grading panel on what was actually saved. It used to open blank as APPROVED,
+  // so re-saving an evaluated submission could silently change a decision the lecturer had
+  // deliberately left otherwise.
+  useEffect(() => {
+    const sub = selectedSubmission;
+    if (!sub) return;
+    const evaluated = sub.evaluatedAt || sub.marks !== null;
+    setEvalStatus(evaluated ? sub.status : 'APPROVED');
+    setEvalMarks(sub.marks !== null && sub.marks !== undefined ? String(sub.marks) : '');
+    setEvalRemarks(sub.remarks || '');
+    const prefill: Record<string, { marks: string; remarks: string }> = {};
+    (sub.answerSheet || []).forEach((sec: any) => {
+      prefill[sec.id] = {
+        marks: sec.evaluation?.marks !== null && sec.evaluation?.marks !== undefined ? String(sec.evaluation.marks) : '',
+        remarks: sec.evaluation?.remarks || '',
+      };
+    });
+    setEvalSectionMarks(prefill);
+    // Keyed on the id: refetches must not overwrite marks being typed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSubmission?.id]);
+  const [inspectorPane, setInspectorPane] = useState<'sheet' | 'code' | 'runs'>('sheet');
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -160,6 +211,21 @@ export default function LecturerDashboard() {
     }
   }, [token, selectedSubject]);
 
+  // Remember where the lecturer is, so a refresh does not drop them back to the subject list.
+  // Nothing is written until the restore attempt in fetchAssignedSubjects has run; otherwise
+  // the initial 'assignments' render would erase the saved view before it could be read.
+  const viewRestoredRef = useRef(false);
+  useEffect(() => {
+    if (!viewRestoredRef.current) return;
+    try {
+      if (viewMode === 'workspace' && selectedSubject) {
+        sessionStorage.setItem(LECTURER_VIEW_KEY, JSON.stringify({ subjectId: selectedSubject.id, tab: activeMainTab }));
+      } else if (viewMode === 'assignments') {
+        sessionStorage.removeItem(LECTURER_VIEW_KEY);
+      }
+    } catch { /* ignore */ }
+  }, [viewMode, selectedSubject, activeMainTab]);
+
   const showToast = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
@@ -172,7 +238,20 @@ export default function LecturerDashboard() {
       });
       if (res.ok) {
         const data = await res.json();
-        setAssignedSubjects(data.subjects || []);
+        const subjects = data.subjects || [];
+        setAssignedSubjects(subjects);
+        // Reopen the subject and tab the lecturer was on before a refresh. Only a subject that
+        // is still assigned to them is restored; anything else falls back to the subject list.
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(LECTURER_VIEW_KEY) || 'null');
+          const sub = saved && subjects.find((x: any) => x.id === saved.subjectId);
+          if (sub) {
+            setSelectedSubject(sub);
+            setViewMode('workspace');
+            if (['labs', 'students', 'submissions', 'violations'].includes(saved.tab)) setActiveMainTab(saved.tab);
+          }
+        } catch { /* storage unavailable: start on the subject list */ }
+        viewRestoredRef.current = true;
       }
     } catch (e) { console.error(e); }
   };
@@ -280,8 +359,16 @@ export default function LecturerDashboard() {
     e.preventDefault();
     if (!selectedSubject) return;
 
-    if (examModeEnabled && !endTimeInput) {
-      showToast('error', 'End time is required when exam mode is enabled');
+    // Same rule the server enforces (examTiming.validateExamSchedule). An end time at or before
+    // the start used to be saved and made the exam complete the moment it began.
+    const scheduleErrors = validateExamSchedule({
+      startTime: combineDateTime(examDateInput, startTimeInput),
+      endTime: combineDateTime(examDateInput, endTimeInput),
+      durationMinutes: durationMinutesInput,
+      examModeEnabled,
+    });
+    if (scheduleErrors.length > 0) {
+      showToast('error', scheduleErrors[0]);
       return;
     }
     if (selectedLanguages.length === 0) {
@@ -343,20 +430,130 @@ export default function LecturerDashboard() {
     } catch (e) { showToast('error', 'Server error'); } finally { setSaving(false); }
   };
 
-  const handleDeleteLab = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this exam?')) return;
+  // Retiring an exam goes through one dialog, and the server decides the outcome. A DELETE
+  // that the server refuses (409) does not fail silently: the refusal is fed back into the
+  // dialog, which switches to offering Archive with the server's own wording.
+  const handleRetireExam = async (intent: 'DELETE' | 'ARCHIVE' | 'RESTORE') => {
+    const lab = retiringLab;
+    if (!lab) return;
+
+    setRetiring(true);
     try {
-      const res = await fetch(`/api/lecturer/labs?id=${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        showToast('success', 'Exam deleted');
-        fetchWorkspaceData();
-        fetchAssignedSubjects();
+      if (intent === 'DELETE') {
+        const res = await fetch(`/api/lecturer/labs?id=${lab.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 409) {
+          // The guard fired. Keep the dialog open and show why, rather than reporting a
+          // failure the lecturer cannot act on.
+          setRetireRefusal(data.error || 'This exam holds student work and cannot be deleted.');
+          setRetiringLab({ ...lab, activity: data.activity ?? lab.activity, canDelete: false });
+          return;
+        }
+        if (!res.ok) {
+          showToast('error', data.error || 'Failed to delete exam');
+          return;
+        }
+        showToast('success', `"${lab.title}" deleted`);
+      } else {
+        const res = await fetch('/api/lecturer/labs', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ id: lab.id, archived: intent === 'ARCHIVE' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast('error', data.error || 'Failed to update exam');
+          return;
+        }
+        showToast(
+          'success',
+          intent === 'ARCHIVE'
+            ? `"${lab.title}" archived — submissions, marks and question sets kept`
+            : `"${lab.title}" restored`
+        );
       }
-    } catch (e) { showToast('error', 'Server error'); }
+
+      closeRetireDialog();
+      fetchWorkspaceData();
+      fetchAssignedSubjects();
+    } catch (e) {
+      showToast('error', 'Server error');
+    } finally {
+      setRetiring(false);
+    }
   };
+
+  // Releasing goes through the same lifecycle endpoint as archive. A 409 (grading
+  // incomplete) is fed back into the dialog rather than reported as a bare failure.
+  const handleReleaseResults = async () => {
+    const lab = releasingLab;
+    if (!lab) return;
+
+    setReleasing(true);
+    try {
+      const res = await fetch('/api/lecturer/labs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id: lab.id, releaseResults: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 409) {
+        setReleaseRefusal(data.error || 'Results cannot be released yet.');
+        setReleasingLab({ ...lab, releaseReadiness: data.readiness ?? lab.releaseReadiness });
+        return;
+      }
+      if (!res.ok) {
+        showToast('error', data.error || 'Failed to release results');
+        return;
+      }
+
+      showToast('success', data.message || 'Results released');
+      closeReleaseDialog();
+      fetchWorkspaceData();
+    } catch (e) {
+      showToast('error', 'Server error');
+    } finally {
+      setReleasing(false);
+    }
+  };
+
+  const openReleaseDialog = (lab: any) => {
+    setReleaseRefusal(null);
+    setReleasingLab(lab);
+  };
+
+  const closeReleaseDialog = () => {
+    setReleasingLab(null);
+    setReleaseRefusal(null);
+  };
+
+  const openRetireDialog = (lab: any) => {
+    setRetireRefusal(null);
+    setRetiringLab(lab);
+  };
+
+  const closeRetireDialog = () => {
+    setRetiringLab(null);
+    setRetireRefusal(null);
+  };
+
+  // Weighted sections of the open submission, and the live roll-up the server will compute.
+  // The inspector payload only carries enabled sections.
+  const gradingSections = gradableSections(
+    ((selectedSubmission?.answerSheet || []) as any[]).map((sec) => ({ ...sec, enabled: true }))
+  );
+  const sectionPreview = evaluateSectionMarks(
+    gradingSections,
+    gradingSections.map((sec) => ({ sectionId: sec.id, marks: evalSectionMarks[sec.id]?.marks ?? '', remarks: evalSectionMarks[sec.id]?.remarks ?? '' }))
+  );
+  // Mirrors the server: a final (non-PENDING) status needs every weighted section marked, because
+  // release publishes final-status submissions and must never show a partial total.
+  const finalStatusBlocked = gradingSections.length > 0 && evalStatus !== 'PENDING' && !sectionPreview.complete;
 
   const handleEvaluateSubmission = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -369,9 +566,12 @@ export default function LecturerDashboard() {
         body: JSON.stringify({
           submissionId: selectedSubmission.id,
           status: evalStatus,
-          marks: evalMarks ? parseFloat(evalMarks) : null,
           remarks: evalRemarks,
-          isPublished: evalPublish,
+          // Weighted exams send section marks and the server computes the total; others keep
+          // the single flat mark.
+          ...(gradingSections.length > 0
+            ? { sectionMarks: gradingSections.map((sec) => ({ sectionId: sec.id, marks: evalSectionMarks[sec.id]?.marks ?? '', remarks: evalSectionMarks[sec.id]?.remarks ?? '' })) }
+            : { marks: evalMarks === '' ? null : evalMarks }),
         }),
       });
       const data = await res.json();
@@ -447,9 +647,20 @@ export default function LecturerDashboard() {
   // other tabs have no meaning until a subject is open.
   const navActive = viewMode === 'assignments' ? 'assignments' : activeMainTab;
   const handleNavigate = (id: string) => {
-    if (id === 'assignments' || !selectedSubject) {
+    if (id === 'assignments') {
       setViewMode('assignments');
       return;
+    }
+    if (!selectedSubject) {
+      // Without this the sidebar item silently did nothing. One subject: open it. Several:
+      // say what is needed rather than ignoring the click.
+      if (assignedSubjects.length === 1) {
+        setSelectedSubject(assignedSubjects[0]);
+      } else {
+        setViewMode('assignments');
+        showToast('error', assignedSubjects.length === 0 ? 'No subject is assigned to you yet. Ask the administrator to assign one.' : 'Open a subject first — examinations, students and evaluations are kept per subject.');
+        return;
+      }
     }
     setViewMode('workspace');
     setActiveMainTab(id as typeof activeMainTab);
@@ -656,23 +867,61 @@ export default function LecturerDashboard() {
                   labs.map((lab) => (
                     <Card key={lab.id} interactive className="p-5 flex flex-col justify-between gap-4">
                       <div className="space-y-2">
+                        {lab.scheduleProblem && (
+                          <Alert tone="warning">{lab.scheduleProblem}</Alert>
+                        )}
                         <div className="flex items-center justify-between">
                           <StatusBadge tone={EXAM_STATUS_TONE[lab.status] || 'neutral'}>{lab.status}</StatusBadge>
-                          <div className="flex items-center space-x-1">
+                          {/* Every action is labelled and sits in a 36px target. Delete is
+                              pulled away from edit by a divider and carries a destructive
+                              hover state, so the irreversible action is never the one you
+                              hit by accident. */}
+                          <div className="flex items-center gap-0.5">
                             <button
                               onClick={() => setQuestionSetsLab(lab)}
                               title="Question sets"
                               aria-label={`Question sets for ${lab.title}`}
-                              className="p-1 rounded text-slate-400 hover:text-indigo-400"
+                              className="p-2 rounded-control text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             >
-                              <Layers className="w-4 h-4" />
+                              <Layers className="w-4 h-4" aria-hidden="true" />
                             </button>
-                            <button onClick={() => openEditModal(lab)} className="p-1 rounded text-slate-400 hover:text-brand-blue-500">
-                              <Edit2 className="w-4 h-4" />
+                            <button
+                              onClick={() => openEditModal(lab)}
+                              title="Edit exam"
+                              aria-label={`Edit ${lab.title}`}
+                              className="p-2 rounded-control text-slate-400 hover:text-brand-blue-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" aria-hidden="true" />
                             </button>
-                            <button onClick={() => handleDeleteLab(lab.id)} className="p-1 rounded text-slate-400 hover:text-red-600">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <span aria-hidden="true" className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" />
+                            {lab.archivedAt ? (
+                              <button
+                                onClick={() => openRetireDialog(lab)}
+                                title="Restore exam"
+                                aria-label={`Restore ${lab.title} to active examinations`}
+                                className="p-2 rounded-control text-slate-400 hover:text-brand-olive-600 hover:bg-brand-olive-50 dark:hover:bg-brand-olive-900/30 transition-colors"
+                              >
+                                <ArchiveRestore className="w-4 h-4" aria-hidden="true" />
+                              </button>
+                            ) : lab.canDelete === false ? (
+                              <button
+                                onClick={() => openRetireDialog(lab)}
+                                title="Archive exam"
+                                aria-label={`Archive ${lab.title} — it holds student work and cannot be deleted`}
+                                className="p-2 rounded-control text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                              >
+                                <Archive className="w-4 h-4" aria-hidden="true" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => openRetireDialog(lab)}
+                                title="Delete exam"
+                                aria-label={`Delete ${lab.title} permanently`}
+                                className="p-2 rounded-control text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" aria-hidden="true" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -696,6 +945,32 @@ export default function LecturerDashboard() {
                           View submissions &rarr;
                         </button>
                       </div>
+
+                      {/* Result release. Shown only once an exam has submissions to release,
+                          so a draft or an untaken exam is not cluttered with an action that
+                          cannot apply. State is named in text, never by colour alone. */}
+                      {(lab.releaseReadiness?.totalSubmissions ?? 0) > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+                          <div className="flex items-center gap-2">
+                            <StatusBadge tone={lab.resultsReleasedAt ? 'emerald' : 'neutral'}>
+                              {RELEASE_STATE_LABEL[releaseState(lab.resultsReleasedAt)]}
+                            </StatusBadge>
+                            <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                              {lab.releaseReadiness.graded} graded · {lab.releaseReadiness.ungraded} pending
+                            </span>
+                          </div>
+                          {!lab.resultsReleasedAt && (
+                            <Button
+                              variant="outline"
+                              onClick={() => openReleaseDialog(lab)}
+                              aria-label={`Release results for ${lab.title}`}
+                            >
+                              <Send className="w-3.5 h-3.5" aria-hidden="true" />
+                              Release results
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </Card>
                   ))
                 )}
@@ -921,10 +1196,29 @@ export default function LecturerDashboard() {
                     <input type="time" value={startTimeInput} onChange={(e) => setStartTimeInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">End Time</label>
+                    <label className="text-[10px] text-slate-500 block mb-0.5">End Time <span className="text-slate-400">(optional if a duration is set)</span></label>
                     <input type="time" value={endTimeInput} onChange={(e) => setEndTimeInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                 </div>
+                {(() => {
+                  // Live summary of what will actually be stored, so an AM/PM slip is visible
+                  // before saving instead of when the exam closes at its start time.
+                  const startIso = combineDateTime(examDateInput, startTimeInput);
+                  const endIso = combineDateTime(examDateInput, endTimeInput);
+                  if (!startIso) return null;
+                  const problems = validateExamSchedule({ startTime: startIso, endTime: endIso, durationMinutes: durationMinutesInput, examModeEnabled });
+                  const windowEnd = getExamWindowEnd({ startTime: startIso, endTime: endIso, durationMinutes: durationMinutesInput ? Number(durationMinutesInput) : null });
+                  const fmt = (d: Date) => d.toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                  return problems.length > 0 ? (
+                    <p role="alert" className="text-[11px] text-rose-600 dark:text-rose-400">{problems[0]}</p>
+                  ) : windowEnd ? (
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400" aria-live="polite">
+                      Open from <strong>{fmt(new Date(startIso))}</strong> to <strong>{fmt(windowEnd)}</strong>
+                      {` (${Math.round((windowEnd.getTime() - new Date(startIso).getTime()) / 60000)} min window`}
+                      {durationMinutesInput ? `; each student gets ${durationMinutesInput} min from when they start)` : ')'}
+                    </p>
+                  ) : null;
+                })()}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="text-[10px] text-slate-500 block mb-0.5">Duration (minutes)</label>
@@ -1032,32 +1326,61 @@ export default function LecturerDashboard() {
                 {selectedSubmission.startDeviceClass && (
                   <StatusBadge tone="neutral">{selectedSubmission.startDeviceClass}</StatusBadge>
                 )}
+                {/* What is shown is the latest immutable hand-in; its hash is re-verified server-side. */}
+                {selectedSubmission.snapshots?.[0] && (
+                  <StatusBadge tone={selectedSubmission.snapshots[0].verified ? 'emerald' : 'rose'}>
+                    {`Hand-in v${selectedSubmission.snapshots[0].version} · ${selectedSubmission.snapshots[0].verified ? 'integrity verified' : 'INTEGRITY CHECK FAILED'}`}
+                  </StatusBadge>
+                )}
+                {selectedSubmission.snapshots?.[0] && !selectedSubmission.snapshots[0].onTime && (
+                  <StatusBadge tone="amber">Handed in after the deadline</StatusBadge>
+                )}
+                {(selectedSubmission.snapshots?.length || 0) > 1 && (
+                  <span className="text-[11px] text-slate-500" title={selectedSubmission.snapshots.map((s: any) => `v${s.version} ${new Date(s.submittedAt).toLocaleString()} ${s.contentHash.slice(0, 12)}`).join('\n')}>
+                    {selectedSubmission.snapshots.length} versions
+                  </span>
+                )}
               </div>
               <button onClick={() => setSelectedSubmission(null)} className="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white rounded-control text-xs font-bold">Close</button>
             </div>
 
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-4 gap-4">
               <div className="flex-1 h-full overflow-hidden flex flex-col min-h-0">
-                {(selectedSubmission.answerSheet?.length || 0) > 0 && (
-                  <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+                {/* Always shown now: the Runs tab applies whether or not the exam has an answer sheet. */}
+                <div className="flex items-center gap-2 mb-2 flex-shrink-0" role="tablist" aria-label="Submission views">
+                  {(selectedSubmission.answerSheet?.length || 0) > 0 && (
                     <button
                       type="button"
+                      role="tab"
+                      aria-selected={inspectorPane === 'sheet'}
                       onClick={() => setInspectorPane('sheet')}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'sheet' ? 'bg-brand-blue-600 border-brand-blue-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
                     >
                       <FileText className="w-3.5 h-3.5" />
                       <span>Answer Sheet</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setInspectorPane('code')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'code' ? 'bg-brand-olive-700 border-brand-olive-600 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
-                    >
-                      <Code className="w-3.5 h-3.5" />
-                      <span>Code</span>
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={inspectorPane === 'code' || (inspectorPane === 'sheet' && !(selectedSubmission.answerSheet?.length > 0))}
+                    onClick={() => setInspectorPane('code')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'code' || (inspectorPane === 'sheet' && !(selectedSubmission.answerSheet?.length > 0)) ? 'bg-brand-olive-700 border-brand-olive-600 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                  >
+                    <Code className="w-3.5 h-3.5" />
+                    <span>Code</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={inspectorPane === 'runs'}
+                    onClick={() => setInspectorPane('runs')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'runs' ? 'bg-brand-blue-600 border-brand-blue-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
+                  >
+                    <TerminalSquare className="w-3.5 h-3.5" />
+                    <span>Runs</span>
+                  </button>
+                </div>
 
                 {(selectedSubmission.answerSheet?.length || 0) > 0 && inspectorPane === 'sheet' ? (
                   <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-5 space-y-5">
@@ -1098,6 +1421,16 @@ export default function LecturerDashboard() {
                       </div>
                     ))}
                   </div>
+                ) : inspectorPane === 'runs' ? (
+                  <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-4">
+                    <RunHistory
+                      submissionId={selectedSubmission.id}
+                      token={token}
+                      outputSectionText={
+                        (selectedSubmission.answerSheet || []).find((sec: any) => sec.key === 'OUTPUT')?.content ?? null
+                      }
+                    />
+                  </div>
                 ) : (
                   <div className="flex-1 min-h-0 overflow-hidden">
                     <OnlineIDE labId={selectedSubmission.labId} labTitle={selectedSubmission.labTitle} problemStatement="" readOnly={true} initialFiles={selectedSubmission.files || []} isSubmitted={true} fillParent />
@@ -1134,31 +1467,132 @@ export default function LecturerDashboard() {
                 )}
 
                 <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-5 flex flex-col justify-between space-y-4">
-                  <form onSubmit={handleEvaluateSubmission} className="space-y-4">
-                    <h4 className="font-bold text-sm text-white border-b border-slate-800 pb-2">Grading Panel</h4>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Status</label>
-                      <select value={evalStatus} onChange={(e) => setEvalStatus(e.target.value)} className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs">
-                        <option value="APPROVED">APPROVED</option>
-                        <option value="REJECTED">REJECTED</option>
-                        <option value="NEEDS_CORRECTION">NEEDS CORRECTION</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Marks (out of 100)</label>
-                      <input type="number" placeholder="100" value={evalMarks} onChange={(e) => setEvalMarks(e.target.value)} className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">Remarks</label>
-                      <textarea placeholder="Feedback..." value={evalRemarks} onChange={(e) => setEvalRemarks(e.target.value)} rows={3} className="w-full bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-control p-3 text-xs" />
-                    </div>
-                    <button type="submit" className="w-full py-2.5 bg-brand-olive-700 text-white rounded-control font-bold text-xs">Submit Grade</button>
+                  <form onSubmit={handleEvaluateSubmission} className="space-y-4" noValidate>
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-2">Grading Panel</h4>
+                    <Field label="Status" htmlFor="eval-status">
+                      <Select id="eval-status" value={evalStatus} onChange={(e) => setEvalStatus(e.target.value)}>
+                        <option value="APPROVED">Approved</option>
+                        <option value="REJECTED">Rejected</option>
+                        <option value="NEEDS_CORRECTION">Needs correction (reopens the attempt)</option>
+                        <option value="PENDING">Pending (not yet decided)</option>
+                      </Select>
+                    </Field>
+
+                    {gradingSections.length > 0 ? (
+                      <fieldset className="space-y-3">
+                        <legend className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Section marks</legend>
+                        {gradingSections.map((sec: any) => {
+                          const entry = evalSectionMarks[sec.id] || { marks: '', remarks: '' };
+                          const n = entry.marks === '' ? null : Number(entry.marks);
+                          const invalid = n !== null && (!Number.isFinite(n) || n < 0 || n > sec.maxMarks);
+                          return (
+                            <div key={sec.id} className="space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <label htmlFor={`sec-${sec.id}`} className="flex-1 min-w-0 text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
+                                  {sec.label}
+                                </label>
+                                {/* Fixed-width wrapper: cn() does not de-conflict classes, so a width on the
+                                    Input itself loses to the primitive's w-full and hides the label. */}
+                                <div className="w-20 flex-shrink-0">
+                                <Input
+                                  id={`sec-${sec.id}`}
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={0}
+                                  max={sec.maxMarks}
+                                  step="0.5"
+                                  value={entry.marks}
+                                  invalid={invalid}
+                                  aria-describedby={`sec-${sec.id}-max`}
+                                  onChange={(e) => setEvalSectionMarks((m) => ({ ...m, [sec.id]: { ...entry, marks: e.target.value } }))}
+                                  className="text-right tabular"
+                                />
+                                </div>
+                                <span id={`sec-${sec.id}-max`} className="text-xs text-slate-500 tabular w-10 flex-shrink-0">/ {sec.maxMarks}</span>
+                              </div>
+                              <Input
+                                aria-label={`Remark for ${sec.label} (optional)`}
+                                placeholder="Remark (optional)"
+                                value={entry.remarks}
+                                onChange={(e) => setEvalSectionMarks((m) => ({ ...m, [sec.id]: { ...entry, remarks: e.target.value } }))}
+                                className="text-[11px]"
+                              />
+                              {invalid && <p className="text-[11px] text-rose-600 dark:text-rose-400">Enter 0–{sec.maxMarks}.</p>}
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-baseline justify-between border-t border-slate-200 dark:border-slate-800 pt-2" aria-live="polite">
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Total</span>
+                          <span className="text-sm font-bold tabular text-slate-900 dark:text-white">
+                            {sectionPreview.total !== null
+                              ? `${sectionPreview.total} / ${sectionPreview.maxTotal}`
+                              : `${gradingSections.filter((sec) => (evalSectionMarks[sec.id]?.marks ?? '') !== '').length} of ${gradingSections.length} sections marked`}
+                          </span>
+                        </div>
+                      </fieldset>
+                    ) : (
+                      <Field label={`Marks (out of ${selectedSubmission.maxMarks ?? 100})`} htmlFor="eval-marks">
+                        <Input
+                          id="eval-marks"
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          max={selectedSubmission.maxMarks ?? 100}
+                          step="0.5"
+                          value={evalMarks}
+                          onChange={(e) => setEvalMarks(e.target.value)}
+                        />
+                      </Field>
+                    )}
+
+                    <Field label="Remarks" htmlFor="eval-remarks">
+                      <Textarea id="eval-remarks" placeholder="Feedback for the student…" value={evalRemarks} onChange={(e) => setEvalRemarks(e.target.value)} rows={3} />
+                    </Field>
+
+                    {finalStatusBlocked && (
+                      <Alert tone="warning">Mark every section to save a final status, or choose Pending to keep partial marks.</Alert>
+                    )}
+                    {sectionPreview.errors.length > 0 && <Alert tone="danger">{sectionPreview.errors[0]}</Alert>}
+
+                    <Button type="submit" className="w-full" disabled={finalStatusBlocked || sectionPreview.errors.length > 0}>
+                      Save evaluation
+                    </Button>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      {selectedSubmission?.resultsReleasedAt
+                        ? 'Results for this exam are released — saving makes this mark visible to the student immediately.'
+                        : 'This mark stays private until you release results for this exam.'}
+                    </p>
                   </form>
                 </div>
               </div>
             </div>
           </div>
         </Modal>
+      )}
+
+      {releasingLab && (
+        <ResultReleaseDialog
+          open={!!releasingLab}
+          onClose={closeReleaseDialog}
+          examTitle={releasingLab.title}
+          readiness={releasingLab.releaseReadiness ?? NO_SUBMISSIONS}
+          busy={releasing}
+          serverRefusal={releaseRefusal}
+          onConfirm={handleReleaseResults}
+        />
+      )}
+
+      {retiringLab && (
+        <ExamRetirementDialog
+          open={!!retiringLab}
+          onClose={closeRetireDialog}
+          examTitle={retiringLab.title}
+          activity={retiringLab.activity}
+          archived={!!retiringLab.archivedAt}
+          busy={retiring}
+          serverRefusal={retireRefusal}
+          onConfirm={handleRetireExam}
+        />
       )}
 
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />

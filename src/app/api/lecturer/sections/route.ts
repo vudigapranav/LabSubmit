@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export async function GET(req: Request) {
-  const { errorResponse, session } = requireAuth(req, ['LECTURER', 'ADMIN']);
+  const { errorResponse, session } = await requireAuth(req, ['LECTURER', 'ADMIN']);
   if (errorResponse) return errorResponse;
 
   try {
@@ -55,6 +55,7 @@ export async function GET(req: Request) {
       assignedBranches,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
+    console.error('[/api/lecturer/sections]', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

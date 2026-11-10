@@ -363,6 +363,10 @@ model ExecutionRecord {
   exitCode      Int?
   durationMs    Int?
   compileFailed Boolean  @default(false)
+  // The source the engine compiled for this run: [{ filename, language, content }], canonical
+  // order. Lets an evaluator see which version of the code produced this output. Null for runs
+  // recorded before this column existed, or whose source exceeded the record limit.
+  files         Json?
   createdAt     DateTime @default(now())
 
   workspace LabWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

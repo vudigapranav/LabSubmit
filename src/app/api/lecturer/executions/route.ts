@@ -36,6 +36,7 @@ export async function GET(req: Request) {
         exitCode: true,
         durationMs: true,
         compileFailed: true,
+        files: true,
         createdAt: true,
       },
     });

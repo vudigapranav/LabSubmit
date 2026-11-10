@@ -70,3 +70,27 @@ export function findMatchingRun(sectionText: string, runOutputs: string[]): numb
   if (!target) return -1;
   return runOutputs.findIndex((out) => normaliseForComparison(out) === target);
 }
+
+export interface SourceFileLike {
+  filename: string;
+  content: string;
+}
+
+/**
+ * Whether the source a run compiled is the same as the source that was handed in. 'unknown'
+ * when the run's source was not recorded (runs from before source recording, or too large) —
+ * never guessed. Exact comparison: a single changed character is a different program.
+ */
+export function compareRunSource(
+  runFiles: SourceFileLike[] | null | undefined,
+  handIn: SourceFileLike[]
+): 'same' | 'different' | 'unknown' {
+  if (!Array.isArray(runFiles)) return 'unknown';
+  const key = (files: SourceFileLike[]) =>
+    JSON.stringify(
+      files
+        .map((f) => [f.filename, f.content])
+        .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    );
+  return key(runFiles) === key(handIn) ? 'same' : 'different';
+}

@@ -4,8 +4,30 @@
 // sheet were purely student-attested — a student could type output their program never
 // produced. With every run recorded, the evaluator can see the run history and whether the
 // submitted Output matches something that actually executed.
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import { RECORD_FIELD_LIMIT, TRUNCATION_MARKER } from './runTranscript';
+
+/**
+ * Largest source (all files of one run, in bytes) stored with a run. Source is stored whole or
+ * not at all: a clipped program is not "the code that ran", and pretending otherwise would
+ * mislead the evaluator. Lab programs are a few KB; this bounds a workspace's worst case.
+ */
+export const RECORD_SOURCE_LIMIT = 128 * 1024;
+
+export interface RunSourceFile {
+  filename: string;
+  language: string;
+  content: string;
+}
+
+/** Same canonical order as a hand-in snapshot, so the two can be compared file by file. */
+export function runSourceForRecord(files: RunSourceFile[]): RunSourceFile[] | null {
+  const canonical = files
+    .map((f) => ({ filename: f.filename, language: f.language, content: f.content }))
+    .sort((a, b) => a.filename.localeCompare(b.filename));
+  const bytes = canonical.reduce((n, f) => n + Buffer.byteLength(f.content), 0);
+  return bytes > RECORD_SOURCE_LIMIT ? null : canonical;
+}
 
 /** Oldest runs beyond this are pruned so one student cannot grow the table without bound. */
 export const MAX_RECORDS_PER_WORKSPACE = 200;
@@ -21,6 +43,8 @@ export interface RunRecordInput {
   exitCode: number | null;
   durationMs: number;
   compileFailed: boolean;
+  /** Every source file the engine compiled for this run; null when too large to keep whole. */
+  files: RunSourceFile[] | null;
 }
 
 const clip = (s: string) => (s.length > RECORD_FIELD_LIMIT ? s.slice(0, RECORD_FIELD_LIMIT) + TRUNCATION_MARKER : s);
@@ -41,6 +65,7 @@ export async function persistExecutionRecord(prisma: PrismaClient, run: RunRecor
         exitCode: run.exitCode,
         durationMs: Math.max(0, Math.round(run.durationMs)),
         compileFailed: run.compileFailed,
+        files: run.files ? (run.files as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
       },
     });
 

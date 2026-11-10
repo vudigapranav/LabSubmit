@@ -30,6 +30,8 @@ export interface TerminalRef {
     files?: { filename: string; content: string }[];
     labId: string;
     token: string;
+    /** Faculty review: the server runs this submission's hand-in instead of `code`. */
+    submissionId?: string;
   }) => void;
   stopProgram: () => void;
   clear: () => void;
@@ -40,12 +42,16 @@ interface TerminalProps {
   onStatusChange?: (isRunning: boolean) => void;
   /** Fires as a run progresses and when it ends, with what the program read and wrote. */
   onRunCaptured?: (run: CapturedRun) => void;
+  /** Header label; the review IDE uses it to mark lecturer runs as such. */
+  title?: string;
+  /** Fill the parent's height instead of the fixed exam-terminal height. */
+  fill?: boolean;
 }
 
 // Capture rules (stripAnsi, applyTerminalInput) are shared with the execution engine, which
 // persists every run with the same transformation — see src/lib/runTranscript.ts.
 
-export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange, onRunCaptured }, ref) => {
+export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange, onRunCaptured, title = 'Terminal (Interactive PTY)', fill = false }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<any>(null);
   const fitAddonRef = useRef<any>(null);
@@ -251,7 +257,7 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
 
   // Expose imperatives
   useImperativeHandle(ref, () => ({
-    runCode: ({ filename, code, files, labId, token }) => {
+    runCode: ({ filename, code, files, labId, token, submissionId }) => {
       console.log(`[STAGE: 1. RUN CODE CALLED IN TERMINAL] Target: "${filename}"`);
       setExecutionTimeMs(null);
       // Each run captures itself from scratch — the answer sheet offers the LAST run,
@@ -284,6 +290,7 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
               rows,
               labId,
               token,
+              ...(submissionId ? { submissionId } : {}),
               // Narrow-only hint for the server's exam-device check (iPadOS reports a
               // desktop UA); the server decides, and ignores this unless it is stricter.
               deviceClass: detectClientDeviceClass(),
@@ -360,14 +367,14 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
 
   return (
     <div
-      className="h-64 bg-slate-950 border-t border-slate-800 flex flex-col font-mono text-xs cursor-text outline-none focus:outline-none"
+      className={`${fill ? 'h-full' : 'h-64'} bg-slate-950 border-t border-slate-800 flex flex-col font-mono text-xs cursor-text outline-none focus:outline-none`}
       onClick={handleContainerClick}
     >
       {/* Header Bar */}
       <div className="h-9 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between select-none">
         <div className="flex items-center space-x-3">
           <TerminalIcon className="w-4 h-4 text-emerald-400" />
-          <span className="font-semibold text-xs text-slate-200">Terminal (Interactive PTY)</span>
+          <span className="font-semibold text-xs text-slate-200">{title}</span>
 
           {status === 'compiling' && (
             <span className="text-[11px] text-amber-400 font-medium flex items-center space-x-1 bg-amber-950/60 border border-amber-800/80 px-2 py-0.5 rounded-md">

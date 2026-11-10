@@ -12,6 +12,7 @@ import { detectClientDeviceClass } from '@/lib/useDeviceClass';
 import { useFileAutosave, type FlushOutcome } from '@/lib/useFileAutosave';
 import { QuestionPaper } from './QuestionPaper';
 import { Terminal, TerminalRef, CapturedRun } from './Terminal';
+import { RecordedRunsConsole, languageLabel, type RecordedRun } from './RunHistory';
 import {
   Play,
   Send,
@@ -23,6 +24,8 @@ import {
   Lock,
   Code,
   BookOpen,
+  Eye,
+  History,
 } from 'lucide-react';
 
 interface LabFile {
@@ -76,6 +79,13 @@ interface OnlineIDEProps {
   questions?: { order: number; text: string; marks: number | null }[];
   /** Filled with a function that saves every unsaved file — the page calls it before an auto-submit. */
   flushRef?: React.MutableRefObject<(() => Promise<FlushOutcome>) | null>;
+  /**
+   * Faculty review of a submission (Submission Inspector). The IDE shows `initialFiles` — the
+   * immutable hand-in — and never loads or saves the student's live workspace. Under the editor
+   * it shows the student's recorded runs, and its Run button becomes a "Lecturer Test Run" the
+   * server executes from the stored hand-in, recorded nowhere in the student's history.
+   */
+  review?: { submissionId: string; handInLabel: string };
 }
 
 export const OnlineIDE: React.FC<OnlineIDEProps> = ({
@@ -97,6 +107,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   onRunCaptured,
   questions,
   flushRef,
+  review,
 }) => {
   const { token, theme } = useApp();
   const newFileLanguageOptions = allowedLanguages && allowedLanguages.length > 0
@@ -120,6 +131,13 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   const [renameInput, setRenameInput] = useState<string>('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Review mode only. `viewingRun` swaps the editor to the source a recorded run compiled;
+  // null shows the hand-in. `consoleTab` picks between the student's recorded runs and the
+  // lecturer's own test terminal (kept mounted so its connection and output survive a switch).
+  const [viewingRun, setViewingRun] = useState<{ number: number; files: LabFile[] } | null>(null);
+  const [consoleTab, setConsoleTab] = useState<'runs' | 'test'>('runs');
+  const [recordedRunCount, setRecordedRunCount] = useState<number | null>(null);
+
   // Saves every edit (see src/lib/useFileAutosave.ts). Off for read-only views and once submitted.
   const autosave = useFileAutosave({ labId, token, enabled: !readOnly && !workspaceSubmitted });
   useEffect(() => {
@@ -127,6 +145,8 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   }, [flushRef, autosave.flush]);
 
   useEffect(() => {
+    // A reviewer must see the hand-in, never the student's current (possibly reopened) workspace.
+    if (review) return;
     fetchWorkspace();
   }, [labId]);
 
@@ -162,7 +182,35 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
     }
   };
 
-  const activeFile = files.find((f) => f.id === activeFileId) || files[0];
+  // What the editor shows: normally the workspace (or hand-in) files; in review, optionally the
+  // source of one recorded run.
+  const shownFiles = viewingRun ? viewingRun.files : files;
+  const activeFile = shownFiles.find((f) => f.id === activeFileId) || shownFiles[0];
+
+  // Switching between the hand-in and a run's source keeps the same file open where it exists.
+  const showSource = (next: { number: number; files: LabFile[] } | null, openFilename?: string) => {
+    const target = next ? next.files : files;
+    const wanted = openFilename || activeFile?.filename;
+    const same = wanted && target.find((f) => f.filename === wanted);
+    setViewingRun(next);
+    setActiveFileId(same ? same.id : target[0]?.id || '');
+  };
+  const viewRunSource = (run: RecordedRun, number: number) => {
+    if (!run.files) return;
+    // Opens the file the student ran, since that is the program behind this output.
+    showSource(
+      {
+        number,
+        files: run.files.map((f, i) => ({ id: `run-${run.id}-${i}`, filename: f.filename, content: f.content, language: f.language })),
+      },
+      run.filename
+    );
+  };
+  const switchConsole = (tab: 'runs' | 'test') => {
+    setConsoleTab(tab);
+    // xterm measures its container; it was hidden, so re-fit once it is visible again.
+    if (tab === 'test') setTimeout(() => window.dispatchEvent(new Event('resize')), 0);
+  };
 
   const handleCodeChange = (value: string | undefined) => {
     if (!activeFile || workspaceSubmitted || readOnly) return;
@@ -288,6 +336,19 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
   // INTERACTIVE PTY LAUNCHER VIA WEBSOCKET
   const handleRunCode = async () => {
     if (!activeFile) return;
+    if (review) {
+      // The server loads the hand-in itself and ignores any code sent with a review run.
+      switchConsole('test');
+      terminalRef.current?.runCode({
+        filename: activeFile.filename,
+        code: '',
+        files: [],
+        labId,
+        token: token || localStorage.getItem('cbit_token') || '',
+        submissionId: review.submissionId,
+      });
+      return;
+    }
     await saveActiveFile();
     if (terminalRef.current) {
       terminalRef.current.runCode({
@@ -387,7 +448,29 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
           </div>
         )}
 
-        {workspaceSubmitted && (
+        {review && (
+          <div className="bg-slate-900 text-slate-300 px-4 py-2 text-xs font-medium flex items-center gap-2 border-b border-slate-800 flex-wrap">
+            <Eye className="w-3.5 h-3.5 text-brand-blue-400" aria-hidden="true" />
+            {viewingRun ? (
+              <>
+                <span className="text-amber-300">
+                  Showing the code student run #{viewingRun.number} compiled — this is not the hand-in.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => showSource(null)}
+                  className="ml-auto px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700"
+                >
+                  Back to the hand-in
+                </button>
+              </>
+            ) : (
+              <span>Review mode · {review.handInLabel} · read-only. Nothing here can change the submission.</span>
+            )}
+          </div>
+        )}
+
+        {workspaceSubmitted && !review && (
           <div className="bg-amber-900/60 text-amber-200 px-4 py-2 text-xs font-medium flex items-center justify-between border-b border-amber-800/80">
             <div className="flex items-center space-x-2">
               <Lock className="w-3.5 h-3.5" />
@@ -432,14 +515,15 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* Run Code Button */}
+            {/* Run Code Button. In review it runs the hand-in, so it is off while a run's older source is shown. */}
             <button
               onClick={handleRunCode}
-              disabled={isRunning}
+              disabled={isRunning || (!!review && !!viewingRun)}
+              title={review ? (viewingRun ? 'Go back to the hand-in to test-run it' : `Run ${activeFile?.filename || ''} from the hand-in, in the sandbox`) : undefined}
               className="flex items-center space-x-1.5 px-4 py-1.5 rounded-lg bg-brand-olive-700 hover:bg-brand-olive-600 disabled:opacity-50 text-white text-xs font-medium transition-colors shadow-card"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              <span>{isRunning ? 'Running...' : 'Run Code'}</span>
+              <span>{isRunning ? 'Running...' : review ? 'Lecturer Test Run' : 'Run Code'}</span>
             </button>
 
             {/* Submit Lab Button */}
@@ -483,11 +567,11 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {files.map((file) => (
+              {shownFiles.map((file) => (
                 <div
                   key={file.id}
                   className={`group flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-mono cursor-pointer transition-colors ${
-                    activeFileId === file.id
+                    activeFile?.id === file.id
                       ? 'bg-slate-800 text-white font-semibold border border-slate-700'
                       : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
                   }`}
@@ -544,12 +628,12 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
           <div className="flex-1 flex flex-col min-w-0 bg-slate-950">
             {/* Editor Tabs */}
             <div className="h-9 bg-slate-900 border-b border-slate-800 flex items-center px-2 space-x-1 overflow-x-auto">
-              {files.map((file) => (
+              {shownFiles.map((file) => (
                 <button
                   key={file.id}
                   onClick={() => setActiveFileId(file.id)}
                   className={`px-3 py-1 text-xs font-mono flex items-center space-x-1.5 transition-colors border-t-2 ${
-                    activeFileId === file.id
+                    activeFile?.id === file.id
                       ? 'bg-slate-950 border-brand-olive-600 text-white font-semibold'
                       : 'border-transparent text-slate-400 hover:bg-slate-900'
                   }`}
@@ -558,6 +642,11 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
                   <span>{file.filename}</span>
                 </button>
               ))}
+              {review && activeFile && (
+                <span className="ml-auto pl-3 text-[11px] text-slate-400 whitespace-nowrap" aria-label="Language of the open file">
+                  {languageLabel(activeFile.language)}
+                </span>
+              )}
             </div>
 
             <div className="flex-1 relative">
@@ -587,12 +676,58 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
               )}
             </div>
 
-            {/* SHARED INTEGRATED TERMINAL COMPONENT */}
-            <Terminal
-              ref={terminalRef}
-              onStatusChange={(running) => setIsRunning(running)}
-              onRunCaptured={onRunCaptured}
-            />
+            {review ? (
+              // Review console: the student's recorded runs (the default — the lecturer should land
+              // on what the student saw, not an empty terminal) and the lecturer's own test terminal.
+              <div className="h-72 flex flex-col border-t border-slate-800 bg-slate-950 min-h-0">
+                <div className="h-9 bg-slate-900 border-b border-slate-800 px-2 flex items-center gap-1 flex-shrink-0" role="tablist" aria-label="Console">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={consoleTab === 'runs'}
+                    onClick={() => switchConsole('runs')}
+                    className={`px-3 py-1 text-xs flex items-center gap-1.5 border-t-2 ${consoleTab === 'runs' ? 'border-brand-olive-600 text-white font-semibold bg-slate-950' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                  >
+                    <History className="w-3.5 h-3.5" aria-hidden="true" />
+                    Student runs{recordedRunCount !== null ? ` (${recordedRunCount})` : ''}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={consoleTab === 'test'}
+                    onClick={() => switchConsole('test')}
+                    className={`px-3 py-1 text-xs flex items-center gap-1.5 border-t-2 ${consoleTab === 'test' ? 'border-brand-blue-500 text-white font-semibold bg-slate-950' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                  >
+                    <Play className="w-3.5 h-3.5" aria-hidden="true" />
+                    Lecturer Test Run
+                  </button>
+                </div>
+                <div className={`flex-1 min-h-0 ${consoleTab === 'runs' ? '' : 'hidden'}`}>
+                  <RecordedRunsConsole
+                    submissionId={review.submissionId}
+                    token={token}
+                    handInFiles={files}
+                    onViewSource={viewRunSource}
+                    onCount={setRecordedRunCount}
+                  />
+                </div>
+                <div className={`flex-1 min-h-0 ${consoleTab === 'test' ? '' : 'hidden'}`}>
+                  <Terminal
+                    ref={terminalRef}
+                    fill
+                    title="Lecturer Test Run — runs the hand-in; not part of the student's record"
+                    onStatusChange={(running) => setIsRunning(running)}
+                  />
+                </div>
+              </div>
+            ) : (
+              /* SHARED INTEGRATED TERMINAL COMPONENT */
+              <Terminal
+                ref={terminalRef}
+                onStatusChange={(running) => setIsRunning(running)}
+                onRunCaptured={onRunCaptured}
+              />
+            )}
           </div>
         </div>
 

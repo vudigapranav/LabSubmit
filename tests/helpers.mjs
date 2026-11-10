@@ -54,7 +54,7 @@ export async function lecturerWithLab(language) {
 // i.e. type only once the prompt is on screen, as a student would. Use this whenever the
 // test asserts on the exact transcript: a fixed delay races a slow first spawn, and an
 // early keystroke is echoed before the prompt.
-export function runOnEngine({ token, labId, filename, code, files = [], inputs = [], timeoutMs = 30000 }) {
+export function runOnEngine({ token, labId, filename, code, files = [], inputs = [], timeoutMs = 30000, submissionId }) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(WS_URL, {
       headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LabSubmitTest/1.0' },
@@ -66,7 +66,7 @@ export function runOnEngine({ token, labId, filename, code, files = [], inputs =
       reject(new Error(`Engine run timed out. Output so far:\n${result.output}`));
     }, timeoutMs);
 
-    ws.on('open', () => ws.send(JSON.stringify({ type: 'run', filename, code, files, token, labId })));
+    ws.on('open', () => ws.send(JSON.stringify({ type: 'run', filename, code, files, token, labId, ...(submissionId ? { submissionId } : {}) })));
     ws.on('message', (raw) => {
       const msg = JSON.parse(raw.toString());
       if (msg.type === 'output') {

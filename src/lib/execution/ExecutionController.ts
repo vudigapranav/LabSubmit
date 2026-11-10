@@ -15,7 +15,7 @@ import { PtyService } from './PtyService';
 import { ExecutionLogger } from './ExecutionLogger';
 import { isSafeSourceFilename, SOURCE_FILENAME_RULE, MAX_FILES_PER_WORKSPACE } from '../sourceFilename';
 import { appendBounded, applyTerminalInput, RECORD_FIELD_LIMIT, stripAnsi } from '../runTranscript';
-import { persistExecutionRecord } from '../executionRecords';
+import { persistExecutionRecord, runSourceForRecord, type RunSourceFile } from '../executionRecords';
 import { acquireRunIdentity, sandboxRefusal } from './sandbox';
 // Relative imports (not the @/* alias) — this file is loaded by server.js via tsx's
 // CJS require hook, a different resolution path than Next's own webpack/SWC bundling
@@ -48,10 +48,32 @@ interface RunCapture {
   startTime: number;
   stdin: string;
   stdout: string;
+  /** The exact source compiled for this run (null when too large to keep whole). */
+  files: RunSourceFile[] | null;
   finalized: boolean;
 }
 
-type RunAuthorization = { code: string; message: string } | { workspaceId: string | null; userId: string };
+/** The hand-in a faculty "Lecturer Test Run" executes, loaded on the server. */
+interface ReviewSource {
+  version: number | null;
+  files: { filename: string; content: string }[];
+}
+
+type RunAuthorization =
+  | { code: string; message: string }
+  | { workspaceId: string | null; userId: string; reviewSource?: ReviewSource };
+
+/**
+ * The files the compiler actually writes for a run: the auxiliary files, then the entry file's
+ * content from `code` (CompilerService writes the entry from `code` and skips any auxiliary
+ * file of the same name). Recording anything else would misstate what ran.
+ */
+function compiledSource(filename: string, code: string, files: { filename: string; content: string }[]): RunSourceFile[] {
+  const byName = new Map<string, string>();
+  for (const f of files) byName.set(f.filename, f.content);
+  byName.set(filename, code);
+  return Array.from(byName, ([name, content]) => ({ filename: name, language: detectLanguage(name), content }));
+}
 
 export class ExecutionController {
   private ws: WebSocket;
@@ -113,6 +135,7 @@ export class ExecutionController {
       exitCode: outcome.exitCode,
       durationMs: Date.now() - run.startTime,
       compileFailed: outcome.compileFailed ?? false,
+      files: run.files,
     });
   }
 
@@ -125,7 +148,8 @@ export class ExecutionController {
       this.currentSessionId = null;
     }
 
-    const { filename, code, files = [], cols = 80, rows = 24, token, labId } = msg;
+    const { filename, cols = 80, rows = 24, token, labId } = msg;
+    let { code, files = [] } = msg;
 
     if (!filename || code === undefined) {
       this.sendWs({ type: 'output', data: '\r\n\x1b[31mError: Filename and code content are required.\x1b[0m\r\n', system: true });
@@ -136,7 +160,7 @@ export class ExecutionController {
     // Every name here comes from the client, not the database, and becomes a filesystem
     // path and a compiler argument. Reject the whole run on any unsafe name — before
     // authorisation, before the temp dir exists, before anything touches the disk (S2/S3).
-    const fileList = Array.isArray(files) ? files : [];
+    let fileList = Array.isArray(files) ? files : [];
     const badName = [filename, ...fileList.map((f) => f?.filename)].find((n) => !isSafeSourceFilename(n));
     if (badName !== undefined || fileList.length > MAX_FILES_PER_RUN || fileList.some((f) => typeof f?.content !== 'string')) {
       const message =
@@ -159,11 +183,32 @@ export class ExecutionController {
     // Authorization: verify identity, workspace ownership, and exam window before
     // touching the filesystem or spawning any process. This is the actual security
     // boundary for code execution — everything the client sends is otherwise untrusted.
-    const auth = await this.authorizeRun(token, labId, filename, msg.deviceClass);
+    const auth = await this.authorizeRun(token, labId, filename, msg.deviceClass, msg.submissionId);
     if ('code' in auth) {
       this.sendWs({ type: 'error', code: auth.code, message: auth.message });
       this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
       return;
+    }
+
+    // A Lecturer Test Run executes the HAND-IN as stored on the server, never source from the
+    // browser: whatever the client sent is discarded, so the lecturer verifies exactly what
+    // the student submitted. Nothing about the hand-in or the student's history is written.
+    if (auth.reviewSource) {
+      const entry = auth.reviewSource.files.find((f) => f.filename === filename);
+      if (!entry) {
+        const message = `"${filename.slice(0, 100)}" is not a file in this submission.`;
+        this.sendWs({ type: 'error', code: 'NOT_IN_SUBMISSION', message });
+        this.sendWs({ type: 'exit', exitCode: 1, executionTimeMs: 0 });
+        return;
+      }
+      code = entry.content;
+      fileList = auth.reviewSource.files;
+      const version = auth.reviewSource.version === null ? 'the submitted files' : `hand-in v${auth.reviewSource.version}`;
+      this.sendWs({
+        type: 'output',
+        data: `\x1b[36m── Lecturer Test Run of ${filename} from ${version}. Not part of the student's record. ──\x1b[0m\r\n`,
+        system: true,
+      });
     }
 
     // Checked and claimed in the same tick (no await in between), so parallel sockets
@@ -205,6 +250,7 @@ export class ExecutionController {
           startTime: Date.now(),
           stdin: '',
           stdout: '',
+          files: runSourceForRecord(compiledSource(filename, code, fileList)),
           finalized: false,
         }
       : null;
@@ -341,7 +387,8 @@ export class ExecutionController {
     token: string | undefined,
     labId: string | undefined,
     filename: string,
-    deviceClassHint?: string
+    deviceClassHint?: string,
+    submissionId?: string
   ): Promise<RunAuthorization> {
     if (!token || !labId) {
       return { code: 'UNAUTHORIZED', message: 'Missing authentication or exam context.' };
@@ -363,6 +410,11 @@ export class ExecutionController {
     if (payload.role === 'LECTURER' || payload.role === 'ADMIN') {
       if (payload.role === 'LECTURER' && lab.lecturerId !== payload.userId) {
         return { code: 'FORBIDDEN', message: 'You do not have access to this exam.' };
+      }
+      if (submissionId !== undefined) {
+        const reviewSource = await this.loadReviewSource(submissionId, labId);
+        if (!reviewSource) return { code: 'NOT_FOUND', message: 'Submission not found.' };
+        return { workspaceId: null, userId: payload.userId, reviewSource };
       }
       return { workspaceId: null, userId: payload.userId };
     }
@@ -410,6 +462,31 @@ export class ExecutionController {
     }
 
     return { workspaceId: workspace.id, userId: payload.userId };
+  }
+
+  /**
+   * The files the Submission Inspector shows for this submission — the latest immutable
+   * snapshot, or, for a submission finalized before snapshots existed, its workspace files
+   * (the same fallback GET /api/lecturer/submissions uses). Null when the submission does not
+   * belong to `labId`, so an id from another exam cannot be run under this one's ownership check.
+   */
+  private async loadReviewSource(submissionId: string, labId: string): Promise<ReviewSource | null> {
+    if (typeof submissionId !== 'string' || submissionId.length > 100) return null;
+    const sub = await prisma.submission.findUnique({
+      where: { id: submissionId },
+      select: {
+        labId: true,
+        snapshots: { orderBy: { version: 'desc' }, take: 1, select: { version: true, files: true } },
+        workspace: { select: { files: { select: { filename: true, content: true } } } },
+      },
+    });
+    if (!sub || sub.labId !== labId) return null;
+    const snap = sub.snapshots[0];
+    if (snap) {
+      const files = Array.isArray(snap.files) ? (snap.files as unknown as { filename: string; content: string }[]) : [];
+      return { version: snap.version, files: files.map((f) => ({ filename: f.filename, content: f.content })) };
+    }
+    return { version: null, files: sub.workspace.files };
   }
 
   private handleInput(data: string): void {

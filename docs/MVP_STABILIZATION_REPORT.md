@@ -195,6 +195,14 @@ I ran them against the old Docker build, whose missing role check deleted the Do
 no exam-action records to lose. Its 11 earlier audit entries remain in the audit log under the
 old account id. The test now uses a throwaway admin, so it can't do this again.
 
+### Follow-up (2026-11-10): lecturer submission review
+
+The inspector's Code tab now opens the student's IDE in review mode: the immutable hand-in, every
+recorded run (stdin, output, errors, exit status, and the exact source it compiled), and a
+server-enforced Lecturer Test Run that never touches the student's record. It adds one nullable
+column, `ExecutionRecord.files`, which production needs **before** that code is deployed. Details:
+[SUBMISSION_REVIEW_REPORT.md](SUBMISSION_REVIEW_REPORT.md).
+
 ## 10. What I need from you
 
 1. **Review the changes, and tell me whether to push.** Nothing has been pushed.

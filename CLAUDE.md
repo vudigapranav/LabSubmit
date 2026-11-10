@@ -332,6 +332,7 @@ and hosts Postgres. Both read the same database. See `DEPLOYMENT.md`.
 | Execution engine | `src/lib/execution/*`, driven by `server.js` |
 | Student exam UI | `src/app/student/lab/[id]/page.tsx`, `src/components/OnlineIDE.tsx`, `ExamGuard.tsx`, `AnswerSheet.tsx` |
 | Lecturer UI | `src/app/lecturer/page.tsx`, `src/components/AnswerSheetConfigurator.tsx` |
+| Submission review (lecturer) | `OnlineIDE` `review` mode: immutable hand-in, recorded runs (`RunHistory.tsx`), server-side Lecturer Test Run (`submissionId` in `ExecutionController`) |
 | Schema | `prisma/schema.prisma` |
 
 **Exam entry points that must each enforce policy independently:**

@@ -1429,11 +1429,31 @@ export default function LecturerDashboard() {
                       outputSectionText={
                         (selectedSubmission.answerSheet || []).find((sec: any) => sec.key === 'OUTPUT')?.content ?? null
                       }
+                      handInFiles={selectedSubmission.files || []}
                     />
                   </div>
                 ) : (
                   <div className="flex-1 min-h-0 overflow-hidden">
-                    <OnlineIDE labId={selectedSubmission.labId} labTitle={selectedSubmission.labTitle} problemStatement="" readOnly={true} initialFiles={selectedSubmission.files || []} isSubmitted={true} fillParent />
+                    {/* The student's IDE in review mode: the immutable hand-in in the same editor, their
+                        recorded runs beneath it, and a separately labelled Lecturer Test Run. Keyed by
+                        submission so opening another student never shows the previous one's files. */}
+                    <OnlineIDE
+                      key={selectedSubmission.id}
+                      labId={selectedSubmission.labId}
+                      labTitle={selectedSubmission.labTitle}
+                      problemStatement={selectedSubmission.problemStatement || ''}
+                      questions={selectedSubmission.questions || []}
+                      readOnly={true}
+                      initialFiles={selectedSubmission.files || []}
+                      isSubmitted={true}
+                      fillParent
+                      review={{
+                        submissionId: selectedSubmission.id,
+                        handInLabel: selectedSubmission.snapshots?.[0]
+                          ? `Hand-in v${selectedSubmission.snapshots[0].version}, submitted ${new Date(selectedSubmission.snapshots[0].submittedAt).toLocaleString()}`
+                          : 'Submitted files (recorded before hand-in snapshots existed)',
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -1442,7 +1462,7 @@ export default function LecturerDashboard() {
                 {integrityStatus && (
                   <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-card p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-xs text-white flex items-center space-x-1.5">
+                      <h4 className="font-bold text-xs text-slate-900 dark:text-white flex items-center space-x-1.5">
                         <ShieldAlert className="w-3.5 h-3.5" />
                         <span>Integrity Timeline</span>
                       </h4>
@@ -1457,7 +1477,7 @@ export default function LecturerDashboard() {
                         {timelineEvents.map((ev) => (
                           <div key={ev.id} className="flex items-center space-x-2 text-[10px] font-mono">
                             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${SEVERITY_DOT_STYLES[ev.severity] || SEVERITY_DOT_STYLES.LOW}`} />
-                            <span className="text-slate-300 flex-1">{ev.label}</span>
+                            <span className="text-slate-700 dark:text-slate-300 flex-1">{ev.label}</span>
                             <span className="text-slate-500">{new Date(ev.timestamp).toLocaleTimeString()}</span>
                           </div>
                         ))}

@@ -79,6 +79,8 @@ export type WsClientMessage =
       // Client-volunteered device class. Only ever narrows eligibility server-side —
       // see src/lib/deviceEligibility.ts.
       deviceClass?: string;
+      // Faculty only: run this submission's hand-in (loaded server-side) instead of `code`.
+      submissionId?: string;
     }
   | { type: 'input'; data: string }
   | { type: 'resize'; cols: number; rows: number }

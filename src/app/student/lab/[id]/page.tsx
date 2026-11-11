@@ -16,6 +16,7 @@ import { ArrowLeft, BookOpen, AlertCircle, ShieldAlert, Maximize, Clock, CheckCi
 import { estimateClockOffset } from '@/lib/serverClock';
 import type { FlushOutcome } from '@/lib/useFileAutosave';
 import Link from 'next/link';
+import { formatDateTime } from '@/lib/formatDateTime';
 
 // Switches between the two halves of one attempt: the written record and the code
 // workspace. Rendered only when the lecturer enabled any answer-sheet section, so an exam
@@ -36,7 +37,7 @@ function ExamPaneTabs({ active, onChange }: { active: 'sheet' | 'code'; onChange
         }`}
       >
         <FileText className="w-3.5 h-3.5" />
-        <span>Answer Sheet</span>
+        <span>Answer sheet</span>
       </button>
       <button
         type="button"
@@ -237,7 +238,7 @@ export default function StudentLabWorkspacePage() {
           className="flex items-center space-x-1 text-slate-400 hover:text-white font-semibold transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Dashboard</span>
+          <span>Back to dashboard</span>
         </Link>
 
         <div className="text-slate-400 font-mono">
@@ -265,7 +266,7 @@ export default function StudentLabWorkspacePage() {
                   <div className="bg-amber-950/40 border border-amber-800/60 rounded-control p-4 text-left space-y-2">
                     <div className="flex items-center space-x-2 text-amber-300 font-bold text-xs">
                       <ShieldAlert className="w-4 h-4" />
-                      <span>Secure Exam Mode</span>
+                      <span>Secure exam mode</span>
                     </div>
                     <ul className="text-[11px] text-amber-200/90 space-y-1 list-disc list-inside">
                       <li>Fullscreen will be enforced for the entire exam.</li>
@@ -328,7 +329,7 @@ export default function StudentLabWorkspacePage() {
               <div className="bg-slate-800/60 border border-slate-700 rounded-control p-4 flex items-center justify-center space-x-2 text-slate-300 text-xs font-semibold">
                 <Hourglass className="w-4 h-4" />
                 <span>
-                  This exam opens {labData.startTime ? new Date(labData.startTime).toLocaleString() : 'soon'}.
+                  This exam opens {labData.startTime ? formatDateTime(labData.startTime) : 'soon'}.
                 </span>
               </div>
             ) : (
@@ -348,12 +349,12 @@ export default function StudentLabWorkspacePage() {
             <CheckCircle2 className="w-4 h-4" />
             <span>
               Exam submitted{workspace.autoSubmitted ? ' automatically' : ''}
-              {workspace.submittedAt ? ` at ${new Date(workspace.submittedAt).toLocaleString()}` : ''}. Your code is
+              {workspace.submittedAt ? ` at ${formatDateTime(workspace.submittedAt)}` : ''}. Your code is
               read-only.
               {receipt && (
                 <span className="block font-normal text-emerald-400/90 mt-0.5">
                   Submission reference <span className="font-mono">{receipt.reference}</span> (version {receipt.version}, recorded{' '}
-                  {new Date(receipt.submittedAt).toLocaleString()} server time). Keep this if you need to query your submission.
+                  {formatDateTime(receipt.submittedAt)} server time). Keep this if you need to query your submission.
                 </span>
               )}
             </span>

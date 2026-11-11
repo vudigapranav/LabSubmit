@@ -144,29 +144,33 @@ export const PageHeader: React.FC<{
 
 /* ----------------------------------------------------------------- StatCard */
 
+/**
+ * A stat card is a number, its label and what it compares to.
+ *
+ * It deliberately takes no icon and no sparkline: both are decoration on a figure that
+ * should read on its own, and four cards each carrying a differently coloured icon make a
+ * row where nothing leads. `accent` marks the ONE figure on a screen that matters — a live
+ * exam, an overdue count — and everything else stays in primary text.
+ */
 export const StatCard: React.FC<{
   label: string;
   value: React.ReactNode;
-  icon?: React.ReactNode;
   hint?: string;
-  tone?: 'neutral' | 'olive' | 'blue' | 'amber' | 'rose' | 'emerald';
-}> = ({ label, value, icon, hint, tone = 'neutral' }) => {
-  const TONES = {
-    neutral: 'text-slate-900 dark:text-white',
-    olive: 'text-brand-olive-700 dark:text-brand-olive-400',
-    blue: 'text-brand-blue-700 dark:text-brand-blue-400',
-    amber: 'text-amber-600 dark:text-amber-400',
-    rose: 'text-rose-600 dark:text-rose-400',
-    emerald: 'text-emerald-600 dark:text-emerald-400',
-  };
+  /** Marks the single figure that matters on this screen. Use at most once per row. */
+  accent?: boolean;
+}> = ({ label, value, hint, accent = false }) => {
   return (
-    <Card className="p-4">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
-        {icon && <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">{icon}</span>}
-      </div>
-      <p className={cn('text-2xl font-bold tabular mt-1.5', TONES[tone])}>{value}</p>
-      {hint && <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{hint}</p>}
+    <Card className="p-5">
+      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+      <p
+        className={cn(
+          'text-[28px] leading-none font-medium tabular mt-2',
+          accent ? 'text-brand-olive-700 dark:text-brand-olive-400' : 'text-slate-900 dark:text-white'
+        )}
+      >
+        {value}
+      </p>
+      {hint && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{hint}</p>}
     </Card>
   );
 };
@@ -186,6 +190,35 @@ const BADGE_TONES: Record<BadgeTone, string> = {
 };
 
 /** Status is always conveyed by the label text, never by colour alone. */
+/**
+ * Status values reach this component as raw enum strings — RUNNING, NEEDS_CORRECTION — and
+ * are rendered in sentence case here rather than at each of the dozen call sites, so one
+ * badge can never read differently from another. A node that is not a plain string (an
+ * element, a number) passes through untouched.
+ */
+export function formatStatusLabel(value: React.ReactNode): React.ReactNode {
+  if (typeof value !== 'string') return value;
+  const raw = value.trim();
+  if (!raw) return value;
+
+  // Identifiers are not statuses. A subject code (CS202L), a roll number or anything else
+  // carrying a digit keeps its own casing — sentence-casing it would print "Cs202l", which
+  // is simply wrong rather than merely quieter.
+  if (/\d/.test(raw)) return value;
+
+  // Only transform what actually looks like an enum: NEEDS_CORRECTION, RUNNING. Text that
+  // is already written for a person passes through untouched.
+  if (!/^[A-Z][A-Z_ ]*$/.test(raw)) return value;
+
+  return raw
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .split(' ')
+    // A lone letter is a designator, as in "Set B", and stays capital.
+    .map((w, i) => (w.length === 1 ? w.toUpperCase() : i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}
+
 export const StatusBadge: React.FC<{ tone?: BadgeTone; icon?: React.ReactNode; children: React.ReactNode; className?: string }> = ({
   tone = 'neutral',
   icon,
@@ -194,13 +227,13 @@ export const StatusBadge: React.FC<{ tone?: BadgeTone; icon?: React.ReactNode; c
 }) => (
   <span
     className={cn(
-      'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wide whitespace-nowrap',
+      'inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-medium whitespace-nowrap',
       BADGE_TONES[tone],
       className
     )}
   >
     {icon}
-    {children}
+    {formatStatusLabel(children)}
   </span>
 );
 
@@ -354,7 +387,7 @@ export const TableWrap: React.FC<{ children: React.ReactNode; minWidth?: string;
 export const Th: React.FC<React.ThHTMLAttributes<HTMLTableCellElement>> = ({ className, children, ...rest }) => (
   <th
     scope="col"
-    className={cn('px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400', className)}
+    className={cn('px-4 py-3 text-xs font-medium text-slate-500 dark:text-slate-400', className)}
     {...rest}
   >
     {children}

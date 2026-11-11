@@ -408,7 +408,7 @@ export const Terminal = forwardRef<TerminalRef, TerminalProps>(({ onStatusChange
               title="Terminate Process Session (SIGKILL)"
             >
               <Square className="w-3 h-3 fill-current text-red-400" />
-              <span>Stop Program</span>
+              <span>Stop program</span>
             </button>
           )}
 

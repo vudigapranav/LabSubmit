@@ -192,7 +192,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
 
           {/* Change Password Section */}
           <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center space-x-1">
+            <h4 className="text-xs font-bold r text-slate-500 flex items-center space-x-1">
               <Key className="w-3.5 h-3.5" />
               <span>Change Password</span>
             </h4>

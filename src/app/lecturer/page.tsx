@@ -66,6 +66,7 @@ import {
   Send,
   TerminalSquare,
 } from 'lucide-react';
+import { formatDateTime, formatTime } from '@/lib/formatDateTime';
 
 const LECTURER_VIEW_KEY = 'labsubmit.lecturer.view';
 
@@ -712,7 +713,7 @@ export default function LecturerDashboard() {
                 {assignedSubjects.map((sub) => (
                   <div
                     key={sub.id}
-                    className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-card p-6 shadow-card flex flex-col justify-between space-y-4 hover:border-brand-olive-600/60 transition-all"
+                    className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-card p-6 shadow-card flex flex-col justify-between space-y-4 hover:border-brand-olive-600/60 transition-colors"
                   >
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
@@ -735,7 +736,7 @@ export default function LecturerDashboard() {
 
                       <button
                         onClick={() => handleOpenSubjectWorkspace(sub)}
-                        className="w-full py-2.5 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 text-white font-bold text-xs shadow-cardHover transition-all flex items-center justify-center space-x-1.5"
+                        className="w-full py-2.5 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 text-white font-bold text-xs shadow-cardHover transition-colors flex items-center justify-center space-x-1.5"
                       >
                         <span>Open Workspace</span>
                         <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
@@ -751,59 +752,32 @@ export default function LecturerDashboard() {
         {/* View Mode 2: Specific Subject Workspace */}
         {viewMode === 'workspace' && selectedSubject && (
           <div className="space-y-6">
-            {/* Subject Context Header */}
-            <div className="bg-slate-900 border border-slate-800 p-5 rounded-card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center space-x-2">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-brand-blue-950/40 text-brand-blue-300 border border-brand-blue-800/50">
-                    {selectedSubject.code}
-                  </span>
-                  <h2 className="text-base font-bold text-white">{selectedSubject.name}</h2>
-                </div>
-                <p className="text-xs text-slate-400 font-mono">
-                  Year {selectedSubject.year} • Branch: <strong className="text-white">{selectedSubject.branch?.name}</strong> • Enrolled Students: <strong className="text-white">{students.length}</strong>
-                </p>
-              </div>
+            {/* The subject name is already the page title, so this row carries only what the
+                title does not: the cohort it belongs to, and the one action that starts work.
+                Codes and roll-style identifiers stay in mono — the signature of the system. */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200 dark:border-slate-800">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                <span className="font-mono text-slate-900 dark:text-white">{selectedSubject.code}</span>
+                <span className="mx-2 text-slate-300 dark:text-slate-700">/</span>
+                Year {selectedSubject.year}, {selectedSubject.branch?.name}
+                <span className="mx-2 text-slate-300 dark:text-slate-700">/</span>
+                {students.length} enrolled
+              </p>
 
-              <button
-                onClick={openCreateModal}
-                className="px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 text-white font-bold text-xs shadow-card flex items-center space-x-1.5 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Create Programming Exam</span>
-              </button>
+              <Button onClick={openCreateModal}>
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                Create examination
+              </Button>
             </div>
 
-            {/* Exam status summary strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-control p-3 flex items-center space-x-2">
-                <Hourglass className="w-4 h-4 text-amber-500" />
-                <div>
-                  <div className="text-sm font-bold text-slate-900 dark:text-white">{statusCounts.UPCOMING}</div>
-                  <div className="text-[10px] text-slate-500">Upcoming</div>
-                </div>
-              </div>
-              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-control p-3 flex items-center space-x-2">
-                <PlayCircle className="w-4 h-4 text-emerald-500" />
-                <div>
-                  <div className="text-sm font-bold text-slate-900 dark:text-white">{statusCounts.RUNNING}</div>
-                  <div className="text-[10px] text-slate-500">Running</div>
-                </div>
-              </div>
-              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-control p-3 flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-slate-400" />
-                <div>
-                  <div className="text-sm font-bold text-slate-900 dark:text-white">{statusCounts.COMPLETED}</div>
-                  <div className="text-[10px] text-slate-500">Completed</div>
-                </div>
-              </div>
-              <div className="bg-white dark:bg-surface-darkCard border border-slate-200 dark:border-slate-800/80 rounded-control p-3 flex items-center space-x-2">
-                <ShieldAlert className="w-4 h-4 text-rose-500" />
-                <div>
-                  <div className="text-sm font-bold text-slate-900 dark:text-white">{violations.length}</div>
-                  <div className="text-[10px] text-slate-500">Violations Logged</div>
-                </div>
-              </div>
+            {/* Exam status summary. Built from the shared StatCard so this row cannot drift
+                from the student dashboard's, and carrying one accent: a running examination
+                is the only state that means students are sitting the paper right now. */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard label="Running" value={statusCounts.RUNNING} accent={statusCounts.RUNNING > 0} hint="Students sitting now" />
+              <StatCard label="Upcoming" value={statusCounts.UPCOMING} hint="Scheduled" />
+              <StatCard label="Completed" value={statusCounts.COMPLETED} hint="Window closed" />
+              <StatCard label="Integrity events" value={violations.length} hint="Logged this subject" />
             </div>
 
             {/* Workspace sub-tabs — the sidebar covers these on desktop, so they render
@@ -811,7 +785,7 @@ export default function LecturerDashboard() {
             <div className="lg:hidden flex items-center gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-3 overflow-x-auto">
               <button
                 onClick={() => setActiveMainTab('labs')}
-                className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 flex-shrink-0 ${
+                className={`px-4 py-2 rounded-control text-xs font-semibold transition-colors flex items-center space-x-2 flex-shrink-0 ${
                   activeMainTab === 'labs' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
@@ -821,17 +795,17 @@ export default function LecturerDashboard() {
 
               <button
                 onClick={() => setActiveMainTab('students')}
-                className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 flex-shrink-0 ${
+                className={`px-4 py-2 rounded-control text-xs font-semibold transition-colors flex items-center space-x-2 flex-shrink-0 ${
                   activeMainTab === 'students' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 <GraduationCap className="w-3.5 h-3.5" />
-                <span>Enrolled Students ({students.length})</span>
+                <span>Enrolled students ({students.length})</span>
               </button>
 
               <button
                 onClick={() => setActiveMainTab('submissions')}
-                className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 flex-shrink-0 ${
+                className={`px-4 py-2 rounded-control text-xs font-semibold transition-colors flex items-center space-x-2 flex-shrink-0 ${
                   activeMainTab === 'submissions' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
@@ -841,7 +815,7 @@ export default function LecturerDashboard() {
 
               <button
                 onClick={() => setActiveMainTab('violations')}
-                className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 flex-shrink-0 ${
+                className={`px-4 py-2 rounded-control text-xs font-semibold transition-colors flex items-center space-x-2 flex-shrink-0 ${
                   activeMainTab === 'violations' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
@@ -929,7 +903,7 @@ export default function LecturerDashboard() {
                         <p className="text-xs text-slate-500 dark:text-slate-400">{lab.description}</p>
 
                         <div className="flex flex-wrap gap-2 text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                          {lab.startTime && <span>Starts: {new Date(lab.startTime).toLocaleString()}</span>}
+                          {lab.startTime && <span>Starts: {formatDateTime(lab.startTime)}</span>}
                           {lab.durationMinutes && <span>• {lab.durationMinutes} min</span>}
                           {typeof lab.allowedLanguages === 'string' && <span>• {lab.allowedLanguages.split(',').join(', ')}</span>}
                         </div>
@@ -1121,7 +1095,7 @@ export default function LecturerDashboard() {
                           <StatusBadge tone="rose">{v.type}</StatusBadge>
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-400">{v.examTitle}</p>
-                        <p className="text-[11px] text-slate-500 font-mono">{new Date(v.createdAt).toLocaleString()}</p>
+                        <p className="text-[11px] text-slate-500 font-mono">{formatDateTime(v.createdAt)}</p>
                       </Card>
                     ))}
                   </div>
@@ -1145,7 +1119,7 @@ export default function LecturerDashboard() {
                             <Td className="font-mono font-bold text-slate-900 dark:text-white">{v.rollNumber}</Td>
                             <Td>{v.examTitle}</Td>
                             <Td><StatusBadge tone="rose">{v.type}</StatusBadge></Td>
-                            <Td className="text-slate-500 tabular">{new Date(v.createdAt).toLocaleString()}</Td>
+                            <Td className="text-slate-500 tabular">{formatDateTime(v.createdAt)}</Td>
                             <Td className="text-right font-bold text-slate-900 dark:text-white tabular">{v.violationCount}</Td>
                           </Tr>
                         ))}
@@ -1176,8 +1150,8 @@ export default function LecturerDashboard() {
           dismissOnBackdrop={false}
         >
             <form className="space-y-3">
-              <input type="text" placeholder="Exam Name" value={labTitle} onChange={(e) => setLabTitle(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
-              <input type="text" placeholder="Short Description" value={labDesc} onChange={(e) => setLabDesc(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
+              <input type="text" placeholder="Exam name" value={labTitle} onChange={(e) => setLabTitle(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
+              <input type="text" placeholder="Short description" value={labDesc} onChange={(e) => setLabDesc(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               <textarea placeholder="Programming Question / Problem Statement" value={labProblem} onChange={(e) => setLabProblem(e.target.value)} rows={4} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors leading-relaxed resize-y" />
 
               {/* Scheduling */}
@@ -1192,11 +1166,11 @@ export default function LecturerDashboard() {
                     <input type="date" value={examDateInput} onChange={(e) => setExamDateInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Start Time</label>
+                    <label className="text-[10px] text-slate-500 block mb-0.5">Start time</label>
                     <input type="time" value={startTimeInput} onChange={(e) => setStartTimeInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">End Time <span className="text-slate-400">(optional if a duration is set)</span></label>
+                    <label className="text-[10px] text-slate-500 block mb-0.5">End time <span className="text-slate-400">(optional if a duration is set)</span></label>
                     <input type="time" value={endTimeInput} onChange={(e) => setEndTimeInput(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
                   </div>
                 </div>
@@ -1282,7 +1256,7 @@ export default function LecturerDashboard() {
 
               <div className="flex justify-end space-x-2 pt-2">
                 <button type="button" onClick={() => setShowLabModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
-                <button type="button" disabled={saving} onClick={(e) => handleSaveLab(e, false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50">Save Draft</button>
+                <button type="button" disabled={saving} onClick={(e) => handleSaveLab(e, false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors disabled:opacity-50">Save draft</button>
                 <button type="button" disabled={saving} onClick={(e) => handleSaveLab(e, true)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors disabled:opacity-50">
                   {editingLabId ? 'Save & publish' : 'Publish examination'}
                 </button>
@@ -1336,7 +1310,7 @@ export default function LecturerDashboard() {
                   <StatusBadge tone="amber">Handed in after the deadline</StatusBadge>
                 )}
                 {(selectedSubmission.snapshots?.length || 0) > 1 && (
-                  <span className="text-[11px] text-slate-500" title={selectedSubmission.snapshots.map((s: any) => `v${s.version} ${new Date(s.submittedAt).toLocaleString()} ${s.contentHash.slice(0, 12)}`).join('\n')}>
+                  <span className="text-[11px] text-slate-500" title={selectedSubmission.snapshots.map((s: any) => `v${s.version} ${formatDateTime(s.submittedAt)} ${s.contentHash.slice(0, 12)}`).join('\n')}>
                     {selectedSubmission.snapshots.length} versions
                   </span>
                 )}
@@ -1357,7 +1331,7 @@ export default function LecturerDashboard() {
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${inspectorPane === 'sheet' ? 'bg-brand-blue-600 border-brand-blue-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'}`}
                     >
                       <FileText className="w-3.5 h-3.5" />
-                      <span>Answer Sheet</span>
+                      <span>Answer sheet</span>
                     </button>
                   )}
                   <button
@@ -1450,7 +1424,7 @@ export default function LecturerDashboard() {
                       review={{
                         submissionId: selectedSubmission.id,
                         handInLabel: selectedSubmission.snapshots?.[0]
-                          ? `Hand-in v${selectedSubmission.snapshots[0].version}, submitted ${new Date(selectedSubmission.snapshots[0].submittedAt).toLocaleString()}`
+                          ? `Hand-in v${selectedSubmission.snapshots[0].version}, submitted ${formatDateTime(selectedSubmission.snapshots[0].submittedAt)}`
                           : 'Submitted files (recorded before hand-in snapshots existed)',
                       }}
                     />
@@ -1478,7 +1452,7 @@ export default function LecturerDashboard() {
                           <div key={ev.id} className="flex items-center space-x-2 text-[10px] font-mono">
                             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${SEVERITY_DOT_STYLES[ev.severity] || SEVERITY_DOT_STYLES.LOW}`} />
                             <span className="text-slate-700 dark:text-slate-300 flex-1">{ev.label}</span>
-                            <span className="text-slate-500">{new Date(ev.timestamp).toLocaleTimeString()}</span>
+                            <span className="text-slate-500">{formatTime(ev.timestamp)}</span>
                           </div>
                         ))}
                       </div>

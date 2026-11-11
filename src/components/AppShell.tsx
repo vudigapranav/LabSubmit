@@ -156,12 +156,12 @@ export const AppShell: React.FC<AppShellProps> = ({
   const nav = (
     <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
       {contextLabel && (
-        <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">{contextLabel}</p>
+        <p className="px-3 text-[10px] font-bold r text-slate-400 dark:text-slate-500 truncate">{contextLabel}</p>
       )}
       {sections.map((section, i) => (
         <div key={i} className="space-y-1">
           {section.heading && (
-            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{section.heading}</p>
+            <p className="px-3 pb-1 text-[10px] font-bold r text-slate-400 dark:text-slate-500">{section.heading}</p>
           )}
           {section.items.map((item) => {
             const isActive = item.id === active;

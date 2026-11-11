@@ -562,7 +562,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         message: receipt
           ? `Exam submitted at ${latest!.submittedAt.toISOString()} (server time). Reference ${receipt.reference}. Your workspace is now locked.`
-          : 'Exam submitted successfully! Your workspace is now locked.',
+          : 'Exam submitted. Your workspace is now locked.',
         submission: toStudentSubmission(sub, lab.resultsReleasedAt),
         receipt,
       });

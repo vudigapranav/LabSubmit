@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { Navbar } from '@/components/Navbar';
-import { Card, StatusBadge } from '@/components/ui';
+import { Card } from '@/components/ui';
+import { LandingPreview } from '@/components/LandingPreview';
 import {
   GraduationCap,
   ArrowRight,
@@ -95,7 +95,6 @@ const CAPABILITIES: { icon: React.ReactNode; title: string; body: string }[] = [
 export default function Home() {
   const router = useRouter();
   const { user, loading } = useApp();
-  const [logoError, setLogoError] = useState(false);
 
   // Signed-in visitors go straight to their workspace — unchanged behaviour.
   useEffect(() => {
@@ -134,152 +133,136 @@ export default function Home() {
 
       <main className="flex-1">
         {/* ------------------------------------------------------------- Hero */}
-        <section className="px-4 sm:px-6 lg:px-8 pt-12 sm:pt-20 pb-12 sm:pb-16">
-          <div className="max-w-3xl mx-auto text-center space-y-6 animate-slide-up">
-            <div className="flex justify-center">
-              {!logoError ? (
-                <Image
-                  src="/cbit-logo.png"
-                  alt="Chaitanya Bharathi Institute of Technology"
-                  width={64}
-                  height={64}
-                  className="object-contain w-auto h-14 sm:h-16"
-                  onError={() => setLogoError(true)}
-                  priority
-                />
-              ) : (
-                <div className="w-14 h-14 rounded-card bg-brand-olive-700 text-white flex items-center justify-center font-bold text-lg">
-                  CBIT
-                </div>
-              )}
+        {/* An asymmetric split rather than a centred stack: the argument of the page is
+            that a lab exam is a record AND code, so the product view has to be visible in
+            the first screen, not described above the fold and shown below it. */}
+        <section className="px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 lg:pt-20 pb-14 sm:pb-20">
+          <div className="max-w-6xl mx-auto grid lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] gap-10 lg:gap-14 items-center">
+            <div className="space-y-6">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Chaitanya Bharathi Institute of Technology
+              </p>
+
+              {/* Says what it does for whom. The product name is the wordmark in the bar
+                  above; it does not need to be the headline as well. */}
+              <h1 className="text-[40px] sm:text-5xl lg:text-[56px] leading-[1.05] font-medium tracking-tight text-slate-900 dark:text-white text-balance">
+                Run the whole lab exam, not just the code
+              </h1>
+
+              <p className="text-lg leading-relaxed text-slate-600 dark:text-slate-300 max-w-[36rem]">
+                LabSubmit is a digital laboratory examination platform. The written record, the
+                compiler, the invigilation and the marking sit in one place, instead of on paper
+                beside a terminal.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                <Link href="/login" className={primaryCta}>
+                  Sign in
+                  <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                </Link>
+                <Link href="/register" className={secondaryCta}>
+                  <GraduationCap className="w-4 h-4" aria-hidden="true" />
+                  Student registration
+                </Link>
+              </div>
+
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Students register with an institute roll number authorised by the administrator
+              </p>
             </div>
 
-            <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
-              Chaitanya Bharathi Institute of Technology
-            </p>
-
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-              LabSubmit
-            </h1>
-
-            {/* States what the product is, and why it is useful, in one breath. */}
-            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl mx-auto">
-              A digital laboratory examination and evaluation platform. Run an invigilated lab exam end to end —
-              the written record, the code, the execution and the marking — in one place, instead of on paper
-              and a compiler.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <Link href="/login" className={`${primaryCta} w-full sm:w-auto`}>
-                Sign in to LabSubmit
-                <ArrowRight className="w-4 h-4" aria-hidden="true" />
-              </Link>
-              <Link href="/register" className={`${secondaryCta} w-full sm:w-auto`}>
-                <GraduationCap className="w-4 h-4" aria-hidden="true" />
-                Student registration
-              </Link>
-            </div>
-
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-1">
-              Students register with an institute roll number authorised by the administrator.
-            </p>
+            <LandingPreview />
           </div>
         </section>
 
-        {/* --------------------------------------------- What LabSubmit does */}
-        <section aria-labelledby="what-heading" className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16 border-t border-slate-200 dark:border-slate-800">
-          <div className="max-w-5xl mx-auto">
-            <div className="max-w-2xl space-y-3">
-              <StatusBadge tone="olive">What it is</StatusBadge>
-              <h2 id="what-heading" className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        {/* ------------------------- What it is, and the sequence it runs in */}
+        {/* The thesis and the pipeline were two sections of near-identical cards saying
+            overlapping things. They are one section now: the argument on the left, the
+            nine steps as a dense ordered list on the right. Numbers earn their place here
+            because this really is a sequence — step 4 cannot happen before step 3. */}
+        <section aria-labelledby="what-heading" className="px-4 sm:px-6 lg:px-8 py-16 sm:py-20 border-t border-slate-200 dark:border-slate-800">
+          <div className="max-w-6xl mx-auto grid lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] gap-10 lg:gap-16">
+            <div className="space-y-4">
+              <h2 id="what-heading" className="text-3xl font-medium tracking-tight text-slate-900 dark:text-white text-balance">
                 An examination platform, not an online editor
               </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                A programming lab exam is more than the code. It is a structured record — an aim, an algorithm, the
-                program, the input it was given, the output it produced, a conclusion — sat under invigilation and
-                marked by a human. LabSubmit runs that whole examination. The editor is one part of it.
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                A programming lab exam is more than the code. It is a structured record — an aim,
+                an algorithm, the program, the input it was given, the output it produced, a
+                conclusion — sat under invigilation and marked by a human. LabSubmit runs that
+                whole examination. The editor is one part of it.
               </p>
+              <dl className="pt-2 space-y-3 text-sm">
+                <div>
+                  <dt className="text-slate-900 dark:text-white">Lecturers configure</dt>
+                  <dd className="text-slate-600 dark:text-slate-400">The answer sheet, the question sets, the schedule and the integrity rules, per examination.</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-900 dark:text-white">Students record</dt>
+                  <dd className="text-slate-600 dark:text-slate-400">The lab record book, rendered exactly as the lecturer configured it, beside a real terminal.</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-900 dark:text-white">Evaluators mark</dt>
+                  <dd className="text-slate-600 dark:text-slate-400">Record, code and integrity signals reviewed together, then results released.</dd>
+                </div>
+              </dl>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-              {[
-                { icon: <Settings2 className="w-5 h-5" />, title: 'Lecturers configure', body: 'The format of the answer sheet, the question sets, the schedule and the integrity rules are all set per examination.' },
-                { icon: <PenLine className="w-5 h-5" />, title: 'Students record', body: 'The digital equivalent of the lab record book, rendered exactly as the lecturer configured it, alongside a real terminal.' },
-                { icon: <Award className="w-5 h-5" />, title: 'Evaluators mark', body: 'The complete submission — record, code and integrity signals — reviewed in one place, then marks published.' },
-              ].map((c) => (
-                <Card key={c.title} className="p-5 space-y-2.5">
-                  <span className="inline-flex w-9 h-9 rounded-control bg-brand-olive-50 dark:bg-brand-olive-900/30 text-brand-olive-700 dark:text-brand-olive-400 items-center justify-center">
-                    {c.icon}
-                  </span>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">{c.title}</h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{c.body}</p>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ------------------------------------------------------ The workflow */}
-        <section aria-labelledby="flow-heading" className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16 border-t border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-surface-darkCard/30">
-          <div className="max-w-5xl mx-auto">
-            <div className="max-w-2xl space-y-3">
-              <StatusBadge tone="blue">The workflow</StatusBadge>
-              <h2 id="flow-heading" className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                One examination, end to end
-              </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                Every examination follows the same pipeline. Each step is part of a single flow rather than a
-                separate tool.
-              </p>
-            </div>
-
-            {/* An ordered list is the honest markup for a sequence, and reads correctly to a
-                screen reader as "1 of 9". */}
-            <ol className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {WORKFLOW.map((step, i) => (
-                <li key={step.label}>
-                  <Card className="p-4 h-full flex gap-3">
-                    <span
-                      aria-hidden="true"
-                      className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[11px] font-bold flex items-center justify-center tabular"
-                    >
-                      {i + 1}
+            <div>
+              <h3 className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+                Every examination follows the same nine steps
+              </h3>
+              <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-0">
+                {WORKFLOW.map((step, i) => (
+                  <li
+                    key={step.label}
+                    className="flex gap-4 py-3 border-b border-slate-200/70 dark:border-slate-800/70"
+                  >
+                    <span aria-hidden="true" className="font-mono text-xs text-slate-400 dark:text-slate-600 tabular pt-0.5">
+                      {String(i + 1).padStart(2, '0')}
                     </span>
-                    <div className="min-w-0 space-y-0.5">
-                      <h3 className="text-xs font-bold text-slate-900 dark:text-white">{step.label}</h3>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">{step.detail}</p>
+                    <div className="min-w-0">
+                      <h4 className="text-sm text-slate-900 dark:text-white">{step.label}</h4>
+                      <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{step.detail}</p>
                     </div>
-                  </Card>
-                </li>
-              ))}
-            </ol>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         </section>
 
         {/* ---------------------------------------------------- Capabilities */}
-        <section aria-labelledby="caps-heading" className="px-4 sm:px-6 lg:px-8 py-12 sm:py-16 border-t border-slate-200 dark:border-slate-800">
-          <div className="max-w-5xl mx-auto">
+        {/* Nine bordered cards in a grid read as a template and made every capability look
+            equally weighted. The same nine, kept in full, as a two-column list separated by
+            hairlines: denser, faster to scan, and the content is unchanged. */}
+        <section aria-labelledby="caps-heading" className="px-4 sm:px-6 lg:px-8 py-16 sm:py-20 border-t border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-surface-darkCard/30">
+          <div className="max-w-6xl mx-auto">
             <div className="max-w-2xl space-y-3">
-              <StatusBadge tone="neutral">Capabilities</StatusBadge>
-              <h2 id="caps-heading" className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+              <h2 id="caps-heading" className="text-3xl font-medium tracking-tight text-slate-900 dark:text-white">
                 What the platform does today
               </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                 Everything listed here is implemented and in use — not a roadmap.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
+            <dl className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-10">
               {CAPABILITIES.map((c) => (
-                <Card key={c.title} className="p-5 space-y-2.5">
-                  <span className="inline-flex w-9 h-9 rounded-control bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 items-center justify-center">
+                <div
+                  key={c.title}
+                  className="flex gap-4 py-5 border-b border-slate-200/70 dark:border-slate-800/70"
+                >
+                  <span className="flex-shrink-0 text-slate-400 dark:text-slate-500 pt-0.5" aria-hidden="true">
                     {c.icon}
                   </span>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">{c.title}</h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{c.body}</p>
-                </Card>
+                  <div className="min-w-0">
+                    <dt className="text-sm text-slate-900 dark:text-white">{c.title}</dt>
+                    <dd className="text-xs leading-relaxed text-slate-500 dark:text-slate-400 mt-1">{c.body}</dd>
+                  </div>
+                </div>
               ))}
-            </div>
+            </dl>
           </div>
         </section>
 

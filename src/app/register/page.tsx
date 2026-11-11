@@ -126,7 +126,7 @@ export default function RegisterPage() {
               <div className="flex items-center space-x-3 text-emerald-800 dark:text-emerald-200">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500 flex-shrink-0" />
                 <div>
-                  <h3 className="font-bold text-sm">Registration Successful!</h3>
+                  <h3 className="font-bold text-sm">Account created</h3>
                   <p className="text-xs text-emerald-600 dark:text-emerald-400">
                     Your account has been created and verified.
                   </p>
@@ -135,7 +135,7 @@ export default function RegisterPage() {
 
               <div className="bg-white dark:bg-slate-900 p-4 rounded-control border border-emerald-100 dark:border-emerald-900/50 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500 dark:text-slate-400 font-medium">Academic Year:</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Academic year</span>
                   <span className="font-bold text-slate-900 dark:text-white">Year {registrationSuccess.year}</span>
                 </div>
                 <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-2">
@@ -152,7 +152,7 @@ export default function RegisterPage() {
 
               <button
                 onClick={handleProceedToDashboard}
-                className="w-full py-3 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 text-white font-bold text-xs shadow-cardHover transition-all flex items-center justify-center space-x-2"
+                className="w-full py-3 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 text-white font-bold text-xs shadow-cardHover transition-colors flex items-center justify-center space-x-2"
               >
                 <span>Proceed to Student Dashboard</span>
                 <ArrowRight className="w-4 h-4" />
@@ -175,7 +175,7 @@ export default function RegisterPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="Full Name"
+                    placeholder="Full name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     autoComplete="off"
@@ -254,7 +254,7 @@ export default function RegisterPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-2 py-3 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 disabled:opacity-50 text-white font-semibold text-sm transition-all shadow-cardHover flex items-center justify-center space-x-2"
+                  className="w-full mt-2 py-3 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 disabled:opacity-50 text-white font-semibold text-sm transition-colors shadow-cardHover flex items-center justify-center space-x-2"
                 >
                   <span>{loading ? 'Detecting Branch & Registering...' : 'Complete Student Registration'}</span>
                   <ArrowRight className="w-4 h-4" />

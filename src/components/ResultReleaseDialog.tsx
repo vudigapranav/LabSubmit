@@ -100,7 +100,7 @@ export const ResultReleaseDialog: React.FC<Props> = ({
               You can no longer treat these marks as private after release.
             </Alert>
             <div className="rounded-card border border-slate-200 dark:border-slate-800 p-4 space-y-3">
-              <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+              <h4 className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-400">
                 <ShieldAlert className="w-3.5 h-3.5" aria-hidden="true" />
                 Releasing results will
               </h4>

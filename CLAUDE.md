@@ -295,6 +295,34 @@ Two props carry real decisions rather than styling:
   themed primitive would put a light panel in the middle of a dark, deliberately focused
   examination.
 
+### Interface writing and labels
+
+- **Sentence case everywhere.** Labels, buttons, table headers, badges and section
+  headings. No `NAVIGATION`-style capitals with wide tracking: tracked capitals read more
+  slowly than sentence case and small text should never carry extra tracking to compensate
+  for being shouted. `StatusBadge` sentence-cases raw enum values itself
+  (`NEEDS_CORRECTION` renders as "Needs correction"), so call sites pass the enum through
+  unchanged — but identifiers carrying a digit, such as the subject code `CS202L`, are left
+  exactly as they are.
+- **No greeting headlines.** A page title names the context — "My examinations", not
+  "Welcome, Rahul".
+- **One date format**, from `src/lib/formatDateTime.ts`: `12 Nov 2026`, `14:30`,
+  `12 Nov 2026, 14:30`. Day-month order with a short month name, because `11/12/2026` means
+  two different days in two different places, and an examination is scheduled to the minute
+  rather than the second. Never call `toLocaleString()` in a component.
+- **No exclamation marks** in interface text, and no trailing periods on labels, buttons or
+  short strings.
+
+### Stat cards and colour in data
+
+- A stat card is a label, a figure and what it compares to. It takes **no icon and no
+  sparkline**: both are decoration on a figure that should read on its own, and a row of
+  cards each carrying a differently coloured icon is a row where nothing leads.
+- **One accent per screen.** `StatCard`'s `accent` marks the single figure that matters —
+  an examination running right now, an overdue count. Everything else is primary text.
+  Colour in the chrome means something or it is noise.
+- Meta icons take the colour of the text they label, never their own.
+
 ### Accessibility expectations
 
 Semantic HTML (`nav`, `header`, `main`, `table`, real `button`s); every input has a label;

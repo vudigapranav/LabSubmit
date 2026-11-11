@@ -122,7 +122,7 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange, sta
   return (
     <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <label className="text-xs font-semibold text-slate-900 dark:text-white block">Answer Sheet Format</label>
+        <label className="text-xs font-semibold text-slate-900 dark:text-white block">Answer sheet Format</label>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-slate-500">
             {enabledCount} section{enabledCount === 1 ? '' : 's'} enabled
@@ -186,7 +186,7 @@ export const AnswerSheetConfigurator: React.FC<Props> = ({ drafts, onChange, sta
                 className="flex-1 min-w-[8rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-900 dark:text-white disabled:opacity-50"
               />
 
-              <span className="text-[9px] font-mono uppercase tracking-wide text-slate-400 w-16 text-center">
+              <span className="text-[9px] font-mono text-slate-400 w-16 text-center">
                 {draft.key}
               </span>
 

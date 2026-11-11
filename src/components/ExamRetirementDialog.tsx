@@ -150,7 +150,7 @@ export const ExamRetirementDialog: React.FC<Props> = ({
             </Alert>
 
             <div className="rounded-card border border-slate-200 dark:border-slate-800 p-4 space-y-3">
-              <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+              <h4 className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
                 <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
                 Archiving preserves
               </h4>
@@ -158,7 +158,7 @@ export const ExamRetirementDialog: React.FC<Props> = ({
             </div>
 
             <div className="rounded-card border border-slate-200 dark:border-slate-800 p-4 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+              <h4 className="text-xs font-bold text-amber-700 dark:text-amber-400">
                 Archiving changes
               </h4>
               <PreservationList items={ARCHIVE_EFFECTS} tone="change" />

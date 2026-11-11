@@ -92,12 +92,12 @@ export default function LoginPage() {
                 Chaitanya Bharathi Institute of Technology
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Programming Laboratory Management Portal
+                Digital laboratory examination and evaluation
               </p>
             </div>
           </div>
 
-          {/* 2 Role Tabs: Student Login vs Faculty Login */}
+          {/* 2 Role Tabs: Student vs Faculty */}
           <div className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-control border border-slate-200/60 dark:border-slate-700/50">
             <button
               type="button"
@@ -105,14 +105,14 @@ export default function LoginPage() {
                 setActiveTab('STUDENT');
                 setErrorMsg(null);
               }}
-              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-colors flex items-center justify-center space-x-2 ${
                 activeTab === 'STUDENT'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-card'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <GraduationCap className="w-4 h-4" />
-              <span>Student Login</span>
+              <span>Student</span>
             </button>
 
             <button
@@ -121,14 +121,14 @@ export default function LoginPage() {
                 setActiveTab('FACULTY');
                 setErrorMsg(null);
               }}
-              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center space-x-2 ${
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-colors flex items-center justify-center space-x-2 ${
                 activeTab === 'FACULTY'
                   ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <Shield className="w-4 h-4" />
-              <span>Faculty Login</span>
+              <span>Faculty</span>
             </button>
           </div>
 
@@ -144,7 +144,7 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
             <div>
               <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">
-                {activeTab === 'STUDENT' ? 'Roll Number or Registered Email' : 'Faculty / Staff Email'}
+                {activeTab === 'STUDENT' ? 'Roll number or registered email' : 'Faculty email'}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -187,13 +187,13 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3 rounded-control font-semibold text-sm transition-all shadow-cardHover flex items-center justify-center space-x-2 ${
+              className={`w-full py-3 rounded-control font-semibold text-sm transition-colors shadow-cardHover flex items-center justify-center space-x-2 ${
                 activeTab === 'STUDENT'
                   ? 'bg-brand-olive-700 hover:bg-brand-olive-800 text-white'
                   : 'bg-slate-900 dark:bg-slate-100 hover:opacity-90 text-white dark:text-slate-900'
               } disabled:opacity-50`}
             >
-              <span>{loading ? 'Authenticating...' : activeTab === 'STUDENT' ? 'Sign In as Student' : 'Sign In as Faculty'}</span>
+              <span>{loading ? 'Authenticating...' : activeTab === 'STUDENT' ? 'Sign in' : 'Sign in'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -202,9 +202,9 @@ export default function LoginPage() {
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center space-y-2">
             {activeTab === 'STUDENT' ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                First time student user?{' '}
+                New student?{' '}
                 <Link href="/register" className="text-brand-blue-600 dark:text-brand-blue-400 font-bold hover:underline">
-                  Self Register Account
+                  Create an account
                 </Link>
               </p>
             ) : (

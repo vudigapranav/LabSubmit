@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import { AppShell, ADMIN_NAV } from '@/components/AppShell';
-import { LoadingState, Modal, PageHeader, Toast as UiToast } from '@/components/ui';
+import { Button, LoadingState, Modal, PageHeader, Toast as UiToast } from '@/components/ui';
 import { ProfileModal } from '@/components/ProfileModal';
 import {
   Shield,
@@ -478,7 +478,7 @@ export default function AdminDashboard() {
           description="Academic hierarchy and college system governance."
           actions={
             <div className="flex items-center gap-2 flex-wrap">
-            <button
+            <Button
               onClick={() => {
                 setEditingBranchId(null);
                 setBranchActive(true);
@@ -487,24 +487,26 @@ export default function AdminDashboard() {
                 setRollEnd('');
                 setShowBranchModal(true);
               }}
-              className="px-3.5 py-2 rounded-control bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold hover:opacity-90 transition-all shadow-card flex items-center space-x-1.5"
+              variant={activeTab === 'branches' ? 'primary' : 'outline'}
+              size="sm"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Branch</span>
-            </button>
-            <button
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              New branch
+            </Button>
+            <Button
               onClick={() => {
                 setEditingSubjectId(null);
                 setSubName('');
                 setSubCode('');
                 setShowSubjectModal(true);
               }}
-              className="px-3.5 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-800 text-white text-xs font-semibold transition-all shadow-card flex items-center space-x-1.5"
+              variant={activeTab === 'subjects' ? 'primary' : 'outline'}
+              size="sm"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Subject</span>
-            </button>
-            <button
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              New subject
+            </Button>
+            <Button
               onClick={() => {
                 setEditingLecturerId(null);
                 setLecName('');
@@ -512,11 +514,12 @@ export default function AdminDashboard() {
                 setLecPassword('');
                 setShowAddLecturerModal(true);
               }}
-              className="px-3.5 py-2 rounded-control bg-brand-blue-600 hover:bg-brand-blue-700 text-white text-xs font-semibold transition-all shadow-card flex items-center space-x-1.5"
+              variant={activeTab === 'lecturers' ? 'primary' : 'outline'}
+              size="sm"
             >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Add Faculty</span>
-            </button>
+              <UserPlus className="w-4 h-4" aria-hidden="true" />
+              Add faculty
+            </Button>
             </div>
           }
         />
@@ -526,7 +529,7 @@ export default function AdminDashboard() {
         <div className="lg:hidden flex items-center gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-3 overflow-x-auto">
           <button
             onClick={() => setActiveTab('branches')}
-            className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 ${
+            className={`px-4 py-2 rounded-control text-xs font-semibold transition-colors flex items-center space-x-2 ${
               activeTab === 'branches' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -536,7 +539,7 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('subjects')}
-            className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 ${
+            className={`px-4 py-2 rounded-control text-xs font-semibold transition-colors flex items-center space-x-2 ${
               activeTab === 'subjects' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -546,7 +549,7 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('lecturers')}
-            className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 ${
+            className={`px-4 py-2 rounded-control text-xs font-semibold transition-colors flex items-center space-x-2 ${
               activeTab === 'lecturers' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -556,17 +559,17 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => setActiveTab('students')}
-            className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 ${
+            className={`px-4 py-2 rounded-control text-xs font-semibold transition-colors flex items-center space-x-2 ${
               activeTab === 'students' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <GraduationCap className="w-3.5 h-3.5" />
-            <span>Student Management</span>
+            <span>Students</span>
           </button>
 
           <button
             onClick={() => setActiveTab('labs')}
-            className={`px-4 py-2 rounded-control text-xs font-semibold transition-all flex items-center space-x-2 ${
+            className={`px-4 py-2 rounded-control text-xs font-semibold transition-colors flex items-center space-x-2 ${
               activeTab === 'labs' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-card' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -661,7 +664,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-control text-xs text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/50">
-                  <div className="font-semibold text-slate-500 text-[10px] uppercase">Assigned Lecturer:</div>
+                  <div className="text-xs text-slate-500">Assigned lecturer</div>
                   <div className="font-bold text-slate-900 dark:text-white text-xs mt-0.5">
                     {sub.lecturer ? `${sub.lecturer.name} (${sub.lecturer.email})` : '⚠️ Unassigned'}
                   </div>
@@ -678,11 +681,11 @@ export default function AdminDashboard() {
               <table className="w-full min-w-[640px] text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Faculty Member</th>
-                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</th>
-                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</th>
-                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Assigned Subjects</th>
-                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Actions</th>
+                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Faculty member</th>
+                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Email</th>
+                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Department</th>
+                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Assigned subjects</th>
+                    <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -740,7 +743,7 @@ export default function AdminDashboard() {
                           className="px-2 py-1 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 font-semibold inline-flex items-center space-x-1"
                         >
                           <Key className="w-3 h-3" />
-                          <span>Reset Pass</span>
+                          <span>Reset password</span>
                         </button>
 
                         <button
@@ -771,7 +774,7 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 w-full sm:w-auto">
                 {/* Step 1: Select Academic Year */}
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-500 block mb-1">Academic Year</label>
+                  <label className="text-[11px] font-semibold text-slate-500 block mb-1">Academic year</label>
                   <select
                     value={studentFilterYear}
                     onChange={(e) => setStudentFilterYear(e.target.value)}
@@ -813,7 +816,7 @@ export default function AdminDashboard() {
                 <GraduationCap className="w-10 h-10 text-slate-400 mx-auto" />
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white">Hierarchical Student Filtering</h3>
                 <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Select an <strong>Academic Year</strong> and <strong>Branch</strong> above to load matching enrolled students from the server.
+                  Select an <strong>Academic year</strong> and <strong>Branch</strong> above to load matching enrolled students from the server.
                 </p>
               </div>
             ) : loadingStudents ? (
@@ -834,12 +837,12 @@ export default function AdminDashboard() {
                   <table className="w-full min-w-[640px] text-left text-xs">
                     <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
                       <tr>
-                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Roll Number</th>
-                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Student Name</th>
-                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Email</th>
-                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Branch</th>
-                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Academic Year</th>
-                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 text-right">Actions</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Roll number</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Student name</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Email</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Branch</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">Academic year</th>
+                        <th scope="col" className="px-4 py-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -891,7 +894,7 @@ export default function AdminDashboard() {
                               className="px-2 py-1 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 font-sans font-semibold text-[11px] inline-flex items-center space-x-1"
                             >
                               <Key className="w-3 h-3" />
-                              <span>Reset Pass</span>
+                              <span>Reset password</span>
                             </button>
 
                             <button
@@ -967,12 +970,12 @@ export default function AdminDashboard() {
         >
 
             <div className="space-y-2.5 text-xs bg-slate-50 dark:bg-slate-800/60 p-4 rounded-control border border-slate-200 dark:border-slate-700/60 font-mono">
-              <div className="flex justify-between"><span className="text-slate-500 font-sans">Full Name:</span><strong className="text-slate-900 dark:text-white">{viewingUser.name}</strong></div>
+              <div className="flex justify-between"><span className="text-slate-500 font-sans">Full name</span><strong className="text-slate-900 dark:text-white">{viewingUser.name}</strong></div>
               <div className="flex justify-between"><span className="text-slate-500 font-sans">Email Address:</span><span className="text-slate-800 dark:text-slate-200">{viewingUser.email || 'N/A'}</span></div>
               {viewingUser.type === 'STUDENT' ? (
                 <>
-                  <div className="flex justify-between"><span className="text-slate-500 font-sans">Roll Number:</span><strong className="text-brand-blue-400">{viewingUser.rollNumber}</strong></div>
-                  <div className="flex justify-between"><span className="text-slate-500 font-sans">Academic Year:</span><span>Year {viewingUser.year}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500 font-sans">Roll number</span><strong className="text-brand-blue-400">{viewingUser.rollNumber}</strong></div>
+                  <div className="flex justify-between"><span className="text-slate-500 font-sans">Academic year</span><span>Year {viewingUser.year}</span></div>
                   <div className="flex justify-between"><span className="text-slate-500 font-sans">Auto Branch:</span><strong className="text-emerald-400">{viewingUser.branchName}</strong></div>
                   <div className="flex justify-between"><span className="text-slate-500 font-sans">Submissions:</span><span>{viewingUser.submissionCount || 0}</span></div>
                 </>
@@ -1004,7 +1007,7 @@ export default function AdminDashboard() {
         >
             <form onSubmit={handleSaveEditStudent} className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Full Name</label>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Full name</label>
                 <input type="text" value={editStudentName} onChange={(e) => setEditStudentName(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               </div>
               <div>
@@ -1013,11 +1016,11 @@ export default function AdminDashboard() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Roll Number</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Roll number</label>
                   <input type="text" value={editStudentRoll} onChange={(e) => setEditStudentRoll(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Academic Year</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Academic year</label>
                   <select value={editStudentYear} onChange={(e) => setEditStudentYear(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors">
                     <option value="1">1st Year</option>
                     <option value="2">2nd Year</option>
@@ -1035,7 +1038,7 @@ export default function AdminDashboard() {
 
               <div className="flex justify-end space-x-2 pt-2">
                 <button type="button" onClick={() => setShowEditStudentModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
-                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors">Save Changes</button>
+                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors">Save changes</button>
               </div>
             </form>
         </Modal>
@@ -1077,11 +1080,11 @@ export default function AdminDashboard() {
         >
             <form onSubmit={handleSaveBranch} className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Branch Name (e.g. CSE-1, CSE-2)</label>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Branch name (e.g. CSE-1, CSE-2)</label>
                 <input type="text" value={branchName} onChange={(e) => setBranchName(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Academic Year</label>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Academic year</label>
                 <select value={branchYear} onChange={(e) => setBranchYear(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors">
                   <option value="1">1st Year</option>
                   <option value="2">2nd Year</option>
@@ -1091,11 +1094,11 @@ export default function AdminDashboard() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Roll Start</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">First roll number</label>
                   <input type="text" placeholder="160125733001" value={rollStart} onChange={(e) => setRollStart(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Roll End</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Last roll number</label>
                   <input type="text" placeholder="160125733060" value={rollEnd} onChange={(e) => setRollEnd(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
                 </div>
               </div>
@@ -1108,7 +1111,7 @@ export default function AdminDashboard() {
               </label>
               <div className="flex justify-end space-x-2 pt-2">
                 <button type="button" onClick={() => setShowBranchModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
-                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors">Save Branch</button>
+                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-olive-700 hover:bg-brand-olive-600 text-white text-xs font-semibold shadow-card transition-colors">Save branch</button>
               </div>
             </form>
         </Modal>
@@ -1131,7 +1134,7 @@ export default function AdminDashboard() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Subject Code</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Subject code</label>
                   <input type="text" placeholder="CS202L" value={subCode} onChange={(e) => setSubCode(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors font-mono" />
                 </div>
                 <div>
@@ -1141,7 +1144,7 @@ export default function AdminDashboard() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Academic Year</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Academic year</label>
                   <select value={subYear} onChange={(e) => setSubYear(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors">
                     <option value="1">1st Year</option>
                     <option value="2">2nd Year</option>
@@ -1150,7 +1153,7 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Target Branch</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block mb-1">Target branch</label>
                   <select value={subBranchId} onChange={(e) => setSubBranchId(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors">
                     {branches.map((b) => <option key={b.id} value={b.id}>{b.name} (Yr {b.year})</option>)}
                   </select>
@@ -1165,7 +1168,7 @@ export default function AdminDashboard() {
               </div>
               <div className="flex justify-end space-x-2 pt-2">
                 <button type="button" onClick={() => setShowSubjectModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
-                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-blue-600 hover:bg-brand-blue-500 text-white text-xs font-semibold shadow-card transition-colors">Save Subject</button>
+                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-blue-600 hover:bg-brand-blue-500 text-white text-xs font-semibold shadow-card transition-colors">Save subject</button>
               </div>
             </form>
         </Modal>
@@ -1190,7 +1193,7 @@ export default function AdminDashboard() {
               <input type="text" placeholder="Department (e.g. CSE)" value={lecDepartment} onChange={(e) => setLecDepartment(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-control px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 transition-colors" />
               <div className="flex justify-end space-x-2 pt-2">
                 <button type="button" onClick={() => setShowAddLecturerModal(false)} className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control border border-slate-300 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors">Cancel</button>
-                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-blue-600 hover:bg-brand-blue-500 text-white text-xs font-semibold shadow-card transition-colors">Save Faculty</button>
+                <button type="submit" className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-control bg-brand-blue-600 hover:bg-brand-blue-500 text-white text-xs font-semibold shadow-card transition-colors">Save faculty</button>
               </div>
             </form>
         </Modal>

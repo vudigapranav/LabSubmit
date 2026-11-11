@@ -117,7 +117,7 @@ Before installing and running the application, ensure the following software too
 | **GCC** | Any recent version | C compiler (`gcc`) | `gcc --version` |
 | **G++** | Any recent version | C++ compiler (`g++`) | `g++ --version` |
 | **Java JDK** | OpenJDK 11+ or 17+ | Java compiler (`javac`) & runtime (`java`) | `javac -version` |
-| **PostgreSQL** *(Optional)* | v14+ or v15+ | Relational database (SQLite used by default for zero setup) | `psql --version` |
+| **PostgreSQL** | v14+ or v15+ | Relational database — **required**; the project is PostgreSQL-only | `psql --version` |
 | **Docker** *(Optional)* | v20+ | Containerized production deployment | `docker --version` |
 
 ---
@@ -164,7 +164,7 @@ PORT=3000
 The platform uses Prisma ORM. Follow these steps to synchronize the database schema and initialize the System Administrator account.
 
 ### Step 1: Push Database Schema
-Synchronize the Prisma DSL schema with the database file:
+Synchronize the Prisma schema with your PostgreSQL database (this project keeps no `prisma/migrations/` directory — schema changes are applied with `db push`):
 ```bash
 npx prisma db push
 ```
@@ -176,17 +176,25 @@ npx prisma generate
 ```
 
 ### Step 3: Seed Database (Fresh Installation)
-Initialize the system with the single System Administrator account:
+Populate a development database with sample data:
 ```bash
 npm run db:seed
 ```
 
+> [!WARNING]
+> **`npm run db:seed` deletes everything first.** It clears users, branches, subjects,
+> exams, workspaces, submissions, marks, question sets, answer sheets and the integrity log
+> before inserting the sample data. Run it on a fresh or throwaway development database
+> only — never against one holding real exams or student work.
+
 > [!IMPORTANT]
-> **Initial System Administrator Credentials:**
-> - **Email**: `admin@cbit.in`
-> - **Password**: `admin@123`
+> **System Administrator:** `admin@cbit.in` / `admin@123`
 >
-> The database is initialized cleanly without dummy lecturers or students. Log in as Admin to create lecturers, roll number ranges, and sections.
+> The seed also creates sample lecturers (`ravi@cbit.in`, `lakshmi@cbit.in`,
+> `suresh@cbit.in`), students (roll numbers from `160125733078`), branches, subjects and
+> example exams — all with the password `password123`. These exist so the platform can be
+> explored immediately; delete them before any real use. In production the seed refuses to
+> run unless `SEED_ADMIN_PASSWORD` is set to at least 12 characters.
 
 ---
 
@@ -262,13 +270,20 @@ brew install openjdk
 - On Linux/macOS: Run `lsof -i :3000` and kill the PID with `kill -9 <PID>`.
 - Or specify a different port in `.env`: `PORT=3001` or run `PORT=3001 npm run dev`.
 
-### Issue 2: `PrismaClientKnownRequestError` or SQLite Database Lock
-**Cause**: Database file is corrupted or opened by another process.  
-**Solution**: Reset and re-seed the database:
+### Issue 2: `PrismaClientInitializationError` — can't reach the database server
+**Cause**: PostgreSQL is not running, or `DATABASE_URL` points at the wrong host, port, database or credentials.  
+**Solution**: Confirm the server is up and the URL is right:
 ```bash
-npx prisma db push --force-reset
-npm run db:seed
+pg_isready -h localhost -p 5432        # should report "accepting connections"
+psql "$DATABASE_URL" -c '\conninfo'    # should connect and print the database name
 ```
+If the schema is out of step with `prisma/schema.prisma`, re-apply it:
+```bash
+npx prisma db push
+```
+
+> **`--force-reset` drops every table and deletes all data.** Use it only on a throwaway
+> development database, never on one holding real exams, submissions or marks.
 
 ### Issue 3: `gcc` / `g++` / `javac` is not recognized as an internal or external command
 **Cause**: C, C++, or Java compilers are not installed or not in your system's PATH.  

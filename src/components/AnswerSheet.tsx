@@ -170,11 +170,11 @@ export const AnswerSheet: React.FC<AnswerSheetProps> = ({
                 <span className="text-slate-500 font-mono">{index + 1}.</span>
                 <span>{section.label}</span>
                 {section.required ? (
-                  <span className="text-[9px] font-bold uppercase tracking-wide text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded px-1.5 py-0.5">
+                  <span className="text-[9px] font-bold text-rose-300 bg-rose-950/40 border border-rose-800/60 rounded px-1.5 py-0.5">
                     Required
                   </span>
                 ) : (
-                  <span className="text-[9px] font-bold uppercase tracking-wide text-slate-500 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5">
+                  <span className="text-[9px] font-bold text-slate-500 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5">
                     Optional
                   </span>
                 )}

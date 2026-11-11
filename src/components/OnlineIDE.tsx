@@ -549,7 +549,7 @@ export const OnlineIDE: React.FC<OnlineIDEProps> = ({
           {/* File Explorer Sidebar */}
           <div className="w-52 bg-slate-900 border-r border-slate-800 flex flex-col">
             <div className="p-3 border-b border-slate-800 flex items-center justify-between">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Files</span>
+              <span className="text-[11px] font-medium r text-slate-400">Files</span>
               {!readOnly && !workspaceSubmitted && (
                 <button
                   onClick={() => {

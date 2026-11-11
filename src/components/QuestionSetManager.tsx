@@ -505,7 +505,7 @@ export const QuestionSetManager: React.FC<Props> = ({ labId, labTitle, token, on
                   <table className="w-full min-w-[640px] text-left text-xs">
                     <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                       <tr>
-                        <th className="p-3">Roll Number</th>
+                        <th className="p-3">Roll number</th>
                         <th className="p-3">Student</th>
                         <th className="p-3">Assigned Set</th>
                         <th className="p-3">Started</th>

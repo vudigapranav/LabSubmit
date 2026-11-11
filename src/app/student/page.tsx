@@ -36,6 +36,7 @@ import {
   Hourglass,
   PlayCircle,
 } from 'lucide-react';
+import { formatDate } from '@/lib/formatDateTime';
 
 const LANGUAGE_LABELS: Record<string, string> = {
   c: 'C',
@@ -152,24 +153,24 @@ export default function StudentDashboard() {
 
           <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
             <div className="flex items-center gap-1.5 min-w-0">
-              <UserIcon className="w-3 h-3 text-brand-blue-500 flex-shrink-0" aria-hidden="true" />
+              <UserIcon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" aria-hidden="true" />
               <dt className="sr-only">Faculty</dt>
               <dd className="truncate">{lab.facultyName}</dd>
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
-              <Calendar className="w-3 h-3 text-brand-olive-600 flex-shrink-0" aria-hidden="true" />
+              <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" aria-hidden="true" />
               <dt className="sr-only">Date</dt>
               <dd className="truncate">
-                {lab.examDate ? new Date(lab.examDate).toLocaleDateString() : lab.startTime ? new Date(lab.startTime).toLocaleDateString() : 'To be announced'}
+                {lab.examDate ? formatDate(lab.examDate) : lab.startTime ? formatDate(lab.startTime) : 'To be announced'}
               </dd>
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
-              <Timer className="w-3 h-3 text-amber-500 flex-shrink-0" aria-hidden="true" />
+              <Timer className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" aria-hidden="true" />
               <dt className="sr-only">Duration</dt>
               <dd className="truncate">{lab.durationMinutes ? `${lab.durationMinutes} min` : 'No limit'}</dd>
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
-              <Code2 className="w-3 h-3 text-brand-blue-500 flex-shrink-0" aria-hidden="true" />
+              <Code2 className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" aria-hidden="true" />
               <dt className="sr-only">Languages</dt>
               <dd className="truncate">{languages || 'Any'}</dd>
             </div>
@@ -178,7 +179,7 @@ export default function StudentDashboard() {
 
         <div className="pt-3 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center justify-between gap-2">
           {lab.marks !== null ? (
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular">
+            <span className="text-sm font-medium text-slate-900 dark:text-white tabular">
               {lab.marks}/{lab.maxMarks}
             </span>
           ) : lab.isSubmitted && !lab.resultsReleased ? (
@@ -248,7 +249,7 @@ export default function StudentDashboard() {
         onOpenProfile={() => setProfileOpen(true)}
       >
         <PageHeader
-          title={`Welcome, ${user.name.split(' ')[0]}`}
+          title="My examinations"
           description="Your laboratory examinations, submissions and results."
           meta={
             <>
@@ -261,10 +262,12 @@ export default function StudentDashboard() {
 
         {/* Compact statistics: what a student most wants to know at a glance. */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard label="Active now" value={runningExams.length} tone={runningExams.length > 0 ? 'olive' : 'neutral'} icon={<PlayCircle className="w-4 h-4" />} hint={runningExams.length > 0 ? 'Open for you' : 'Nothing open'} />
-          <StatCard label="Upcoming" value={upcomingExams.length} icon={<Hourglass className="w-4 h-4" />} hint="Scheduled" />
-          <StatCard label="Submitted" value={submittedCount} tone="blue" icon={<CheckCircle className="w-4 h-4" />} hint="Across all subjects" />
-          <StatCard label="Average" value={averageScore !== null ? `${averageScore}%` : '—'} tone={averageScore !== null ? 'emerald' : 'neutral'} icon={<Award className="w-4 h-4" />} hint={publishedGrades.length > 0 ? `${publishedGrades.length} published` : 'Awaiting results'} />
+          {/* One accent on the row: an examination open right now is the only figure that
+              asks the student to act. The rest are context and stay in primary text. */}
+          <StatCard label="Open now" value={runningExams.length} accent={runningExams.length > 0} hint={runningExams.length > 0 ? 'You can start' : 'Nothing open'} />
+          <StatCard label="Scheduled" value={upcomingExams.length} hint="Still to come" />
+          <StatCard label="Submitted" value={submittedCount} hint="Across all subjects" />
+          <StatCard label="Average" value={averageScore !== null ? `${averageScore}%` : '—'} hint={publishedGrades.length > 0 ? `Across ${publishedGrades.length} released result${publishedGrades.length === 1 ? '' : 's'}` : 'Awaiting released results'} />
         </div>
 
         {/* Section heading mirrors the sidebar selection, so the page always says where you are. */}
@@ -288,7 +291,7 @@ export default function StudentDashboard() {
                 {awaitingRelease.length > 0 && (
                   <Card className="p-4 space-y-3">
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                      <Clock className="w-4 h-4 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                       <h3 className="font-bold text-sm text-slate-900 dark:text-white">
                         {RESULTS_WITHHELD_MESSAGE}
                       </h3>
@@ -323,10 +326,10 @@ export default function StudentDashboard() {
                         <StatusBadge tone={EXAM_STATUS_TONE[g.status] || 'neutral'}>{g.status}</StatusBadge>
                       </div>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular">
+                        <span className="text-lg font-medium text-slate-900 dark:text-white tabular">
                           {g.marks !== null ? `${g.marks}/${g.maxMarks}` : 'Ungraded'}
                         </span>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400">{new Date(g.submittedAt).toLocaleDateString()}</span>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">{formatDate(g.submittedAt)}</span>
                       </div>
                       <SectionBreakdown sections={g.sections} />
                       {g.remarks && (
@@ -352,11 +355,11 @@ export default function StudentDashboard() {
                         <React.Fragment key={g.id}>
                         <Tr>
                           <Td className="font-semibold text-slate-900 dark:text-white">{g.labTitle}</Td>
-                          <Td className="text-slate-500 tabular">{new Date(g.submittedAt).toLocaleDateString()}</Td>
+                          <Td className="text-slate-500 tabular">{formatDate(g.submittedAt)}</Td>
                           <Td>
                             <StatusBadge tone={EXAM_STATUS_TONE[g.status] || 'neutral'}>{g.status}</StatusBadge>
                           </Td>
-                          <Td className="text-right font-bold text-emerald-600 dark:text-emerald-400 tabular">
+                          <Td className="text-right font-medium text-slate-900 dark:text-white tabular">
                             {g.marks !== null ? `${g.marks}/${g.maxMarks}` : '—'}
                           </Td>
                           <Td className="text-slate-500 max-w-xs truncate">{g.remarks || '—'}</Td>

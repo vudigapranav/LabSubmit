@@ -490,6 +490,51 @@ Each item was reproduced as a live attack before the fix and is covered by `npm 
 compilers (`tests/`). 113 tests at last run: 113/113 in production mode (109 + 4 production-only
 skips in dev). Browser checks (playwright-core in the session scratchpad, not committed): 73/73.
 
+### UI craft pass (unslop) — *completed this session*
+
+A pass over the whole interface against the unslop checklist. The earlier redesign had
+already removed the worst (no gradients, glows, emoji or hype copy); this fixed what was
+left and gave the landing page a real product view.
+
+**Direction.** Exact, institutional, unhurried. The world is the examination hall and the
+bound lab record book. CBIT olive stays the accent — it is a real institutional brand. The
+app keeps its cool-neutral surfaces deliberately (a lecturer reads them for hours); the
+warmth and richness go into one moment per screen rather than into the chrome.
+
+**What changed**
+- `StatCard` rebuilt: a label, a figure and what it compares to. Decorative icons and the
+  six-colour `tone` prop are gone, replaced by a single `accent` for the one figure that
+  matters. Both dashboards now use it, so they cannot drift apart.
+- `StatusBadge` sentence-cases raw enum values itself, with identifiers such as `CS202L`
+  left alone (unit-tested across nine cases).
+- Uppercase + wide-tracking labels removed across 8 files; remaining Title Case labels and
+  buttons moved to sentence case.
+- `src/lib/formatDateTime.ts` added: one date format everywhere, replacing a mix of
+  `toLocaleString()` ("11/12/2026, 7:24:14 AM") and `toLocaleDateString()` ("11/11/2026").
+- Student dashboard: the greeting headline became "My examinations"; the four meta icons on
+  the exam card, which were blue, green, amber and blue, now take the colour of their text.
+- Lecturer workspace: the dark subject band, which repeated the page title and was the only
+  dark surface on a light page, became a quiet context row; the hand-rolled four-card status
+  strip now uses `StatCard`.
+- Admin: three primary buttons in three different colours became one `Button` primitive,
+  with the accent on whichever section is open.
+- `transition-all` (16 occurrences) replaced with named transitions — it animates layout
+  properties, which stutters on the lab machines this runs on.
+- Landing page: the centred stack became an asymmetric hero with `LandingPreview`, a product
+  view built in code showing the lab record beside a real terminal. The thesis and workflow
+  sections merged into one; the nine capabilities kept in full but moved from nine bordered
+  cards to a dense three-column list.
+
+**Verified.** Typecheck and production build clean. Browser-checked at 1440 and 390 with no
+horizontal overflow, dark-mode contrast scanned with no near-invisible text, and the live
+examination surface confirmed to render and start with no page errors. A story video of the
+pass is in the session scratchpad, not the repository.
+
+**Not changed, deliberately.** The permanently-dark examination surface keeps its own
+treatment, `ExamGuard`'s blocking fullscreen gate stays a non-dismissible barrier, and the
+live indicators that genuinely pulse (a running program, an active violation warning) keep
+their motion.
+
 ## 2. In progress
 
 These have **database schema and, where noted, partial runtime support**, but are not
